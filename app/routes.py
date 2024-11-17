@@ -1,11 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
 import pymysql
 import json
-
-
-from .models import User, TOC_SHOPS
+import os
+import datetime
+from app.models import  TocMessages, TocNotification, TOC_SHOPS
+from sqlalchemy.exc import SQLAlchemyError
+from .models import User, TOC_SHOPS, TocStockOrder
 from . import db
-from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales
+from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form
+from datetime import datetime
 
 main = Blueprint('main', __name__)
 
@@ -29,6 +32,7 @@ def login_post():
     password = request.form.get('password')
     user = User.query.filter_by(username=username).first()
 
+
     if not user or user.password != password:
         flash('User/password invalid')
         return redirect(url_for('main.login'))
@@ -36,6 +40,7 @@ def login_post():
     # Serialize user object
     user_data = {
         'id': user.id,
+        'username' : user.username,
         'first_name': user.first_name,
         'last_name': user.last_name,
         'email': user.email,
@@ -43,6 +48,18 @@ def login_post():
         'role': user.role
     }
     session['user'] = json.dumps(user_data)
+
+    #Save to the session shop data
+    shop = TOC_SHOPS.query.filter_by(blName=user.shop).first()
+    print(f"shop: {shop.store}")
+    shop_data = {
+        'name' : shop.blName,
+        'code' : shop.store,
+        'customer' : shop.customer
+    }
+    session['shop'] = json.dumps(shop_data)
+
+
     return redirect(url_for('main.index'))
 
 @main.route('/welcome/<username>')
@@ -73,6 +90,14 @@ def template():
     conn.close()
     return render_template('pages-blank.html', products=products)
 
+@main.route('/order_stock')
+def order_stock():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    return render_template('order_stock.html', user=user, shop=shop)
+
 
 @main.route('/register', methods=['POST'])
 def register_post():
@@ -100,6 +125,343 @@ def register_post():
 
     flash('User registered successfully')
     return redirect(url_for('main.login'))
+
+
+# @main.route('/get_product_order_template')
+# def get_product_order_template():
+#     user_data = json.loads(session.get('user'))
+#     shop_data = json.loads(session.get('shop'))
+#     print(f"shop_data: {shop_data}")
+#
+#     shop_directory = os.path.join("app/static", shop_data['customer'])
+#     print(f"Check if file exists in {shop_directory}")
+#
+#     if os.path.exists(shop_directory):
+#         print(f"Directory exists: {shop_directory}")
+#         if os.listdir(shop_directory):
+#             file_name = os.listdir(shop_directory)[0]
+#             print(f"Serving file: {file_name}")
+#             return send_from_directory(os.path.join('static', shop_data['customer']), file_name)
+#         else:
+#             print("Directory is empty")
+#     else:
+#         print("Directory does not exist")
+#
+#     return send_from_directory('static', 'products_template.csv')
+
+@main.route('/get_product_order_template', methods=['GET'])
+def get_product_order_template():
+    data = get_stock_order_template()
+    formatted_data = [
+        {
+            "sku": row[0],
+            "product_name": row[1],
+            "stock_count": row[2],
+            "last_stock_qty": row[3],
+            "calc_stock_qty": row[4],
+            "variance": row[5],
+            "variance_rsn": row[6],
+            "stock_recount": row[7],
+            "rejects_qty": row[8],
+            "comments": row[9]
+        }
+        for row in data
+    ]
+    return jsonify(formatted_data)
+
+
+@main.route('/get_product_order_form', methods=['GET'])
+def get_product_order_form():
+    try:
+        # Fetch the shop customer from the session
+        shop = json.loads(session.get('shop'))['customer']  # Assuming 'shop.customer' is stored in the session
+
+        # Query tocStockOrder to check if there is any "New" order for the customer
+        existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
+
+        if not existing_order:
+            # If no "New" order exists, return an empty array with a 200 status
+            return jsonify([]), 200
+
+        # Proceed with fetching the stock order form if an existing order is found
+        data = get_stock_order_form()
+
+        if not data:
+            return jsonify({"message": "Error fetching stock order form data"}), 500
+
+        # Format the data for the client
+        formatted_data = [
+            {
+                "sku": row[0],
+                "product_name": row[1],
+                "stock_count": row[2],
+                "last_stock_qty": row[3],
+                "calc_stock_qty": row[4],
+                "variance": row[5],
+                "variance_rsn": row[6],
+                "stock_recount": row[7],
+                "rejects_qty": row[8],
+                "comments": row[9]
+            }
+            for row in data
+        ]
+
+        return jsonify(formatted_data)
+
+    except Exception as e:
+        print("Error in get_product_order_form:", e)
+        return jsonify({"message": "Internal server error"}), 500
+
+
+
+@main.route('/delete_order', methods=['POST'])
+def delete_order():
+    try:
+        # Parse the request data
+        shop = json.loads(session.get('shop'))['customer']
+
+        # Query the database to find matching orders
+        orders_to_delete = TocStockOrder.query.filter_by(order_status="New", shop_id=shop).all()
+
+        if not orders_to_delete:
+            return jsonify({"message": "No matching orders found to delete."}), 404
+
+        # Delete the records
+        for order in orders_to_delete:
+            db.session.delete(order)
+
+        # Commit the changes to the database
+        db.session.commit()
+
+        return jsonify({"message": "Orders successfully deleted."}), 200
+
+    except Exception as e:
+        # Log the error for debugging
+        print("Error in /delete_order:", e)
+        db.session.rollback()
+        return jsonify({"message": "An error occurred while deleting the order."}), 500
+
+
+
+
+@main.route('/save_csv', methods=['POST'])
+def save_csv():
+    data = request.get_json()
+    csv_data = data['csv_data']
+    shop_data = json.loads(session.get('shop'))
+    shop = shop_data['name']
+    shop_code = shop_data['customer']
+
+    # Create directory if it doesn't exist
+    directory = os.path.join('app/static', shop_code)
+    print(f"save file to directory: {directory}")
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Save CSV file with current store and date as filename
+    date_str = datetime.datetime.now().strftime('%Y-%m-%d')
+    date_str = shop_code+"_"+date_str
+    file_path = os.path.join(directory, f'{date_str}.csv')
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write(csv_data)
+
+    return jsonify({'message': 'CSV saved successfully', 'file_path': file_path})
+
+
+@main.route('/create_message', methods=['POST'])
+def create_message():
+    data = request.get_json()
+
+    new_message = TocMessages(
+        msg_date=data.get('msg_date'),
+        msg_from=data.get('msg_from'),
+        msg_to=data.get('msg_to'),
+        msg_subject=data.get('msg_subject'),
+        msg_body=data.get('msg_body'),
+        msg_status=data.get('msg_status')
+    )
+
+    db.session.add(new_message)
+    db.session.commit()
+
+    return jsonify({'message': 'Message created successfully!', 'msg_id': new_message.msg_id}), 201
+
+@main.route('/create_notification', methods=['POST'])
+def create_notification():
+    data = request.get_json()
+
+    new_notification = TocNotification(
+        not_date=data.get('not_date'),
+        not_address=data.get('not_address'),
+        not_subject=data.get('not_subject'),
+        not_body=data.get('not_body'),
+        not_status=data.get('not_status')
+    )
+
+    db.session.add(new_notification)
+    db.session.commit()
+
+    return jsonify({'message': 'Notification created successfully!', 'not_id': new_notification.not_id}), 201
+
+@main.route('/get_all_notifications', methods=['GET'])
+def get_all_notifications():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    notifications = TocNotification.query.filter_by(not_address=shop_name).all()
+    notifications_list = [
+        {
+            'not_date': notification.not_date,
+            'not_id': notification.not_id,
+            'not_address': notification.not_address,
+            'not_subject': notification.not_subject,
+            'not_body': notification.not_body,
+            'not_status': notification.not_status
+        }
+        for notification in notifications
+    ]
+    return jsonify(notifications_list)
+
+@main.route('/get_unread_notifications', methods=['GET'])
+def get_unread_notifications():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    notifications = TocNotification.query.filter_by(not_address=shop_name, not_status="unread").all()
+    notifications_list = [
+        {
+            'not_date' : notification.not_date,
+            'not_id': notification.not_id,
+            'not_address': notification.not_address,
+            'not_subject': notification.not_subject,
+            'not_body': notification.not_body,
+            'not_status': notification.not_status
+        }
+        for notification in notifications
+    ]
+    return jsonify(notifications_list)
+
+
+@main.route('/get_and_mark_notifications', methods=['GET'])
+def get_and_mark_notifications():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Retrieve unread notifications
+    notifications = TocNotification.query.filter_by(not_address=shop_name, not_status="unread").all()
+
+    # Mark notifications as read
+    for notification in notifications:
+        notification.not_status = "read"
+
+    # Commit the changes to the database
+    db.session.commit()
+
+    # Prepare the list of notifications to return
+    notifications_list = [
+        {
+            'not_date': notification.not_date,
+            'not_id': notification.not_id,
+            'not_address': notification.not_address,
+            'not_subject': notification.not_subject,
+            'not_body': notification.not_body,
+            'not_status': notification.not_status
+        }
+        for notification in notifications
+    ]
+
+    return jsonify(notifications_list)
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# @main.route('/save_order', methods=['POST'])
+# def save_order():
+#     data = request.get_json()
+#
+#     # Extract table data and parameters
+#     table = data.get('table', [])
+#     order_id = data.get('order_id', '')
+#     shop = data.get('shop', '')
+#     user_name = data.get('user_name', '')
+#     date = data.get('date', '')
+#
+#     # Print the received data
+#     print("order_id:", order_id)
+#     print("Shop:", shop)
+#     print("User Name:", user_name)
+#     print("Save Date:", date)
+#     print("Table Data:")
+#     for row in table:
+#         print(row)
+#
+#     return jsonify({"status": "success", "message": "Data received successfully"})
+
+@main.route('/save_order', methods=['POST'])
+def save_order():
+    try:
+        data = request.get_json()
+
+        # Extract table data and parameters
+        table = data.get('table', [])
+        order_id = data.get('order_id', '')
+        shop = data.get('shop', '')
+        user_name = data.get('user_name', '')
+        date = data.get('date', '')
+
+        # Print the received data for debugging
+        print("order_id:", order_id)
+        print("Shop:", shop)
+        print("User Name:", user_name)
+        print("Save Date:", date)
+        print("Table Data:")
+        for row in table:
+            print(row)
+
+        # Check for order_id and delete existing records
+        if order_id:
+            db.session.query(TocStockOrder).filter_by(order_id=order_id).delete()
+
+        # Insert new records into the table
+        for row in table:
+            sku, item_name, count_qty, last_stock_qty, calc_stock_qty, variance_qty, variance_rsn, rejected_qty, order_qty, comments = row
+
+            new_record = TocStockOrder(
+                shop_id=shop,
+                order_open_date=datetime.strptime(date, '%Y%m%d'),
+                sku=sku,
+                order_id=order_id,
+                user=user_name,
+                item_name=item_name,
+                count_qty=float(count_qty) if count_qty else 0,
+                variance_rsn=variance_rsn,
+                rejected_qty=float(rejected_qty) if rejected_qty else 0,
+                order_qty=float(order_qty) if order_qty else 0,
+                comments=comments,
+                order_status="New",
+                order_status_date=datetime.now(),
+                variance_qty=float(variance_qty) if variance_qty else 0
+            )
+            db.session.add(new_record)
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Data saved successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to save data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
 
 
 ######################################    database model ###################################################
@@ -143,6 +505,15 @@ def hourly_sales(timeframe):
     shop_name = user_data['shop']
     data = get_hourly_sales(shop_name, timeframe)
     return jsonify(data)
+
+@main.route('/recent_sales_product/<timeframe>', methods=['GET'])
+def recent_sales_product(timeframe):
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    data = get_recent_product_sales(timeframe, shop_name)
+    return jsonify(data)
+
+
 
 
 

@@ -1,4 +1,7 @@
 from . import db
+from flask_sqlalchemy import SQLAlchemy
+import datetime
+
 
 class User(db.Model):
     __tablename__ = 'toc_users'
@@ -22,3 +25,55 @@ class TOC_SHOPS(db.Model):
     timezone = db.Column(db.String(50))
     store = db.Column(db.String(10))
     customer = db.Column(db.String(10))
+    mt_shop_name = db.Column(db.String(50))
+
+class TocMessages(db.Model):
+    __tablename__ = 'toc_messages'
+
+    msg_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    msg_date = db.Column(db.DateTime)
+    msg_from = db.Column(db.String(45), nullable=True)
+    msg_to = db.Column(db.String(45), nullable=True)
+    msg_subject = db.Column(db.String(100), nullable=True)
+    msg_body = db.Column(db.String(400), nullable=True)
+    msg_status = db.Column(db.String(45), nullable=True)
+
+    def __init__(self, msg_date, msg_from, msg_to, msg_subject, msg_body, msg_status):
+        self.msg_date = msg_date
+        self.msg_from = msg_from
+        self.msg_to = msg_to
+        self.msg_subject = msg_subject
+        self.msg_body = msg_body
+        self.msg_status = msg_status
+
+    def __repr__(self):
+        return f'<TocMessages {self.msg_id}>'
+
+class TocNotification(db.Model):
+    __tablename__ = 'toc_notifications'
+
+    not_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    not_date = db.Column(db.DateTime)
+    not_address = db.Column(db.String(45), nullable=True)
+    not_subject = db.Column(db.String(100), nullable=True)
+    not_body = db.Column(db.String(300), nullable=True)
+    not_status = db.Column(db.String(45), nullable=True)
+
+
+class TocStockOrder(db.Model):
+    __tablename__ = 'toc_stock_order'
+
+    shop_id = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_open_date = db.Column(db.DateTime, primary_key=True, nullable=False)
+    sku = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_id = db.Column(db.String(45), nullable=True)
+    user = db.Column(db.String(45), nullable=True)
+    item_name = db.Column(db.String(100), nullable=True)
+    count_qty = db.Column(db.Float, nullable=True)
+    variance_qty = db.Column(db.Float, nullable=True)
+    variance_rsn = db.Column(db.String(100), nullable=True)
+    rejected_qty = db.Column(db.Float, nullable=True)
+    order_qty = db.Column(db.Float, nullable=True)
+    comments = db.Column(db.String(100), nullable=True)
+    order_status = db.Column(db.String(45), nullable=True)
+    order_status_date = db.Column(db.DateTime, nullable=True)

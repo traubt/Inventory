@@ -25,10 +25,15 @@
   <link href="static/assets/vendor/quill/quill.bubble.css" rel="stylesheet">
   <link href="static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
   <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" type="text/css"/>
 
   <!-- Template Main CSS File -->
   <link href="static/assets/css/style.css" rel="stylesheet">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+
+
 
   <!-- =======================================================
   * Template Name: NiceAdmin
@@ -42,477 +47,8 @@
 <body>
 
   <!-- ======= Header ======= -->
-  <header id="header" class="header fixed-top d-flex align-items-center">
-
-    <div class="d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center">
-        <img src="static/assets/img/logo.png" alt="">
-        <span class="d-none d-lg-block">Taste Of Cannabis</span>
-      </a>
-      <i class="bi bi-list toggle-sidebar-btn"></i>
-    </div><!-- End Logo -->
-
-    <div class="search-bar">
-      <form class="search-form d-flex align-items-center" method="POST" action="#">
-        <input type="text" name="query" placeholder="Search" title="Enter search keyword">
-        <button type="submit" title="Search"><i class="bi bi-search"></i></button>
-      </form>
-    </div><!-- End Search Bar -->
-
-    <div class="last-update d-flex align-items-center ms-3">
-      <form class="form-inline d-flex align-items-center">
-        <label for="last-update" class="me-2">Last Update:</label>
-        <input type="text" id="last-update" class="form-control"  style="width: 300px;">
-      </form>
-    </div><!-- End Last Update -->
-
-    <nav class="header-nav ms-auto">
-      <ul class="d-flex align-items-center">
-
-        <li class="nav-item d-block d-lg-none">
-          <a class="nav-link nav-icon search-bar-toggle " href="#">
-            <i class="bi bi-search"></i>
-          </a>
-        </li><!-- End Search Icon-->
-
-        <li class="nav-item dropdown">
-
-          <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown">
-            <i class="bi bi-bell"></i>
-            <span class="badge bg-primary badge-number">4</span>
-          </a><!-- End Notification Icon -->
-
-          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-            <li class="dropdown-header">
-              You have 4 new notifications
-              <a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="notification-item">
-              <i class="bi bi-exclamation-circle text-warning"></i>
-              <div>
-                <h4>Lorem Ipsum</h4>
-                <p>Quae dolorem earum veritatis oditseno</p>
-                <p>30 min. ago</p>
-              </div>
-            </li>
-
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="notification-item">
-              <i class="bi bi-x-circle text-danger"></i>
-              <div>
-                <h4>Atque rerum nesciunt</h4>
-                <p>Quae dolorem earum veritatis oditseno</p>
-                <p>1 hr. ago</p>
-              </div>
-            </li>
-
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="notification-item">
-              <i class="bi bi-check-circle text-success"></i>
-              <div>
-                <h4>Sit rerum fuga</h4>
-                <p>Quae dolorem earum veritatis oditseno</p>
-                <p>2 hrs. ago</p>
-              </div>
-            </li>
-
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="notification-item">
-              <i class="bi bi-info-circle text-primary"></i>
-              <div>
-                <h4>Dicta reprehenderit</h4>
-                <p>Quae dolorem earum veritatis oditseno</p>
-                <p>4 hrs. ago</p>
-              </div>
-            </li>
-
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-            <li class="dropdown-footer">
-              <a href="#">Show all notifications</a>
-            </li>
-
-          </ul><!-- End Notification Dropdown Items -->
-
-        </li><!-- End Notification Nav -->
-
-        <li class="nav-item dropdown">
-
-          <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown">
-            <i class="bi bi-chat-left-text"></i>
-            <span class="badge bg-success badge-number">3</span>
-          </a><!-- End Messages Icon -->
-
-          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow messages">
-            <li class="dropdown-header">
-              You have 3 new messages
-              <a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="message-item">
-              <a href="#">
-                <img src="static/assets/img/messages-1.jpg" alt="" class="rounded-circle">
-                <div>
-                  <h4>Maria Hudson</h4>
-                  <p>Velit asperiores et ducimus soluta repudiandae labore officia est ut...</p>
-                  <p>4 hrs. ago</p>
-                </div>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="message-item">
-              <a href="#">
-                <img src="static/assets/img/messages-2.jpg" alt="" class="rounded-circle">
-                <div>
-                  <h4>Anna Nelson</h4>
-                  <p>Velit asperiores et ducimus soluta repudiandae labore officia est ut...</p>
-                  <p>6 hrs. ago</p>
-                </div>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="message-item">
-              <a href="#">
-                <img src="static/assets/img/messages-3.jpg" alt="" class="rounded-circle">
-                <div>
-                  <h4>David Muldon</h4>
-                  <p>Velit asperiores et ducimus soluta repudiandae labore officia est ut...</p>
-                  <p>8 hrs. ago</p>
-                </div>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li class="dropdown-footer">
-              <a href="#">Show all messages</a>
-            </li>
-
-          </ul><!-- End Messages Dropdown Items -->
-
-        </li><!-- End Messages Nav -->
-
-        <li class="nav-item dropdown pe-3">
-
-          <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
-            <img src="static/assets/img/profile-img.jpg" alt="Profile" class="rounded-circle">
-            <span class="d-none d-md-block dropdown-toggle ps-2">{{ user.first_name }} {{ user.last_name }}</span>
-          </a><!-- End Profile Iamge Icon -->
-
-          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
-            <li class="dropdown-header">
-              <h6>Kevin Anderson</h6>
-              <span>Web Designer</span>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li>
-              <a class="dropdown-item d-flex align-items-center" href="users-profile.html">
-                <i class="bi bi-person"></i>
-                <span>My Profile</span>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li>
-              <a class="dropdown-item d-flex align-items-center" href="users-profile.html">
-                <i class="bi bi-gear"></i>
-                <span>Account Settings</span>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li>
-              <a class="dropdown-item d-flex align-items-center" href="pages-faq.html">
-                <i class="bi bi-question-circle"></i>
-                <span>Need Help?</span>
-              </a>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            <li>
-              <a class="dropdown-item d-flex align-items-center" href="#">
-                <i class="bi bi-box-arrow-right"></i>
-                <span>Sign Out</span>
-              </a>
-            </li>
-
-          </ul><!-- End Profile Dropdown Items -->
-        </li><!-- End Profile Nav -->
-
-      </ul>
-    </nav><!-- End Icons Navigation -->
-
-  </header><!-- End Header -->
-
-  <!-- ======= Sidebar ======= -->
-  <aside id="sidebar" class="sidebar">
-
-    <ul class="sidebar-nav" id="sidebar-nav">
-
-      <li class="nav-item">
-        <a class="nav-link " href="index.html">
-          <i class="bi bi-grid"></i>
-          <span>Dashboard</span>
-        </a>
-      </li><!-- End Dashboard Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#components-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-menu-button-wide"></i><span>Components</span><i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <ul id="components-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
-            <a href="components-alerts.html">
-              <i class="bi bi-circle"></i><span>Alerts</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-accordion.html">
-              <i class="bi bi-circle"></i><span>Accordion</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-badges.html">
-              <i class="bi bi-circle"></i><span>Badges</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-breadcrumbs.html">
-              <i class="bi bi-circle"></i><span>Breadcrumbs</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-buttons.html">
-              <i class="bi bi-circle"></i><span>Buttons</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-cards.html">
-              <i class="bi bi-circle"></i><span>Cards</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-carousel.html">
-              <i class="bi bi-circle"></i><span>Carousel</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-list-group.html">
-              <i class="bi bi-circle"></i><span>List group</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-modal.html">
-              <i class="bi bi-circle"></i><span>Modal</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-tabs.html">
-              <i class="bi bi-circle"></i><span>Tabs</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-pagination.html">
-              <i class="bi bi-circle"></i><span>Pagination</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-progress.html">
-              <i class="bi bi-circle"></i><span>Progress</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-spinners.html">
-              <i class="bi bi-circle"></i><span>Spinners</span>
-            </a>
-          </li>
-          <li>
-            <a href="components-tooltips.html">
-              <i class="bi bi-circle"></i><span>Tooltips</span>
-            </a>
-          </li>
-        </ul>
-      </li><!-- End Components Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#forms-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-journal-text"></i><span>Forms</span><i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <ul id="forms-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
-            <a href="forms-elements.html">
-              <i class="bi bi-circle"></i><span>Form Elements</span>
-            </a>
-          </li>
-          <li>
-            <a href="forms-layouts.html">
-              <i class="bi bi-circle"></i><span>Form Layouts</span>
-            </a>
-          </li>
-          <li>
-            <a href="forms-editors.html">
-              <i class="bi bi-circle"></i><span>Form Editors</span>
-            </a>
-          </li>
-          <li>
-            <a href="forms-validation.html">
-              <i class="bi bi-circle"></i><span>Form Validation</span>
-            </a>
-          </li>
-        </ul>
-      </li><!-- End Forms Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#tables-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-layout-text-window-reverse"></i><span>Tables</span><i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <ul id="tables-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
-            <a href="tables-general.html">
-              <i class="bi bi-circle"></i><span>General Tables</span>
-            </a>
-          </li>
-          <li>
-            <a href="tables-data.html">
-              <i class="bi bi-circle"></i><span>Data Tables</span>
-            </a>
-          </li>
-        </ul>
-      </li><!-- End Tables Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#charts-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-bar-chart"></i><span>Charts</span><i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <ul id="charts-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
-            <a href="charts-chartjs.html">
-              <i class="bi bi-circle"></i><span>Chart.js</span>
-            </a>
-          </li>
-          <li>
-            <a href="charts-apexcharts.html">
-              <i class="bi bi-circle"></i><span>ApexCharts</span>
-            </a>
-          </li>
-          <li>
-            <a href="charts-echarts.html">
-              <i class="bi bi-circle"></i><span>ECharts</span>
-            </a>
-          </li>
-        </ul>
-      </li><!-- End Charts Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#icons-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-gem"></i><span>Icons</span><i class="bi bi-chevron-down ms-auto"></i>
-        </a>
-        <ul id="icons-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
-            <a href="icons-bootstrap.html">
-              <i class="bi bi-circle"></i><span>Bootstrap Icons</span>
-            </a>
-          </li>
-          <li>
-            <a href="icons-remix.html">
-              <i class="bi bi-circle"></i><span>Remix Icons</span>
-            </a>
-          </li>
-          <li>
-            <a href="icons-boxicons.html">
-              <i class="bi bi-circle"></i><span>Boxicons</span>
-            </a>
-          </li>
-        </ul>
-      </li><!-- End Icons Nav -->
-
-      <li class="nav-heading">Pages</li>
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="users-profile.html">
-          <i class="bi bi-person"></i>
-          <span>Profile</span>
-        </a>
-      </li><!-- End Profile Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="{{ url_for('main.faq') }}">
-          <i class="bi bi-question-circle"></i>
-          <span>F.A.Q</span>
-        </a>
-      </li><!-- End F.A.Q Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="pages-contact.html">
-          <i class="bi bi-envelope"></i>
-          <span>Contact</span>
-        </a>
-      </li><!-- End Contact Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="pages-register.html">
-          <i class="bi bi-card-list"></i>
-          <span>Register</span>
-        </a>
-      </li><!-- End Register Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="pages-login.html">
-          <i class="bi bi-box-arrow-in-right"></i>
-          <span>Login</span>
-        </a>
-      </li><!-- End Login Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="pages-error-404.html">
-          <i class="bi bi-dash-circle"></i>
-          <span>Error 404</span>
-        </a>
-      </li><!-- End Error 404 Page Nav -->
-
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="{{ url_for('main.template') }}">
-          <i class="bi bi-file-earmark"></i>
-          <span>Blank</span>
-        </a>
-      </li><!-- End Blank Page Nav -->
-
-    </ul>
-
-  </aside><!-- End Sidebar-->
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
 
   <main id="main" class="main">
 
@@ -525,6 +61,7 @@
         </ol>
       </nav>
     </div><!-- End Page Title -->
+
 
     <section class="section dashboard">
       <div class="row">
@@ -646,26 +183,15 @@
 
         <!-- Recent Sales -->
         <div class="col-12">
-            <div class="card recent-sales overflow-auto">
-                <div class="card-body">
-                    <h5 class="card-title">Recent Sales</h5>
-                    <table class="table table-borderless datatable recent_sales">
-                        <thead>
-                            <tr>
-                                <th scope="col">Sales Id</th>
-                                <th scope="col">Customer</th>
-                                <th scope="col">Product</th>
-                                <th scope="col">Price</th>
-                                <th scope="col">Date Time</th>
-                                <th scope="col">Shop</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Data will be populated here -->
-                        </tbody>
-                    </table>
+          <div class="card recent-sales overflow-auto">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <h5 class="card-title">Recent Sales</h5>
+                <button class="btn btn-primary" id="refresh_recent_sell">Refresh Data</button>
+
                 </div>
+              <table id="recentSell" style=" margin: 15px; "></table>
             </div>
+
         </div>
 
             <!-- Top Selling -->
@@ -679,65 +205,15 @@
                       <h6>Filter</h6>
                     </li>
 
-                    <li><a class="dropdown-item today" href="#">Today</a></li>
-
-                    <li><a class="dropdown-item month" href="#">This Month</a></li>
-                    <li><a class="dropdown-item year" href="#">This Year</a></li>
+                    <li><a class="dropdown-item today product_sell"  data-value="day" >Today</a></li>
+                    <li><a class="dropdown-item month product_sell" data-value="month" >This Month</a></li>
+                    <li><a class="dropdown-item year  product_sell" data-value = "year" >This Year</a></li>
                   </ul>
                 </div>
 
                 <div class="card-body pb-0">
-                  <h5 class="card-title">Top Selling <span>| Today</span></h5>
-
-                  <table class="table table-borderless">
-                    <thead>
-                      <tr>
-                        <th scope="col">Preview</th>
-                        <th scope="col">Product</th>
-                        <th scope="col">Price</th>
-                        <th scope="col">Sold</th>
-                        <th scope="col">Revenue</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <th scope="row"><a href="#"><img src="static/assets/img/product-1.jpg" alt=""></a></th>
-                        <td><a href="#" class="text-primary fw-bold">Ut inventore ipsa voluptas nulla</a></td>
-                        <td>$64</td>
-                        <td class="fw-bold">124</td>
-                        <td>$5,828</td>
-                      </tr>
-                      <tr>
-                        <th scope="row"><a href="#"><img src="static/assets/img/product-2.jpg" alt=""></a></th>
-                        <td><a href="#" class="text-primary fw-bold">Exercitationem similique doloremque</a></td>
-                        <td>$46</td>
-                        <td class="fw-bold">98</td>
-                        <td>$4,508</td>
-                      </tr>
-                      <tr>
-                        <th scope="row"><a href="#"><img src="static/assets/img/product-3.jpg" alt=""></a></th>
-                        <td><a href="#" class="text-primary fw-bold">Doloribus nisi exercitationem</a></td>
-                        <td>$59</td>
-                        <td class="fw-bold">74</td>
-                        <td>$4,366</td>
-                      </tr>
-                      <tr>
-                        <th scope="row"><a href="#"><img src="static/assets/img/product-4.jpg" alt=""></a></th>
-                        <td><a href="#" class="text-primary fw-bold">Officiis quaerat sint rerum error</a></td>
-                        <td>$32</td>
-                        <td class="fw-bold">63</td>
-                        <td>$2,016</td>
-                      </tr>
-                      <tr>
-                        <th scope="row"><a href="#"><img src="static/assets/img/product-5.jpg" alt=""></a></th>
-                        <td><a href="#" class="text-primary fw-bold">Sit unde debitis delectus repellendus</a></td>
-                        <td>$79</td>
-                        <td class="fw-bold">41</td>
-                        <td>$3,239</td>
-                      </tr>
-                    </tbody>
-                  </table>
-
+                  <h5 class="card-title" id="top_selling">Top Selling <span>| Today</span></h5>
+                  <table id="topSelling"></table>
                 </div>
 
               </div>
@@ -988,52 +464,117 @@
   <script src="static/assets/vendor/tinymce/tinymce.min.js"></script>
   <script src="static/assets/vendor/php-email-form/validate.js"></script>
 
+  <script src="static/assets/js/functions.js"></script>
+
   <!-- Template Main JS File -->
   <script src="static/assets/js/main.js"></script>
 
 <script>
+
+  var _top_selling;
+
   $(document).ready(async function() {
+
+      let fetchInterval;
       // Trigger the click event
        await  $(".today").trigger("click");
        await  $("#daily_chart").trigger("click");
+       await  $("#refresh_recent_sell").trigger("click");
 
-            $('.recent_sales tbody').attr('id', 'sales-table-body');
+       // get notifications
+            async function fetchNotifications() {
+                await fetch('/get_unread_notifications')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Notifications:', data);
+                        $("#new_notifications_counter").text(`${data.length}`);
+                        $("#notification_counter").text(`You have ${data.length} new notifications`);
+                        // populate notifications messages
+                              // Clear existing notification items
+                        $('.notification-item').remove();
 
-            // Fetch and populate the table
-            $('.recent_sales tbody').attr('id', 'sales-table-body');
-
-            // Fetch and populate the table
-            fetch('/recent_sales')
-                .then(response => response.json())
-                .then(data => {
-                    const tableBody = document.getElementById('sales-table-body');
-                    if (tableBody) {
-                        tableBody.innerHTML = ''; // Clear any existing rows
-
-                        data.forEach(row => {
-                            const tableRow = `<tr>
-                                <td>${row[0]}</td>
-                                <td>${row[1]}</td>
-                                <td>${row[2]}</td>
-                                <td>${row[3]}</td>
-                                <td>${row[4]}</td>
-                                <td>${row[5]}</td>
-                            </tr>`;
-                            tableBody.insertAdjacentHTML('beforeend', tableRow);
+                        // Add new notification items
+                        data.forEach(notification => {
+                            const notificationItem = `
+                                <li class="notification-item">
+                                    <i class="bi bi-exclamation-circle text-warning"></i>
+                                    <div>
+                                        <h4>${notification.not_subject}</h4>
+                                        <p>${notification.not_body}</p>
+                                        <p><small>${notification.not_date}</small></p>
+                                    </div>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                            `;
+                            $('.dropdown-footer').before(notificationItem);
                         });
-                    } else {
-                        console.error('Table body element not found.');
-                    }
-                })
-                .catch(error => console.error('Error fetching sales data:', error))
-                .finally(() => console.log('Sales data fetch complete.'));
+                    })
+                    .catch(error => {
+                        console.error('Error fetching notifications:', error);
+                    });
+            }
+
+            // Fetch notifications immediately on page load
+            fetchNotifications();
+
+            // Set interval to fetch notifications every 20 seconds
+            fetchInterval = setInterval(fetchNotifications, 20000);
 
 
-  }); // end document ready
+
+<!--            $('.recent_sales tbody').attr('id', 'sales-table-body');-->
+
+<!--            // Fetch and populate the table-->
+<!--            $('.recent_sales tbody').attr('id', 'sales-table-body');-->
+
+<!--            // Fetch and populate the table-->
+<!--            fetch('/recent_sales')-->
+<!--                .then(response => response.json())-->
+<!--                .then(data => {-->
+<!--                    const tableBody = document.getElementById('sales-table-body');-->
+<!--                    if (tableBody) {-->
+<!--                        tableBody.innerHTML = ''; // Clear any existing rows-->
+
+<!--                        data.forEach(row => {-->
+<!--                            const tableRow = `<tr>-->
+<!--                                <td>${row[0]}</td>-->
+<!--                                <td>${row[1]}</td>-->
+<!--                                <td>${row[2]}</td>-->
+<!--                                <td>${row[3]}</td>-->
+<!--                                <td>${row[4]}</td>-->
+<!--                                <td>${row[5]}</td>-->
+<!--                            </tr>`;-->
+<!--                            tableBody.insertAdjacentHTML('beforeend', tableRow);-->
+<!--                        });-->
+<!--                    } else {-->
+<!--                        console.error('Table body element not found.');-->
+<!--                    }-->
+<!--                })-->
+<!--                .catch(error => console.error('Error fetching sales data:', error))-->
+<!--                .finally(() => console.log('Sales data fetch complete.'));-->
+
+<!--        // Restart the interval when the dropdown is closed-->
+<!--        $('.nav-item.dropdown').on('hidden.bs.dropdown', function () {-->
+<!--            fetchInterval = setInterval(fetchNotifications, 10000); // Restart the interval-->
+<!--        });-->
+
+});  // end ready document
 
 
 
   ///////////////////////  events  /////////////////////////////////
+    $('#confirmBtn').on('click', function() {
+    // Add your custom action code here
+    alert('Confirmed!');
+
+    // Hide the modal after action
+    $('#exampleModal').modal('hide');
+  });
+
+
+
     $(".today").on("click",async function(event) {
       const shop = "{{ user.shop }}";
       const response = await fetch('/sales_summary');
@@ -1121,11 +662,11 @@
       let url = '';
 
       if (timeframe === "hourly") {
-        alert("hourly chart");
+<!--        alert("hourly chart");-->
         $("#line_chart_title").html('Sales Chart <span>| Hourly</span>');
         url = '/hourly_sales/hourly';
       } else if (timeframe === "daily") {
-        alert("daily chart");
+<!--        alert("daily chart");-->
         $("#line_chart_title").html('Sales Chart <span>| Daily</span>');
         url = '/hourly_sales/daily';
       }
@@ -1189,6 +730,179 @@
         console.error('Error fetching data:', error);
       }
   });
+
+ // Recent Sales
+   $("#refresh_recent_sell").on("click", async function(event) {
+    try{
+        // check if datatable exist
+          if ($.fn.DataTable.isDataTable('#recentSell')) {
+            $('#recentSell').DataTable().clear().destroy();
+          }
+fetch('/recent_sales')
+    .then(data => data.json())
+    .then(rows => {
+        //console.log(rows);
+        if (rows.length > 0) {
+            // Convert date strings to Date objects
+            rows.forEach(row => {
+                row[4] = new Date(row[4]); // Assuming the "Selling Date" is the 5th column (index 4)
+            });
+
+            // Initialize DataTable with custom sorting for the "Selling Date" column
+            _top_selling = $('#recentSell').DataTable({
+                data: rows,
+                columns: [
+                    { title: "Sales Id" },
+                    { title: "Customer" },
+                    { title: "Product" },
+                    { title: "Price" },
+                    { title: "Selling Date" },
+                    { title: "Shop" },
+                ],
+                columnDefs: [
+                    {
+                        targets: 4, // Target the "Selling Date" column
+                        render: function (data, type, row) {
+                            if (type === 'display' || type === 'filter') {
+                                return data.toDateString(); // Format the date for display
+                            }
+                            return data;
+                        },
+                        type: 'date' // Specify the column type as date
+                    }
+                ],
+                "autoWidth": true,
+                "order": [[4, 'desc']] // Sort by "Selling Date" in descending order
+            });
+        }
+    });
+    }
+    catch(e){
+        dialog("Error","Can't fetch recent sales "+e,BootstrapDialog.TYPE_INFO);
+    }
+  })
+
+  $("#product_selling_day").on("click", async function(event) {
+    try{
+<!--          alert("product top day selling");-->
+          fetch('/recent_sales_product/day')
+          .then(data => data.json())
+          .then(rows => {
+              //console.log(rows);
+                  if(rows != 0){
+                      _top_selling = $('#topSelling').DataTable({
+                                                      data: rows,
+                                                      columns: [
+                                                          { title: "Product" },
+                                                          { title: "Sold" },
+                                                          { title: "Revenue" },
+                                                      ],
+                                                      order: [[2, 'desc']],
+                                                      "autoWidth": false,
+                                                  });
+                  }
+          });
+    }
+    catch(e){
+        dialog("Error","Can't fetch product infor "+e,BootstrapDialog.TYPE_INFO);
+    }
+  })
+
+
+  $(".product_sell").on("click", function(event) {
+    event.preventDefault(); // Prevent the default link behavior
+    const value = $(this).data("value");
+    $("#top_selling").html(`Top Selling <span>| ${value} </span>`);
+    try{
+    // check if datatable exist
+          if ($.fn.DataTable.isDataTable('#topSelling')) {
+            $('#topSelling').DataTable().clear().destroy();
+          }
+    // populate table
+          fetch(`/recent_sales_product/${value}`)
+          .then(data => data.json())
+          .then(rows => {
+              //console.log(rows);
+                  if(rows != 0){
+                      _top_selling = $('#topSelling').DataTable({
+                                                      data: rows,
+                                                      columns: [
+                                                          { title: "Product" },
+                                                          { title: "Sold" },
+                                                          { title: "Revenue" },
+                                                      ],
+                                                      order: [[2, 'desc']],
+                                                      "autoWidth": false,
+                                                  });
+                  }
+          });
+    }
+    catch(e){
+        dialog("Error","Can't fetch product infor "+e,BootstrapDialog.TYPE_INFO);
+    }
+  });
+
+  // closing notification - mark all notification as read
+        $('.nav-item.dropdown').on('hidden.bs.dropdown', async function () {
+            //alert('close notification');
+            try {
+                const response = await fetch('/get_and_mark_notifications');
+                const data = await response.json();
+                $("#new_notifications_counter").text("0");
+               // console.log('Notifications marked as read:', data);
+            } catch (error) {
+                console.error('Error marking notifications as read:', error);
+            }
+        });
+
+  // Show all notifications
+        $('#show_all_nots').on('click', async function() {
+
+<!--            clearInterval(fetchInterval); // Stop the interval-->
+
+            try {
+                // Clear existing notification items
+                $('.notification-item').remove();
+                $('.dropdown-divider').remove();
+
+                // Fetch all notifications
+                const response = await fetch('/get_all_notifications');
+                const data = await response.json();
+
+                // Populate the list with the returned notifications
+                data.forEach(notification => {
+                    const notificationItem = `
+                        <li class="notification-item">
+                            <i class="bi bi-exclamation-circle text-warning"></i>
+                            <div>
+                                <h4>${notification.not_subject}</h4>
+                                <p>${notification.not_body}</p>
+                                <p><small>${notification.not_date}</small></p>
+                            </div>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                    `;
+                    $('.dropdown-footer').before(notificationItem);
+                });
+
+                // Update the notification counter
+                //$("#notification_counter").text(`You have ${data.length} new notifications`);
+
+                // Close and reopen the dropdown to refresh the view
+                const dropdown = $('.not_dropdown');
+                dropdown.removeClass('show');
+                dropdown.find('.dropdown-menu').removeClass('show');
+                setTimeout(() => {
+                    dropdown.addClass('show');
+                    dropdown.find('.dropdown-menu').addClass('show');
+                }, 100); // Adjust the timeout as needed
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+            }
+        });
+
 
 
 </script>

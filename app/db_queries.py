@@ -1,4 +1,6 @@
 import pymysql
+import json
+from flask import session
 
 # Database connection details
 db_config = {
@@ -92,7 +94,7 @@ def get_recent_sales(shop_name):
                 toc_canna_member m ON p.email = m.email 
             ORDER BY 
                 s.time_of_sale DESC
-            LIMIT 10;
+            LIMIT 100;
         '''
         cursor.execute(query)
     else:
@@ -116,7 +118,7 @@ def get_recent_sales(shop_name):
                 s.store_name = %s
             ORDER BY 
                 s.time_of_sale DESC
-            LIMIT 10;
+            LIMIT 100;
         '''
         cursor.execute(query, (shop_name,))
 
@@ -152,6 +154,37 @@ def get_product_sales(timeframe, shop_name):
             GROUP BY product_name
             ORDER BY total_sales DESC
             LIMIT 5;
+        '''
+        cursor.execute(query, (shop_name,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+def get_recent_product_sales(timeframe, shop_name):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if shop_name == "Head Office":
+        query = f'''
+            SELECT product_name, SUM(count_sales_{timeframe}) AS total_count , SUM(total_sales_{timeframe}) AS total_sales
+            FROM toc_sales_summary_product
+            WHERE total_sales_{timeframe} IS NOT NULL 
+            GROUP BY product_name
+            ORDER BY total_sales DESC;          
+        '''
+        cursor.execute(query)
+    else:
+        query = f'''
+            SELECT product_name, SUM(count_sales_{timeframe}) AS total_count , SUM(total_sales_{timeframe}) AS total_sales
+            FROM toc_sales_summary_product
+            WHERE total_sales_{timeframe} IS NOT NULL AND shop_name = %s
+            GROUP BY product_name
+            ORDER BY total_sales DESC;
         '''
         cursor.execute(query, (shop_name,))
 
@@ -242,6 +275,94 @@ def get_hourly_sales(shop_name, timeframe):
     conn.close()
 
     return result
+
+
+def get_stock_order_template():
+    shop_data = json.loads(session.get('shop'))
+    shop = shop_data["customer"]
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to get the sales summary
+    query = '''
+        SELECT 
+            toc_product.item_sku AS sku,
+            toc_product.item_name AS product_name,
+            0 AS stock_count,
+            0 AS last_stock_qty,
+            0 AS calc_stock_qty,
+            0 AS variance,
+            'NA' AS variance_rsn,
+            0 AS stock_recount,
+            0 AS rejects_qty,
+            'NA' AS comments
+        FROM 
+            toc_shops
+        CROSS JOIN 
+            toc_product
+        WHERE 
+            toc_product.stat_group <> 'Specials'
+            AND toc_shops.customer = %s;
+    '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (shop,))
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+def get_stock_order_form():
+    shop_data = json.loads(session.get('shop'))
+    shop = shop_data["customer"]
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+        SELECT 
+            p.item_sku AS sku,
+            p.item_name AS product_name,
+            0 AS stock_count,
+            0 AS last_stock_qty,
+            0 AS calc_stock_qty,
+            0 AS variance,
+            'NA' AS variance_rsn,
+            0 AS stock_recount,
+            COALESCE(o.order_qty, 0) AS order_qty,
+            'NA' AS comments
+        FROM 
+            toc_shops s
+        CROSS JOIN 
+            toc_product p
+        LEFT JOIN 
+            toc_stock_order o
+        ON 
+            s.customer = o.shop_id 
+            AND p.item_sku = o.sku
+            AND o.order_status = 'New'
+        WHERE 
+            p.stat_group <> 'Specials'
+            AND s.customer = %s
+		ORDER BY order_qty desc, product_name asc;
+    '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (shop,))
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+
 
 
 
