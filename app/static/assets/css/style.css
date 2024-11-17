@@ -1231,3 +1231,24 @@ h6 {
   font-size: 13px;
   color: #012970;
 }
+
+/*                custom css           */
+
+#recentSell_wrapper {
+    margin : 15px  ;
+}
+
+#csvTable thead th {
+    font-size: 1.2em; /* Larger font size */
+    font-weight: bold; /* Bold text */
+    background-color: #f2f2f2; /* Optional: Add a background color */
+    padding: 10px; /* Optional: Add padding */
+}
+
+#show_all_nots, #not_dropdown{
+    cursor: pointer;
+}
+
+#csvTable{
+    margin-top: 5px;
+}
