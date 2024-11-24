@@ -5,9 +5,9 @@ import os
 import datetime
 from app.models import  TocMessages, TocNotification, TOC_SHOPS
 from sqlalchemy.exc import SQLAlchemyError
-from .models import User, TOC_SHOPS, TocStockOrder
+from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder
 from . import db
-from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form
+from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form, get_replenish_order_form
 from datetime import datetime
 
 main = Blueprint('main', __name__)
@@ -97,6 +97,17 @@ def order_stock():
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
     return render_template('order_stock.html', user=user, shop=shop)
+
+@main.route('/replenish_stock')
+def replenish_stock():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    return render_template('replenishment.html', user=user, shop=shop, shops=list_of_shops)
+
 
 
 @main.route('/register', methods=['POST'])
@@ -212,6 +223,61 @@ def get_product_order_form():
         print("Error in get_product_order_form:", e)
         return jsonify({"message": "Internal server error"}), 500
 
+@main.route('/get_product_replenish_form', methods=['POST'])
+def get_product_replenish_form():
+    try:
+        # Get the JSON data sent in the request
+        data = request.get_json()
+        # Access the shop value
+        selected_shop = data.get('shop')
+        history_sold = data.get('sold')
+        replenish_qty = data.get('replenish')
+
+        # Print the selected shop value
+        print(f"Selected shop from client: {selected_shop}")
+        # TODO:    # Query tocStockOrder to check if there is any "New" order for the customer
+        # TODO:    existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
+
+        # Respond to the client (optional, based on your needs)
+        # return jsonify({"status": "success", "shop": selected_shop})
+
+    # try:
+    #     # Fetch the shop customer from the session
+    #     shop = json.loads(session.get('shop'))['customer']  # Assuming 'shop.customer' is stored in the session
+    #
+    #     # Query tocStockOrder to check if there is any "New" order for the customer
+    #     existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
+    #
+    #     if not existing_order:
+    #         # If no "New" order exists, return an empty array with a 200 status
+    #         return jsonify([]), 200
+    #
+        # Proceed with fetching the stock order form if an existing order is found
+        data = get_replenish_order_form(selected_shop,history_sold,replenish_qty)
+    #
+        if not data:
+            return jsonify({"message": "Error fetching stock order form data"}), 500
+    #
+        # Format the data for the client
+        formatted_data = [
+            {
+                "sku": row[0],
+                "product_name": row[1],
+                "current_stock": row[9],
+                "threshold_qty": row[4],
+                "replenish_qty": row[5],
+                "replenish_order": row[10]
+            }
+            for row in data
+        ]
+
+        return jsonify(formatted_data)
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @main.route('/delete_order', methods=['POST'])
@@ -240,8 +306,6 @@ def delete_order():
         print("Error in /delete_order:", e)
         db.session.rollback()
         return jsonify({"message": "An error occurred while deleting the order."}), 500
-
-
 
 
 @main.route('/save_csv', methods=['POST'])

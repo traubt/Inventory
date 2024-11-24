@@ -362,6 +362,77 @@ def get_stock_order_form():
 
     return result
 
+def get_replenish_order_form(shop,threshold, replenish):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+WITH sales_data AS (
+    SELECT 
+        d.item_sku,
+        d.item_name,
+        b.store_customer,
+        c.blName AS shop_name,
+        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
+        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
+        COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read  -- Added new column
+    FROM 
+        toc_product d
+    LEFT JOIN 
+        toc_ls_sales_item a
+        ON d.item_sku = a.item_sku
+    LEFT JOIN 
+        toc_ls_sales b 
+        ON a.sales_id = b.sales_id
+    LEFT JOIN 
+        toc_shops c
+        ON b.store_customer = c.customer
+    LEFT JOIN
+        toc_stock st
+        ON d.item_sku = st.sku AND b.store_customer = st.shop_id  -- Joining toc_stock for stock_qty_date
+    WHERE 
+        d.stat_group <> 'Specials'
+        AND c.blName = %s  -- Ensures we only get sales related to this shop
+    GROUP BY 
+        d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date  -- Group by stock_qty_date
+)
+SELECT 
+    s.item_sku,
+    s.item_name,
+    s.store_customer,
+    s.shop_name,
+    s.threshold_sold_qty,
+    s.replenish_qty,
+    s.sales_since_stock_read,  -- Include the new column in the final SELECT
+    st.final_stock_qty AS last_stock_update,
+    st.stock_qty_date AS last_stock_update_date,
+    st.final_stock_qty - s.sales_since_stock_read AS current_stock_qty,
+    CASE 
+        WHEN st.final_stock_qty - s.sales_since_stock_read > s.threshold_sold_qty THEN 0
+        ELSE s.replenish_qty
+    END AS replenish_order  -- Add the replenish_order column
+FROM 
+    sales_data s
+LEFT JOIN 
+    toc_stock st
+ON 
+    s.item_sku = st.sku AND s.store_customer = st.shop_id
+ORDER BY 
+    s.sales_since_stock_read DESC;
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (threshold, replenish,shop))
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
 
 
 

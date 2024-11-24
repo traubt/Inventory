@@ -77,3 +77,21 @@ class TocStockOrder(db.Model):
     comments = db.Column(db.String(100), nullable=True)
     order_status = db.Column(db.String(45), nullable=True)
     order_status_date = db.Column(db.DateTime, nullable=True)
+
+class TocReplenishOrder(db.Model):
+    __tablename__ = 'toc_replenish_order'
+
+    shop_id = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_open_date = db.Column(db.DateTime, primary_key=True, nullable=False)
+    sku = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_id = db.Column(db.String(45), nullable=True)
+    user = db.Column(db.String(45), nullable=True)
+    item_name = db.Column(db.String(100), nullable=True)
+    count_qty = db.Column(db.Float, nullable=True)
+    variance_qty = db.Column(db.Float, nullable=True)
+    variance_rsn = db.Column(db.String(100), nullable=True)
+    rejected_qty = db.Column(db.Float, nullable=True)
+    order_qty = db.Column(db.Float, nullable=True)
+    comments = db.Column(db.String(100), nullable=True)
+    order_status = db.Column(db.String(45), nullable=True)
+    order_status_date = db.Column(db.DateTime, nullable=True)
