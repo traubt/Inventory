@@ -81,17 +81,39 @@ class TocStockOrder(db.Model):
 class TocReplenishOrder(db.Model):
     __tablename__ = 'toc_replenish_order'
 
-    shop_id = db.Column(db.String(45), primary_key=True, nullable=False)
-    order_open_date = db.Column(db.DateTime, primary_key=True, nullable=False)
-    sku = db.Column(db.String(45), primary_key=True, nullable=False)
-    order_id = db.Column(db.String(45), nullable=True)
+    shop_id = db.Column(db.String(45), primary_key=True)
+    order_id = db.Column(db.String(45), primary_key=True)
+    sku = db.Column(db.String(45), primary_key=True)
+    order_open_date = db.Column(db.DateTime, nullable=True)
     user = db.Column(db.String(45), nullable=True)
     item_name = db.Column(db.String(100), nullable=True)
-    count_qty = db.Column(db.Float, nullable=True)
-    variance_qty = db.Column(db.Float, nullable=True)
-    variance_rsn = db.Column(db.String(100), nullable=True)
-    rejected_qty = db.Column(db.Float, nullable=True)
-    order_qty = db.Column(db.Float, nullable=True)
+    replenish_qty = db.Column(db.Float, nullable=True)
     comments = db.Column(db.String(100), nullable=True)
+
+class TocProduct(db.Model):
+    __tablename__ = 'toc_product'
+
+    item_sku = db.Column(db.String(45), primary_key=True)
+    item_name = db.Column(db.String(200))
+    stat_group = db.Column(db.String(45))
+    acct_group = db.Column(db.String(45))
+    retail_price = db.Column(db.Float)
+    cost_price = db.Column(db.Float)
+    wh_price = db.Column(db.Float)
+    cann_cost_price = db.Column(db.Float)
+    product_url = db.Column(db.String(200))
+    image_url = db.Column(db.String(200))
+    stock_ord_ind = db.Column(db.Integer)
+
+class TOCReplenishCtrl(db.Model):
+    __tablename__ = 'toc_replenish_ctrl'
+
+    order_id = db.Column(db.String(45), primary_key=True)
+    shop_id = db.Column(db.String(45), nullable=True)
+    order_open_date = db.Column(db.DateTime, nullable=True)
+    user = db.Column(db.String(45), nullable=True)
     order_status = db.Column(db.String(45), nullable=True)
     order_status_date = db.Column(db.DateTime, nullable=True)
+    tracking_code = db.Column(db.String(45), nullable=True)
+    comments = db.Column(db.String(100), nullable=True)
+
