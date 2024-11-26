@@ -5,7 +5,7 @@ import os
 import datetime
 from app.models import  TocMessages, TocNotification, TOC_SHOPS
 from sqlalchemy.exc import SQLAlchemyError
-from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder
+from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder, TocProduct, TOCReplenishCtrl
 from . import db
 from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form, get_replenish_order_form
 from datetime import datetime
@@ -235,24 +235,7 @@ def get_product_replenish_form():
 
         # Print the selected shop value
         print(f"Selected shop from client: {selected_shop}")
-        # TODO:    # Query tocStockOrder to check if there is any "New" order for the customer
-        # TODO:    existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
 
-        # Respond to the client (optional, based on your needs)
-        # return jsonify({"status": "success", "shop": selected_shop})
-
-    # try:
-    #     # Fetch the shop customer from the session
-    #     shop = json.loads(session.get('shop'))['customer']  # Assuming 'shop.customer' is stored in the session
-    #
-    #     # Query tocStockOrder to check if there is any "New" order for the customer
-    #     existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
-    #
-    #     if not existing_order:
-    #         # If no "New" order exists, return an empty array with a 200 status
-    #         return jsonify([]), 200
-    #
-        # Proceed with fetching the stock order form if an existing order is found
         data = get_replenish_order_form(selected_shop,history_sold,replenish_qty)
     #
         if not data:
@@ -306,6 +289,38 @@ def delete_order():
         print("Error in /delete_order:", e)
         db.session.rollback()
         return jsonify({"message": "An error occurred while deleting the order."}), 500
+
+@main.route('/delete_replenish_order', methods=['POST'])
+def delete_replenish_order():
+    try:
+        # Parse the request data
+        data = request.get_json()
+        order_id = data.get('order_id')  # Get the shop parameter from the request body
+
+        # Query the database to find matching orders
+        orders_to_delete = TocReplenishOrder.query.filter_by(order_id=order_id).all()
+
+        if not orders_to_delete:
+            return jsonify({"message": "No matching orders found in toc_replenish_order to delete."}), 404
+
+        # Delete orders
+        for order in orders_to_delete:
+            db.session.delete(order)
+        db.session.commit()
+
+        orders_to_delete = TOCReplenishCtrl.query.filter_by(order_id=order_id).all()
+
+        if not orders_to_delete:
+            return jsonify({"message": "No matching orders found in toc_replenish_ctrl to delete."}), 404
+
+        # Delete orders
+        for order in orders_to_delete:
+            db.session.delete(order)
+        db.session.commit()
+
+        return jsonify({"message": "Orders deleted successfully."}), 200
+    except Exception as e:
+        return jsonify({"message": f"An error occurred: {str(e)}"}), 500
 
 
 @main.route('/save_csv', methods=['POST'])
@@ -402,6 +417,67 @@ def get_unread_notifications():
         for notification in notifications
     ]
     return jsonify(notifications_list)
+
+@main.route('/api/toc_shops', methods=['GET'])
+def get_toc_shops():
+    shops = TOC_SHOPS.query.all()  # Query all rows
+    shops_data = [
+        {
+            "blName": shop.blName,
+            "blId": shop.blId,
+            "country": shop.country,
+            "timezone": shop.timezone,
+            "store": shop.store,
+            "customer": shop.customer,
+            "mt_shop_name": shop.mt_shop_name,
+        }
+        for shop in shops
+    ]
+    return jsonify(shops_data)
+
+@main.route('/api/products', methods=['GET'])
+def get_products():
+    products = TocProduct.query.all()  # Query all rows from the table
+    products_data = [
+        {
+            "item_sku": product.item_sku,
+            "item_name": product.item_name,
+            "stat_group": product.stat_group,
+            "acct_group": product.acct_group,
+            "retail_price": product.retail_price,
+            "cost_price": product.cost_price,
+            "wh_price": product.wh_price,
+            "cann_cost_price": product.cann_cost_price,
+            "product_url": product.product_url,
+            "image_url": product.image_url,
+            "stock_ord_ind": product.stock_ord_ind,
+        }
+        for product in products
+    ]
+    return jsonify(products_data)
+
+
+@main.route('/api/open_orders', methods=['GET'])
+def open_orders():
+    new_orders = TOCReplenishCtrl.query.filter_by(order_status='New').all()
+
+    # Return an empty array if no records are found
+    if not new_orders:
+        return jsonify([])
+
+    order_data = [
+        {
+            "order_id": order.order_id,
+            "shop_id": order.shop_id,
+            "order_open_date": order.order_open_date,
+            "user": order.user,
+            "order_status": order.order_status,
+            "order_status_date": order.order_status_date,
+            "tracking_code": order.tracking_code,
+        }
+        for order in new_orders
+    ]
+    return jsonify(order_data)
 
 
 @main.route('/get_and_mark_notifications', methods=['GET'])
@@ -521,11 +597,79 @@ def save_order():
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@main.route('/save_replenish', methods=['POST'])
+def save_replenish():
+    try:
+        data = request.get_json()
 
+        # Extract table data and parameters
+        table = data.get('table', [])
+        order_id = data.get('order_id', '')
+        shop = data.get('shop', '')
+        user_name = data.get('user_name', '')
+        date = data.get('date', '')
+        tracking_code = data.get('tracking_code', '')
 
+        # Print the received data for debugging
+        print("order_id:", order_id)
+        print("Shop:", shop)
+        print("User Name:", user_name)
+        print("Save Date:", date)
+        print("Table Data:")
+        for row in table:
+            print(row)
 
+        # Check for order_id and delete existing records
+        if order_id:
+            db.session.query(TocReplenishOrder).filter_by(order_id=order_id).delete()
+            db.session.query(TOCReplenishCtrl).filter_by(order_id=order_id).delete()
+
+        # Insert new records into the table
+        for row in table:
+            sku, item_name, current_stock_qty, qty_sold_period, calc_replenish, replenish_order,  comments = row
+
+            new_record = TocReplenishOrder(
+                shop_id=shop,
+                order_open_date=datetime.now(),
+                sku=sku,
+                order_id=order_id,
+                user=user_name,
+                item_name=item_name,
+                replenish_qty = float(replenish_order) if replenish_order else 0,
+                comments=comments
+            )
+            db.session.add(new_record)
+
+        #Add tracking code
+
+        status = "New"
+        comment = "NA"
+
+        new_record = TOCReplenishCtrl(
+            order_id = order_id,
+            shop_id = shop,
+            order_open_date=datetime.now(),
+            user=user_name,
+            order_status = status,
+            order_status_date = datetime.now(),
+            tracking_code = tracking_code,
+            comments=comment
+        )
+        db.session.add(new_record)
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Data saved successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to save data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
 
 
 ######################################    database model ###################################################
@@ -576,6 +720,9 @@ def recent_sales_product(timeframe):
     shop_name = user_data['shop']
     data = get_recent_product_sales(timeframe, shop_name)
     return jsonify(data)
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 

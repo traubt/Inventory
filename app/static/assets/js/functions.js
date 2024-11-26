@@ -22,4 +22,55 @@ function allOrderQtyZero() {
     return $('#ProductOrderTemplate').DataTable().column(8).data().toArray().every(value => value === 0)
 }
 
+async function fetchTOCShops() {
+    try {
+        const response = await fetch('/api/toc_shops'); // Call the Flask route
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json(); // Parse JSON response
+        _shops = data; // Populate _shops with the fetched data
+        console.log(_shops); // Log the updated _shops variable to the console
+    } catch (error) {
+        console.error('Error fetching TOC Shops:', error);
+    }
+}
+
+// Fetch all products
+async function fetchProducts() {
+    try {
+        const response = await fetch('/api/products'); // Call the Flask route
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const products = await response.json(); // Parse JSON response
+        _products = products;
+        console.log(_products); // Log the product data to the console
+    } catch (error) {
+        console.error('Error fetching products:', error);
+    }
+}
+
+// Fetch all products
+async function fetchOpenOrders() {
+    try {
+        const response = await fetch('/api/open_orders'); // Call the Flask route
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        _open_orders = await response.json(); // Parse JSON response
+        console.log(_open_orders);
+    } catch (error) {
+        console.error('Error fetching products:', error);
+    }
+}
+
+function getShopCodeByBlName(blName) {
+    const shop = _shops.find(item => item.blName === blName);
+    return shop ? shop.customer : null; // Return the customer or null if not found
+}
+
+
+
+
 

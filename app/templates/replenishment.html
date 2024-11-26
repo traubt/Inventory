@@ -108,20 +108,19 @@
               </div>
             </div>
 
-
-
-
-
-
-
             <div class="d-flex gap-1 mt-3">
               <button class="btn btn-primary" id="newOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Create new order from plain form">Create Order</button>
-              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>
-              <button class="btn btn-primary" id="saveOrder" data-bs-placement="bottom" data-bs-original-title="Save order to the database" disabled >Save Order</button>
+<!--              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>-->
+              <button class="btn btn-primary" id="saveOrder" data-bs-placement="bottom" data-bs-original-title="Save order to the database" disabled>Save Order</button>
               <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>
               <button class="btn btn-primary" id="closeOrder" data-bs-placement="bottom" data-bs-original-title="Close order without saving" disabled>Close Order</button>
               <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>
               <button class="btn btn-danger" id="resetQty" data-bs-placement="bottom" data-bs-original-title="Reset all order quantity to zero" disabled>Reset Order Qty</button>
+                <button class="btn btn-primary" id="printOrder" data-bs-placement="bottom" data-bs-original-title="Print picking slip" disabled>Print</button>
+              <div class="d-flex align-items-center gap-2 ms-auto">
+                <label for="trackingCode" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Tracking Code:</label>
+                <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;">
+              </div>
             </div>
 
               <!--Handle the csv file -->
@@ -158,8 +157,16 @@
 
     var _t_order_product_template;
     var _saved = false;
+    var _shops = [];
+    var _products = [];
+    var _open_orders = []
 
  $(document).ready(async function() {
+
+// Load reference tables shops, products
+await fetchTOCShops();
+await fetchProducts();
+await fetchOpenOrders();
 
 // Parse the `shops` list rendered by Flask
 const shops = {{ shops|tojson }};
@@ -180,7 +187,7 @@ shops.forEach(shop => {
 
     $("#newOrder").on("click",async function(event) {
         // Set the order name based on shop customer and current date
-        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);
+
 
         // Get the selected shop value from the select box
         const selectedShop = $('#replenishShop').val();  // Get the selected value from the dropdown
@@ -198,6 +205,9 @@ shops.forEach(shop => {
                 dialog("Replenish Quantity","Please enter replenish quantity in days.");
                 return 0;
             }
+
+
+         $("#orderName").val(`${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}R`);
 
         // Check if there is already an open "New" order
         fetch('/get_product_replenish_form', {
@@ -222,29 +232,26 @@ shops.forEach(shop => {
 
 
 
-   // Event handler for the "loadOrder" button
-    $("#loadOrder").on("click", function(event) {
-        // Set the order name based on shop customer and current date
-        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);
+<!--// Event handler for the "loadOrder" button-->
+<!--$("#loadOrder").on("click", async function(event) {-->
+<!--    // Check input values-->
+<!--    if ($("#replenishShop").val() === null || $("#replenishShop").val() === "") {-->
+<!--        dialog("Select Shop", "Please select shop from the drop-down list");-->
+<!--        return;-->
+<!--    }-->
 
-        // Fetch the product order form data (check for an existing "New" order)
-        fetch('/get_product_order_form')
-            .then(response => response.json())
-            .then(data => {
-                if (Array.isArray(data) && data.length === 0) {
-                    // No existing order found, create a new order template
-                    dialog("Load Order","<p>There is no existing order. <br>Please click on New Order to open a new order form.</p>");
-                } else {
-                    // Existing order found, load the existing order data
-                    loadExistingOrder(data);
-                    $("#newOrder").prop("disabled", true);
-                    $(this).prop("disabled", true);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching the product order form:', error);
-            });
-    });
+<!--    const shop = $("#replenishShop").val(); // Get selected shop value-->
+<!--    const shop_code = getShopCodeByBlName(shop);-->
+<!--    const open_order = _open_orders.find(order => order.customer === shop_code);-->
+<!--    if(!open_order){-->
+<!--        dialog("Open Order",`No Open Order for shop ${shop}. Please click on Create Order`);-->
+<!--        return 0;-->
+<!--    }-->
+<!--    // load saved order-->
+
+
+
+<!--});-->
 
     // Function to load the new order template data into the table
     function loadOrderTemplate(data) {
@@ -262,18 +269,30 @@ shops.forEach(shop => {
                 { title: "Current Stock Count", data: "current_stock" },
                 { title: "Qty Sold in Period", data: "threshold_qty" },
                 { title: "Calculated Replenish", data: "replenish_qty" },
-                { title: "Replenish Order", data: "replenish_order", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
+                {
+                    title: "Replenish Order",
+                    data: "replenish_order",
+                    className: 'editable',
+                    render: function(data, type, row) {
+                        if (type === 'display') {
+                            return `<input type="text" class="variance-reason-edit" value="${data ?? 0}" />`; // Default to 0 if data is null
+                        }
+                        return data ?? 0; // Ensure null is returned as 0 in other contexts
                     }
-                    return data;
-                }},
-                { title: "Comments",  className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
+                },
+                {
+                    title: "Comments",
+                    data: null, // No corresponding field in the JSON
+                    className: 'editable',
+                    defaultContent: '', // Avoid the "unknown parameter" error
+                    render: function(data, type, row) {
+                        if (type === 'display') {
+                            // Use row['comments'] if 'comments' exists in your data, otherwise use an empty string
+                            return `<input type="text" class="comments-edit" value="${row.comments || ''}" />`;
+                        }
+                        return data;
                     }
-                    return data;
-                }}
+                }
             ],
             pageLength: 50,
             order: [[5, 'desc']],
@@ -281,8 +300,85 @@ shops.forEach(shop => {
             paging: true,
             searching: true,
             responsive: true,
-            dom: 'frtip',
+            dom: 'Bfrtip',
+        buttons: [
+            {
+                text: "Export CSV",
+                action: function (e, dt, button, config) {
+                    // Step 1: Convert DataTable with input fields to a flat HTML table
+                    const table = document.createElement("table");
+                    const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
+                        $("#ProductOrderTemplate thead th:contains('Replenish Order')")
+                    );
+
+                    $("#ProductOrderTemplate thead").clone().appendTo(table); // Copy header
+
+                    $("#ProductOrderTemplate tbody tr").each(function () {
+                        let orderQtyValue = 0;
+
+                        // Get the value of the "Replenish Order" column
+                        $(this)
+                            .find("td")
+                            .each(function (index) {
+                                if (index === orderQtyIndex) {
+                                    orderQtyValue = $(this).find("input").length > 0
+                                        ? parseFloat($(this).find("input").val()) || 0
+                                        : parseFloat($(this).text().trim()) || 0;
+                                }
+                            });
+
+                        // Exclude rows where "Replenish Order" is 0
+                        if (orderQtyValue === 0) return;
+
+                        const row = document.createElement("tr");
+
+                        $(this)
+                            .find("td")
+                            .each(function () {
+                                const cellValue = $(this).find("input").length > 0
+                                    ? $(this).find("input").val() // Get input value
+                                    : $(this).text().trim(); // Get text if no input field
+
+                                const newCell = document.createElement("td");
+                                newCell.textContent = cellValue;
+                                row.appendChild(newCell);
+                            });
+
+                        table.appendChild(row); // Append the processed row to the new table
+                    });
+
+                    // Step 2: Convert the modified flat table into CSV format
+                    const csvData = [];
+                    $(table).find("tr").each(function () {
+                        const row = [];
+                        $(this)
+                            .find("td, th")
+                            .each(function () {
+                                row.push($(this).text());
+                            });
+                        csvData.push(row.join(","));
+                    });
+
+                    // Step 3: Trigger CSV download
+                    const csvString = csvData.join("\n");
+                    const blob = new Blob([csvString], { type: "text/csv" });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "exported_table.csv";
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                },
+            },
+            {
+                text: "Export Excel",
+                action: function (e, dt, button, config) {
+                    alert("Custom Excel export is not yet implemented!");
+                },
+            },
+        ],
         });
+
 
         $('#ProductOrderTemplate').show();
 
@@ -330,7 +426,83 @@ shops.forEach(shop => {
             paging: true,
             searching: true,
             responsive: true,
-            dom: 'frtip',
+            dom: 'Bfrtip',
+        buttons: [
+            {
+                text: "Export CSV",
+                action: function (e, dt, button, config) {
+                    // Step 1: Convert DataTable with input fields to a flat HTML table
+                    const table = document.createElement("table");
+                    const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
+                        $("#ProductOrderTemplate thead th:contains('Replenish Order')")
+                    );
+
+                    $("#ProductOrderTemplate thead").clone().appendTo(table); // Copy header
+
+                    $("#ProductOrderTemplate tbody tr").each(function () {
+                        let orderQtyValue = 0;
+
+                        // Get the value of the "Replenish Order" column
+                        $(this)
+                            .find("td")
+                            .each(function (index) {
+                                if (index === orderQtyIndex) {
+                                    orderQtyValue = $(this).find("input").length > 0
+                                        ? parseFloat($(this).find("input").val()) || 0
+                                        : parseFloat($(this).text().trim()) || 0;
+                                }
+                            });
+
+                        // Exclude rows where "Replenish Order" is 0
+                        if (orderQtyValue === 0) return;
+
+                        const row = document.createElement("tr");
+
+                        $(this)
+                            .find("td")
+                            .each(function () {
+                                const cellValue = $(this).find("input").length > 0
+                                    ? $(this).find("input").val() // Get input value
+                                    : $(this).text().trim(); // Get text if no input field
+
+                                const newCell = document.createElement("td");
+                                newCell.textContent = cellValue;
+                                row.appendChild(newCell);
+                            });
+
+                        table.appendChild(row); // Append the processed row to the new table
+                    });
+
+                    // Step 2: Convert the modified flat table into CSV format
+                    const csvData = [];
+                    $(table).find("tr").each(function () {
+                        const row = [];
+                        $(this)
+                            .find("td, th")
+                            .each(function () {
+                                row.push($(this).text());
+                            });
+                        csvData.push(row.join(","));
+                    });
+
+                    // Step 3: Trigger CSV download
+                    const csvString = csvData.join("\n");
+                    const blob = new Blob([csvString], { type: "text/csv" });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "exported_table.csv";
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                },
+            },
+            {
+                text: "Export Excel",
+                action: function (e, dt, button, config) {
+                    alert("Custom Excel export is not yet implemented!");
+                },
+            },
+        ],
         });
 
         $('#ProductOrderTemplate').show();
@@ -345,13 +517,18 @@ shops.forEach(shop => {
 
 
     $("#saveOrder").on("click", function() {
-        if(! _saved){
-            dialog("Nothing to save","No changes made to the order");
+<!--        if(! _saved){-->
+<!--            dialog("Nothing to save","No changes made to the order");-->
+<!--            return 0;-->
+<!--        }-->
+
+        if ($("#trackingCode").val() === null || $("#trackingCode").val() === "") {
+            dialog("Tracking Code","Please enter tracking code.");
             return 0;
         }
         const tableData = [];
         const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
-            $("#ProductOrderTemplate thead th:contains('Order Qty')")
+            $("#ProductOrderTemplate thead th:contains('Replenish Order')")
         ); // Find the index of the "Order Qty" column
         let allQtyZero = true; // Track if all "Order Qty" are zero
         let isValid = true; // Flag to check if all "Order Qty" are valid numbers
@@ -401,12 +578,13 @@ shops.forEach(shop => {
         // If the order quantities are valid, proceed to save the order
         if (isValid) {
             const order_id = $("#orderName").val();          // Get the order ID from input
-            const shop = {{shop.customer | tojson}};        // Ensure shop variable is serialized
+            const shop =  getShopCodeByBlName($('#replenishShop').val())       // Ensure shop variable is serialized
             const user_name = {{user.username | tojson}};         // Ensure user_name variable is serialized
             const date = getCurrentDate();                  // Get current date in YYYYMMDD format
+            const tracking_code = $("#trackingCode").val()
 
             $.ajax({
-                url: "/save_order",
+                url: "/save_replenish",
                 method: "POST",
                 contentType: "application/json",
                 data: JSON.stringify({
@@ -414,7 +592,8 @@ shops.forEach(shop => {
                     shop: shop,
                     user_name: user_name,
                     order_id: order_id,
-                    date: date
+                    date: date,
+                    tracking_code : tracking_code
                 }),
                 success: function(response) {
                     console.log("Data submitted successfully:", response);
@@ -433,14 +612,17 @@ shops.forEach(shop => {
 
     $("#submitOrder").on("click", async function(event) {
 
+        const address_to = $("#replenishShop").val();
+        const order_id = $("#orderName").val();
+
         // Check if the order is saved (assuming _saved is updated during saveOrder execution)
         if (_saved) {
             const now = new Date();
             const data = {
                 not_date: now,
-                not_address: "Head Office",
-                not_subject: "NEW ORDER",
-                not_body: `New order arrived from {{user.shop}}`,
+                not_address: address_to,
+                not_subject: "Order From Head Office",
+                not_body: `New order ${order_id} was sent from Head Office`,
                 not_status: "unread"
             };
 
@@ -471,29 +653,38 @@ shops.forEach(shop => {
  });
   //////// EVENTS //////////
 $("#cancelOrder").on("click", function(event) {
-    if (allOrderQtyZero()) {
-        dialog("Zero Order Quantity" ,"Can't cancel order where all order qty are zero's");
-        return; // Exit the function if all Order Qty values are zero
+<!--    if (allOrderQtyZero()) {-->
+<!--        dialog("Zero Order Quantity" ,"Can't cancel order where all order qty are zero's");-->
+<!--        return; // Exit the function if all Order Qty values are zero-->
+<!--    }-->
+    if(!_saved){
+        dialog("Order Not Saved","Can't cancel unsaved order.");
+        return;
     }
     // Show the confirmation modal
     $('#cancelModal').modal('show');
 });
 
-// Handle the confirmation action when the user clicks "Yes, Cancel"
-$("#confirmCancel").on("click", function() {
+    // Handle the confirmation action when the user clicks "Yes, Cancel"
+    $("#confirmCancel").on("click", function() {
+
+    const order_id = $("#orderName").val();
 
     $.ajax({
-        url: '/delete_order',
+        url: '/delete_replenish_order',
         type: 'POST',
+        contentType: 'application/json', // Set the content type to JSON
+        data: JSON.stringify({ order_id: order_id }),
         success: function(response) {
-            console.log(response.message);  // Success message from Flask
-            dialog("Delete Order","Order was deleted successfully");
+            console.log(response.message); // Success message from Flask
+            dialog("Delete Order", "Order was deleted successfully");
         },
         error: function(error) {
             console.error("Error deleting the order:", error.responseText);
-            dialog("Delete Order Error","Order could not be deleted");
+            dialog("Delete Order Error", "Order could not be deleted");
         }
     });
+
 
     if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
         $('#ProductOrderTemplate').DataTable().clear().destroy(); // Clear and destroy the DataTable instance
@@ -547,7 +738,7 @@ $("#resetQty").on("click", function() {
         // Loop through all rows and update the 'Order Qty' column
         table.rows().every(function() {
             const rowData = this.data();
-            rowData.rejects_qty = 0; // Assuming 'rejects_qty' corresponds to "Order Qty"
+            rowData.replenish_order = 0; // Assuming 'rejects_qty' corresponds to "Order Qty"
             this.data(rowData); // Update the row with modified data
         });
 
@@ -562,13 +753,14 @@ $("#resetQty").on("click", function() {
  // Event listener for the custom tableChanged event
 $(document).on("tableChanged", function() {
     //alert("Change happened");
-    _saved = true;
+    _saved = false;
 });
 
 // Monitor changes in the table inputs
 $('#ProductOrderTemplate').on('change', 'input', function() {
     const input = $(this);
     const value = input.val();
+    _saved = false;
 
     // Optionally, add validation or processing logic here
     if (value !== null && value.trim() !== "") {
