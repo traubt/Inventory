@@ -27,11 +27,19 @@
   <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
   <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" type="text/css"/>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
   <!-- Template Main CSS File -->
   <link href="static/assets/css/style.css" rel="stylesheet">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.2.2/dist/echarts.min.js"></script>
 
+
+<!--  Include charts javascripts-->
+<script src="static/assets/js/db_sales_chart.js"></script>
+  <script src="static/assets/js/three_month_sales.js"></script>
 
 
 
@@ -315,63 +323,11 @@
             </div>
 
             <div class="card-body pb-0">
-              <h5 class="card-title">Budget Report <span>| This Month</span></h5>
-
-              <div id="budgetChart" style="min-height: 400px;" class="echart"></div>
-
-              <script>
-                document.addEventListener("DOMContentLoaded", () => {
-                  var budgetChart = echarts.init(document.querySelector("#budgetChart")).setOption({
-                    legend: {
-                      data: ['Allocated Budget', 'Actual Spending']
-                    },
-                    radar: {
-                      // shape: 'circle',
-                      indicator: [{
-                          name: 'Sales',
-                          max: 6500
-                        },
-                        {
-                          name: 'Administration',
-                          max: 16000
-                        },
-                        {
-                          name: 'Information Technology',
-                          max: 30000
-                        },
-                        {
-                          name: 'Customer Support',
-                          max: 38000
-                        },
-                        {
-                          name: 'Development',
-                          max: 52000
-                        },
-                        {
-                          name: 'Marketing',
-                          max: 25000
-                        }
-                      ]
-                    },
-                    series: [{
-                      name: 'Budget vs spending',
-                      type: 'radar',
-                      data: [{
-                          value: [4200, 3000, 20000, 35000, 50000, 18000],
-                          name: 'Allocated Budget'
-                        },
-                        {
-                          value: [5000, 14000, 28000, 26000, 42000, 21000],
-                          name: 'Actual Spending'
-                        }
-                      ]
-                    }]
-                  });
-                });
-              </script>
-
+              <h5 class="card-title">Three Months Sales</h5>
+              <div id="salesChart" ></div>
             </div>
-          </div><!-- End Budget Report -->
+          </div>
+          <!-- End Budget Report -->
 
           <!-- product sales summary -->
           {% include 'product_pie_chart.html' %}
@@ -478,8 +434,15 @@
       let fetchInterval;
       // Trigger the click event
        await  $(".today").trigger("click");
-       await  $("#daily_chart").trigger("click");
        await  $("#refresh_recent_sell").trigger("click");
+           // Ensure #reportsChart exists in the DOM
+    if ($("#reportsChart").length > 0) {
+        await populate_sales_chart("daily");
+    } else {
+        alert("#reportsChart element not found in the DOM.");
+    }
+      await sales_three_months()
+
 
        // get notifications
             async function fetchNotifications() {
@@ -655,81 +618,6 @@
 
   });
 
-  $(".line_chart").on("click", async function(event) {
-      event.preventDefault(); // Prevent the default link behavior
-
-      const timeframe = $(this).attr("value");
-      let url = '';
-
-      if (timeframe === "hourly") {
-<!--        alert("hourly chart");-->
-        $("#line_chart_title").html('Sales Chart <span>| Hourly</span>');
-        url = '/hourly_sales/hourly';
-      } else if (timeframe === "daily") {
-<!--        alert("daily chart");-->
-        $("#line_chart_title").html('Sales Chart <span>| Daily</span>');
-        url = '/hourly_sales/daily';
-      }
-
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        // Process the data to extract sales amounts and timestamps
-        const salesData = data.map(entry => entry[1]);
-        const categories = data.map(entry => entry[0]);
-
-        // Update the chart options with the fetched data
-        const options = {
-          series: [{
-            name: 'Sales',
-            data: salesData
-          }],
-          chart: {
-            height: 350,
-            type: 'area',
-            toolbar: {
-              show: false
-            },
-          },
-          markers: {
-            size: 4
-          },
-          colors: ['#4154f1'],
-          fill: {
-            type: "gradient",
-            gradient: {
-              shadeIntensity: 1,
-              opacityFrom: 0.3,
-              opacityTo: 0.4,
-              stops: [0, 90, 100]
-            }
-          },
-          dataLabels: {
-            enabled: false
-          },
-          stroke: {
-            curve: 'smooth',
-            width: 2
-          },
-          xaxis: {
-            type: 'datetime',
-            categories: categories
-          },
-          tooltip: {
-            x: {
-              format: 'dd/MM/yy HH:mm'
-            },
-          }
-        };
-
-        // Render the chart with the new options
-        const chart = new ApexCharts(document.querySelector("#reportsChart"), options);
-        chart.render();
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-  });
 
  // Recent Sales
    $("#refresh_recent_sell").on("click", async function(event) {
@@ -841,6 +729,16 @@ fetch('/recent_sales')
         dialog("Error","Can't fetch product infor "+e,BootstrapDialog.TYPE_INFO);
     }
   });
+
+  //Line chart filter
+      $('.line_chart').click(async function() {
+        // Get the value of the clicked item
+        var selectedValue = $(this).attr('value');
+
+        // Show an alert with the selected value
+        //alert('Selected: ' + selectedValue);
+        await populate_sales_chart(selectedValue)
+    });
 
   // closing notification - mark all notification as read
         $('.nav-item.dropdown').on('hidden.bs.dropdown', async function () {

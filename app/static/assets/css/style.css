@@ -1253,6 +1253,22 @@ h6 {
     margin-top: 5px;
 }
 
-#trackingCode{
+#trackingCode, #tblCtrl{
     margin-bottom : 10px;
 }
+
+#reportsChart {
+    width: 100%; /* or a specific width */
+    height: 400px; /* or a specific height */
+    min-height: 300px; /* Prevent collapsing */
+}
+
+#salesChart {
+    width: 100%; /* or a specific width */
+    height: 600px; /* or a specific height */
+    min-height: 300px; /* Prevent collapsing */
+}
+
+
+
+
