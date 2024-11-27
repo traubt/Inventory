@@ -305,15 +305,32 @@
   /**
    * Autoresize echart charts
    */
-  const mainContainer = select('#main');
-  if (mainContainer) {
+/**
+ * Autoresize echart charts
+ */
+/**
+ * Autoresize echart charts
+ */
+/**
+ * Autoresize echart charts after they are rendered
+ */
+const mainContainer = select('#main');
+if (mainContainer) {
     setTimeout(() => {
-      new ResizeObserver(function() {
-        select('.echart', true).forEach(getEchart => {
-          echarts.getInstanceByDom(getEchart).resize();
-        })
-      }).observe(mainContainer);
-    }, 200);
-  }
+        new ResizeObserver(function() {
+            select('.echart', true).forEach(getEchart => {
+                const chartInstance = echarts.getInstanceByDom(getEchart);
+                if (chartInstance) {
+                    chartInstance.resize();  // Resize only if the chart instance exists
+                } else {
+                    console.warn("Chart instance not found for", getEchart);
+                }
+            });
+        }).observe(mainContainer);
+    }, 100);  // Adjust timeout if necessary to allow the chart to load fully
+}
+
+
+
 
 })();

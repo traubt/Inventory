@@ -5,9 +5,9 @@ import os
 import datetime
 from app.models import  TocMessages, TocNotification, TOC_SHOPS
 from sqlalchemy.exc import SQLAlchemyError
-from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder, TocProduct, TOCReplenishCtrl
+from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder, TocProduct, TOCReplenishCtrl, TocStock
 from . import db
-from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form, get_replenish_order_form
+from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form, get_replenish_order_form, get_stock_count_per_shop, get_sales_by_shop, get_sales_by_shop_last_three_months
 from datetime import datetime
 
 main = Blueprint('main', __name__)
@@ -78,17 +78,25 @@ def faq():
 @main.route('/template')
 def template():
     # Database connection details
-    hostname = "176.58.117.107"
-    username = "tasteofc_wp268"
-    password = "]44p7214)S"
-    database = "tasteofc_wp268" # Route to display the content of the toc_products table @app.route('/template') def template():
-    conn = pymysql.connect( host=hostname, user=username, password=password, database=database )
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM toc_products")
-    products = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return render_template('pages-blank.html', products=products)
+    # hostname = "176.58.117.107"
+    # username = "tasteofc_wp268"
+    # password = "]44p7214)S"
+    # database = "tasteofc_wp268" # Route to display the content of the toc_products table @app.route('/template') def template():
+    # conn = pymysql.connect( host=hostname, user=username, password=password, database=database )
+    # cursor = conn.cursor()
+    # cursor.execute("SELECT * FROM toc_products")
+    # products = cursor.fetchall()
+    # cursor.close()
+    # conn.close()
+    return render_template('pages-blank.html')
+
+@main.route('/count_stock')
+def count_stock():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    return render_template('count_stock.html', user=user, shop=shop)
 
 @main.route('/order_stock')
 def order_stock():
@@ -250,6 +258,40 @@ def get_product_replenish_form():
                 "threshold_qty": row[4],
                 "replenish_qty": row[5],
                 "replenish_order": row[10]
+            }
+            for row in data
+        ]
+
+        return jsonify(formatted_data)
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@main.route('/get_stock_count_form', methods=['GET'])
+def get_stock_count_form():
+    try:
+        shop_data = json.loads(session.get('shop'))
+        selected_shop = shop_data['name']
+        # Print the selected shop value
+        print(f"Selected shop from client: {selected_shop}")
+
+        data = get_stock_count_per_shop(selected_shop)
+    #
+        if not data:
+            return jsonify({"message": "Error fetching stock order form data"}), 500
+    #
+        # Format the data for the client
+        formatted_data = [
+            {
+                "sku": row[0],
+                "product_name": row[1],
+                "store_code" :row[2],
+                "last_stock_count": row[4],
+                "last_stock_count_date": row[5],
+                "sold_qty": row[6],
+                "current_qty": row[7]
             }
             for row in data
         ]
@@ -671,6 +713,105 @@ def save_replenish():
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
 
+@main.route('/update_count_stock', methods=['POST'])
+def update_count_stock():
+    try:
+        # Get JSON data from the request
+        data = request.get_json()
+
+        # Extract relevant information
+        table = data.get('table', [])
+        shop = data.get('shop', '')
+        shop_name = data.get('shop_name', '')
+        user_name = data.get('user_name', '')
+        date = data.get('date', '')
+
+        # Print the received data for debugging purposes
+        print("Shop:", shop)
+        print("User Name:", user_name)
+        print("Update Date:", date)
+        print("Table Data:")
+        for row in table:
+            print(row)
+
+        # Process each row and update the database
+        for row in table:
+            sku = row.get('sku', '')
+            product_name = row.get('product_name', '')
+            stock_count = row.get('stock_count', 0)
+            variance = row.get('variance', 0)
+            variance_rsn = row.get('variance_reason', 'NA')
+            stock_recount = row.get('stock_rejected', 0)
+            comments = row.get('comments', '')
+            calc_stock_qty = row.get('calc_stock_qty', 0)
+
+            # Check if the record exists
+            existing_record = TocStock.query.filter_by(
+                shop_id=shop,
+                sku=sku
+                # stock_qty_date=datetime.strptime(date, '%Y%m%d')
+            ).first()
+
+            if existing_record:
+                # Update the existing record
+                existing_record.product_name = product_name
+                existing_record.stock_count = float(stock_count)
+                existing_record.variance = float(variance)
+                existing_record.variance_rsn = variance_rsn
+                existing_record.stock_recount = float(stock_recount)
+                existing_record.comments = comments
+                existing_record.count_by = user_name
+                existing_record.calc_stock_qty = float(calc_stock_qty)
+            else:
+                raise Exception("Shop SKU combination does not exist")
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Stock data updated successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to update stock data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+#####################################  Reports Section
+
+@main.route('/sales_report')
+def sales_report():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops)
+
+
+@main.route('/get_sales_per_shop_report')
+def get_sales_per_shop_report():
+    try:
+        # Fetch the data from the function
+        data = get_sales_by_shop()
+
+        # Check if no data is returned
+        if not data:
+            return jsonify({"message": "Error fetching sales report"}), 500
+
+        # Return the formatted data as JSON
+        return jsonify(data)
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 
 ######################################    database model ###################################################
 
@@ -688,6 +829,11 @@ def sales_summary():
 @main.route('/sales_data', methods=['GET'])
 def sales_data():
     data = get_sales_data_for_lineChart()
+    return jsonify(data)
+
+@main.route('/sales_three_months', methods=['GET'])
+def sales_three_months():
+    data = get_sales_by_shop_last_three_months()
     return jsonify(data)
 
 @main.route('/recent_sales', methods=['GET'])

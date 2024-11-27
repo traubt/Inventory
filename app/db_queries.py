@@ -198,82 +198,85 @@ def get_recent_product_sales(timeframe, shop_name):
 # db_queries.py
 # db_queries.py
 def get_hourly_sales(shop_name, timeframe):
-    # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
+    print(f"shop_name: {shop_name}")
+    print(f"time_frame: {timeframe}")
 
     if shop_name == "Head Office":
         if timeframe == "hourly":
             query = '''
                 SELECT 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d %%H:00:00') AS time_of_sale,
-                    SUM(total_amount) AS total_amount
+                    'Head Office' as store_name,
+                    DATE_FORMAT(time_of_sale, '%Y-%m-%d %H:00') AS sale_hour, 
+                    ROUND(SUM(tot_amt)) AS total_amount
                 FROM 
-                    toc_sales_hourly
-                WHERE 
-                    time_of_sale >= NOW() - INTERVAL 1 DAY
+                    toc_ls_sales_item
                 GROUP BY 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d %%H:00:00')
+                    sale_hour
                 ORDER BY 
-                    time_of_sale DESC
-                LIMIT 24;
+                    sale_hour DESC
+                LIMIT 200;
             '''
             cursor.execute(query)
         elif timeframe == "daily":
             query = '''
                 SELECT 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d') AS time_of_sale,
-                    SUM(total_amount) AS total_amount
+                    'Head Office' AS store_name,
+                    DATE_FORMAT(time_of_sale, '%Y-%m-%d') AS sale_date,
+                    ROUND(SUM(tot_amt)) AS total_amount
                 FROM 
-                    toc_sales_daily
-                WHERE 
-                    time_of_sale >= NOW() - INTERVAL 1 MONTH
+                    toc_ls_sales_item
                 GROUP BY 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d')
+                    DATE_FORMAT(time_of_sale, '%Y-%m-%d')
                 ORDER BY 
-                    time_of_sale DESC
-                LIMIT 30;
+                    sale_date
+                limit 200;
             '''
             cursor.execute(query)
     else:
         if timeframe == "hourly":
             query = '''
                 SELECT 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d %%H:00:00') AS time_of_sale,
-                    SUM(total_amount) AS total_amount
+                    ts.store_name,
+                    DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d %%H:00') AS sale_hour,
+                    ROUND(SUM(tlsi.tot_amt)) AS total_amount
                 FROM 
-                    toc_sales_hourly
-                WHERE 
-                    store_name = %s AND time_of_sale >= NOW() - INTERVAL 1 DAY
+                    toc_ls_sales_item tlsi
+                JOIN 
+                    toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
+                WHERE
+                    ts.store_name = %s
                 GROUP BY 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d %%H:00:00')
+                    ts.store_name, sale_hour
                 ORDER BY 
-                    time_of_sale DESC
-                LIMIT 24;
+                    ts.store_name, sale_hour
+                limit 200;
             '''
             cursor.execute(query, (shop_name,))
         elif timeframe == "daily":
             query = '''
                 SELECT 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d') AS time_of_sale,
-                    SUM(total_amount) AS total_amount
+                    ts.store_name,
+                    DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d') AS sale_date,
+                    ROUND(SUM(tlsi.tot_amt)) AS total_amount
                 FROM 
-                    toc_sales_daily
+                    toc_ls_sales_item tlsi
+                JOIN 
+                    toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
                 WHERE 
-                    store_name = %s AND time_of_sale >= NOW() - INTERVAL 1 MONTH
+                    ts.store_name = %s
                 GROUP BY 
-                    DATE_FORMAT(time_of_sale, '%%Y-%%m-%%d')
+                    ts.store_name, sale_date
                 ORDER BY 
-                    time_of_sale DESC
-                LIMIT 30;
+                    ts.store_name, sale_date limit 200;
+            
             '''
             cursor.execute(query, (shop_name,))
 
     result = cursor.fetchall()
-
     cursor.close()
     conn.close()
-
     return result
 
 
@@ -432,6 +435,155 @@ ORDER BY
     conn.close()
 
     return result
+
+def get_stock_count_per_shop(shop):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+        WITH sales_data AS (
+            SELECT 
+                d.item_sku,
+                d.item_name,
+                b.store_customer,
+                c.blName AS shop_name,
+                st.stock_qty_date,
+                COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
+            FROM 
+                toc_product d
+            LEFT JOIN 
+                toc_ls_sales_item a
+                ON d.item_sku = a.item_sku
+            LEFT JOIN 
+                toc_ls_sales b 
+                ON a.sales_id = b.sales_id
+            LEFT JOIN 
+                toc_shops c
+                ON b.store_customer = c.customer
+            LEFT JOIN
+                toc_stock st
+                ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+            WHERE 
+                d.stat_group <> 'Specials'
+                AND c.blName = %s -- Ensures we only get sales related to this shop
+            GROUP BY 
+                d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+        )
+        SELECT distinct
+            st.sku AS item_sku,
+            st.product_name AS item_name,
+            st.shop_id AS store_customer,
+            st.shop_name,
+            st.final_stock_qty AS last_stock_count, -- Last stock count (final_stock_qty from toc_stock)
+            st.stock_qty_date AS last_stock_count_date, -- Last stock count date (stock_qty_date from toc_stock)
+            COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
+            st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity -- Current quantity (last stock count - sold quantity)
+        FROM 
+            toc_stock st
+        LEFT JOIN 
+            sales_data s
+        ON 
+            st.sku = s.item_sku AND st.shop_id = s.store_customer
+        WHERE 
+            st.shop_name = %s -- Filter to include only entries for the specified shop
+        ORDER BY 
+            COALESCE(s.sales_since_stock_read, 0) DESC;
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (shop,shop))
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+def get_sales_by_shop_last_three_months():
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+            SELECT 
+                ts.store_name,
+                DATE_FORMAT(tlsi.time_of_sale, '%Y-%m') AS sale_month,
+                ROUND(SUM(tlsi.tot_amt)) AS total_sales
+            FROM 
+                toc_ls_sales_item tlsi
+            JOIN 
+                toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
+            WHERE 
+                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
+            GROUP BY 
+                ts.store_name, sale_month
+            ORDER BY 
+                sale_month DESC, ts.store_name;
+            '''
+
+    # Execute the query
+    cursor.execute(query)
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
+################################################  REPORT SECTION
+
+def get_sales_by_shop():
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+                SELECT 
+                    a.store_name, 
+                    DATE_FORMAT(a.time_of_sale, '%b/%Y') AS month,  -- Format as MON/YEAR (e.g., OCT/2024)
+                    ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                    ROUND(SUM(b.tot_amt)) AS total_sales_amount
+                FROM 
+                    toc_ls_sales a
+                JOIN 
+                    toc_ls_sales_item b ON a.sales_id = b.sales_id
+                JOIN 
+                    toc_product d ON b.item_sku = d.item_sku 
+                LEFT JOIN 
+                    toc_ls_payments c ON b.sales_id = c.sales_id
+                GROUP BY 
+                    a.store_name, DATE_FORMAT(a.time_of_sale, '%b/%Y')
+                ORDER BY 
+                    a.store_name ASC, month ASC;
+            '''
+
+    # Execute the query
+    cursor.execute(query)
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
+
 
 
 
