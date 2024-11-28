@@ -92,11 +92,11 @@
               </div>
             </div>
             <div class="d-flex gap-1 mt-3">
-              <button class="btn btn-primary" id="newOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Create new order from plain form">Get Form</button>
+              <button class="btn btn-primary" id="newOrder" >Get Form</button>
 <!--              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>-->
-              <button class="btn btn-primary" id="saveOrder" data-bs-placement="bottom" data-bs-original-title="Save order to the database" disabled >Confirm Stock</button>
+              <button class="btn btn-primary" id="saveOrder"   disabled >Confirm Stock</button>
 <!--              <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>-->
-              <button class="btn btn-primary" id="closeOrder" data-bs-placement="bottom" data-bs-original-title="Close order without saving" disabled>Close Form</button>
+              <button class="btn btn-primary" id="closeOrder"   disabled>Close Form</button>
 <!--              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>-->
               <button class="btn btn-danger" id="resetQty" data-bs-placement="bottom" data-bs-original-title="Reset all order quantity to zero" disabled>Reset Count</button>
             </div>
@@ -401,92 +401,13 @@ function loadStockData(rows) {
     }
 
 
-<!--    $("#saveOrder").on("click", function() {-->
-<!--        if(! _saved){-->
-<!--            dialog("Nothing to save","No changes made to the order");-->
-<!--            return 0;-->
-<!--        }-->
-<!--        const tableData = [];-->
-<!--        const orderQtyIndex = $("#ProductOrderTemplate thead th").index(-->
-<!--            $("#ProductOrderTemplate thead th:contains('Order Qty')")-->
-<!--        ); // Find the index of the "Order Qty" column-->
-<!--        let allQtyZero = true; // Track if all "Order Qty" are zero-->
-<!--        let isValid = true; // Flag to check if all "Order Qty" are valid numbers-->
-
-<!--        $("#ProductOrderTemplate tbody tr").each(function() {-->
-<!--            const row = [];-->
-<!--            let orderQtyValue = 0;-->
-<!--            let productName = '';  // Store product name to show in the error message if needed-->
-
-<!--            $(this).find("td").each(function(index) {-->
-<!--                const cellValue = $(this).find("input").length > 0-->
-<!--                    ? $(this).find("input").val()  // Get input value if present-->
-<!--                    : $(this).text().trim();       // Otherwise, get text content-->
-
-<!--                if (index === orderQtyIndex) {-->
-<!--                    orderQtyValue = parseFloat(cellValue) || 0; // Parse "Order Qty" value-->
-<!--                    productName = $(this).closest("tr").find("td:nth-child(2)").text().trim(); // Get product name from second column-->
-
-<!--                    if (orderQtyValue !== 0) {-->
-<!--                        allQtyZero = false; // If any "Order Qty" is non-zero, set allQtyZero to false-->
-<!--                    }-->
-
-<!--                    if (isNaN(orderQtyValue) || orderQtyValue < 0) {-->
-<!--                        isValid = false; // If "Order Qty" is not a valid number (less than 0 or NaN)-->
-<!--                        alert(`Please enter valid value to ${productName} field`);-->
-<!--                        return false;  // Exit the loop early if invalid value is found-->
-<!--                        _saved = false;-->
-<!--                    }-->
-<!--                }-->
-
-<!--                row.push(cellValue);-->
-<!--            });-->
-
-<!--            // Only include the row if "Order Qty" is greater than 0-->
-<!--            if (orderQtyValue > 0) {-->
-<!--                tableData.push(row);-->
-<!--            }-->
-<!--        });-->
-
-<!--        // If all "Order Qty" values are zero, show an alert and stop the process-->
-<!--        if (allQtyZero) {-->
-<!--            dialog("Empty Order","You have not entered any order quantity.");-->
-<!--            _saved = false;-->
-<!--            return; // Stop the execution of the order saving-->
-<!--        }-->
-
-<!--        // If the order quantities are valid, proceed to save the order-->
-<!--        if (isValid) {-->
-<!--            const order_id = $("#orderName").val();          // Get the order ID from input-->
-<!--            const shop = {{shop.customer | tojson}};        // Ensure shop variable is serialized-->
-<!--            const user_name = {{user.username | tojson}};         // Ensure user_name variable is serialized-->
-<!--            const date = getCurrentDate();                  // Get current date in YYYYMMDD format-->
-
-<!--            $.ajax({-->
-<!--                url: "/save_order",-->
-<!--                method: "POST",-->
-<!--                contentType: "application/json",-->
-<!--                data: JSON.stringify({-->
-<!--                    table: tableData,-->
-<!--                    shop: shop,-->
-<!--                    user_name: user_name,-->
-<!--                    order_id: order_id,-->
-<!--                    date: date-->
-<!--                }),-->
-<!--                success: function(response) {-->
-<!--                    console.log("Data submitted successfully:", response);-->
-<!--                    dialog("Save Order","Order was saved successfully");-->
-<!--                    _saved = true;-->
-<!--                },-->
-<!--                error: function(error) {-->
-<!--                    console.error("Error submitting data:", error);-->
-<!--                    _saved = false;-->
-<!--                }-->
-<!--            });-->
-<!--        }-->
-<!--    });-->
-
 $("#saveOrder").on("click", function () {
+
+    if ($("#ProductOrderTemplate_filter input").val().length > 0){
+        dialog("Filter Is On","Can't submit count stock while fitler is on. Please close the table filter before submit");
+        return;
+    }
+
     let isValid = true; // Flag to validate the data
     const tableData = []; // Array to store table data for sending to the server
 
@@ -524,6 +445,15 @@ $("#saveOrder").on("click", function () {
         return;
     }
 
+    // Show spinner and text
+    const spinnerWrapper = $(`
+        <div class="spinner-wrapper">
+            <div class="spinner"></div>
+            <p class="spinner-text">Please wait while stock data is being updated...</p>
+        </div>
+    `);
+    $("body").append(spinnerWrapper);
+
     // AJAX request to send data to Flask route
     const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
     const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized
@@ -539,7 +469,7 @@ $("#saveOrder").on("click", function () {
             shop: shop,
             user_name: user_name,
             date: date,
-            shop_name : shop_name
+            shop_name: shop_name
         }),
         success: function (response) {
             console.log("Data submitted successfully:", response);
@@ -548,9 +478,15 @@ $("#saveOrder").on("click", function () {
         error: function (error) {
             console.error("Error submitting data:", error);
             dialog("Error", "Failed to save stock data. Please try again.");
+        },
+        complete: function () {
+            // Hide spinner after request completes
+            spinnerWrapper.remove();
         }
     });
 });
+
+
 
 
 

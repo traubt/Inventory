@@ -1,6 +1,7 @@
 from . import db
 from flask_sqlalchemy import SQLAlchemy
 import datetime
+from datetime import datetime
 
 
 class User(db.Model):
@@ -129,6 +130,28 @@ class TocStock(db.Model):
     last_stock_qty = db.Column(db.Float, nullable=True)
     calc_stock_qty = db.Column(db.Float, nullable=True)
     variance = db.Column(db.Float, nullable=False, default=0)
+    variance_rsn = db.Column(db.String(45), nullable=True)
+    stock_recount = db.Column(db.Float, nullable=True)
+    shop_name = db.Column(db.String(45), nullable=True)
+    rejects_qty = db.Column(db.Float, nullable=True)
+    final_stock_qty = db.Column(db.Float, nullable=True)
+    transfer_id = db.Column(db.Integer, nullable=True)
+    comments = db.Column(db.String(150), nullable=True)
+
+class TOCStockVariance(db.Model):
+    __tablename__ = 'toc_stock_variance'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow())  # Use datetime.utcnow for default
+    shop_id = db.Column(db.String(20), nullable=True)
+    sku = db.Column(db.String(45), nullable=True)
+    stock_qty_date = db.Column(db.DateTime, nullable=True)
+    product_name = db.Column(db.String(100), nullable=True)
+    stock_count = db.Column(db.Float, nullable=True)
+    count_by = db.Column(db.String(45), nullable=True)
+    last_stock_qty = db.Column(db.Float, nullable=True)
+    calc_stock_qty = db.Column(db.Float, nullable=True)
+    variance = db.Column(db.Float, default=0)  # Ensure default is numeric
     variance_rsn = db.Column(db.String(45), nullable=True)
     stock_recount = db.Column(db.Float, nullable=True)
     shop_name = db.Column(db.String(45), nullable=True)

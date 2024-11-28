@@ -562,6 +562,9 @@ function loadOrderTemplate(data) {
 
         const address_to = $("#replenishShop").val();
         const order_id = $("#orderName").val();
+        const shop_code = getShopCodeByBlName($('#replenishShop').val())
+
+
 
         // Check if the order is saved (assuming _saved is updated during saveOrder execution)
         if (_saved) {
@@ -570,7 +573,7 @@ function loadOrderTemplate(data) {
                 not_date: now,
                 not_address: address_to,
                 not_subject: "Order From Head Office",
-                not_body: `New order ${order_id} was sent from Head Office`,
+                not_body: `New order ${order_id} was created by Head Office`,
                 not_status: "unread"
             };
 

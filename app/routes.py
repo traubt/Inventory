@@ -5,11 +5,13 @@ import os
 import datetime
 from app.models import  TocMessages, TocNotification, TOC_SHOPS
 from sqlalchemy.exc import SQLAlchemyError
-from .models import User, TOC_SHOPS, TocStockOrder, TocReplenishOrder, TocProduct, TOCReplenishCtrl, TocStock
+from .models import *
 from . import db
-from .db_queries import  get_top_items, get_sales_summary, get_sales_data_for_lineChart, get_recent_sales, get_product_sales, get_hourly_sales, get_recent_product_sales, get_stock_order_template, get_stock_order_form, get_replenish_order_form, get_stock_count_per_shop, get_sales_by_shop, get_sales_by_shop_last_three_months
+from .db_queries import *
 from datetime import datetime
+from flask import Flask, request, jsonify
 
+app = Flask(__name__)
 main = Blueprint('main', __name__)
 
 @main.route('/')
@@ -552,32 +554,6 @@ def get_and_mark_notifications():
 
     return jsonify(notifications_list)
 
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-# @main.route('/save_order', methods=['POST'])
-# def save_order():
-#     data = request.get_json()
-#
-#     # Extract table data and parameters
-#     table = data.get('table', [])
-#     order_id = data.get('order_id', '')
-#     shop = data.get('shop', '')
-#     user_name = data.get('user_name', '')
-#     date = data.get('date', '')
-#
-#     # Print the received data
-#     print("order_id:", order_id)
-#     print("Shop:", shop)
-#     print("User Name:", user_name)
-#     print("Save Date:", date)
-#     print("Table Data:")
-#     for row in table:
-#         print(row)
-#
-#     return jsonify({"status": "success", "message": "Data received successfully"})
-
 @main.route('/save_order', methods=['POST'])
 def save_order():
     try:
@@ -730,9 +706,7 @@ def update_count_stock():
         print("Shop:", shop)
         print("User Name:", user_name)
         print("Update Date:", date)
-        print("Table Data:")
-        for row in table:
-            print(row)
+        print("Table Data:", table)
 
         # Process each row and update the database
         for row in table:
@@ -741,29 +715,54 @@ def update_count_stock():
             stock_count = row.get('stock_count', 0)
             variance = row.get('variance', 0)
             variance_rsn = row.get('variance_reason', 'NA')
-            stock_recount = row.get('stock_rejected', 0)
+            stock_rejected = row.get('stock_rejected', 0)
             comments = row.get('comments', '')
-            calc_stock_qty = row.get('calc_stock_qty', 0)
+            calc_stock_qty = row.get('current_qty', 0)
+            last_stock_count = row.get('last_stock_count', 0)
 
-            # Check if the record exists
+            # Check if the record exists in TocStock
             existing_record = TocStock.query.filter_by(
                 shop_id=shop,
                 sku=sku
-                # stock_qty_date=datetime.strptime(date, '%Y%m%d')
             ).first()
 
             if existing_record:
-                # Update the existing record
+                # Update the existing record in TocStock
+                existing_record.stock_qty_date = datetime.utcnow()
                 existing_record.product_name = product_name
+                existing_record.last_stock_qty = last_stock_count
                 existing_record.stock_count = float(stock_count)
                 existing_record.variance = float(variance)
                 existing_record.variance_rsn = variance_rsn
-                existing_record.stock_recount = float(stock_recount)
+                existing_record.rejects_qty = float(stock_rejected)
                 existing_record.comments = comments
                 existing_record.count_by = user_name
                 existing_record.calc_stock_qty = float(calc_stock_qty)
+                existing_record.final_stock_qty = float(stock_count)
+                existing_record.shop_name = shop_name
             else:
                 raise Exception("Shop SKU combination does not exist")
+
+            # Insert into TOCStockVariance if Variance > 0
+            if calc_stock_qty != stock_count:
+                new_variance_record = TOCStockVariance(
+                    shop_id=shop,
+                    sku=sku,
+                    stock_qty_date=datetime.strptime(date, '%Y%m%d'),
+                    product_name=product_name,
+                    stock_count=float(stock_count),
+                    count_by=user_name,
+                    last_stock_qty=float(last_stock_count),
+                    calc_stock_qty=float(calc_stock_qty),
+                    variance=float(variance),
+                    variance_rsn=variance_rsn,
+                    stock_recount=0,  # Add a default value if not provided
+                    shop_name=shop_name,
+                    rejects_qty=float(stock_rejected),
+                    final_stock_qty=float(stock_count),
+                    comments=comments
+                )
+                db.session.add(new_variance_record)
 
         # Commit changes to the database
         db.session.commit()
@@ -778,6 +777,7 @@ def update_count_stock():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
 
 #####################################  Reports Section
 
