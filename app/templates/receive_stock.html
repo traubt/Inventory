@@ -73,7 +73,7 @@
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="index.html">Home</a></li>
           <li class="breadcrumb-item">Pages</li>
-          <li class="breadcrumb-item active">Stock Count</li>
+          <li class="breadcrumb-item active">Receive Stock</li>
         </ol>
       </nav>
     </div><!-- End Page Title -->
@@ -85,11 +85,22 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center">
-              <h5 class="card-title mb-0">Stock Count</h5>
-              <div class="d-flex gap-2">
-                <label for="orderName" class="form-label mb-0">Order:</label>
-                <input type="text" id="orderName" class="form-control" >
-              </div>
+              <h5 class="card-title mb-0">Recieve Stock</h5>
+<!--              <div class="d-flex gap-2">-->
+<!--                <label for="orderName" class="form-label mb-0">Select Order:</label>-->
+<!--                <select id="orderName" class="form-control">-->
+<!--                  <option value="" disabled selected>No Order Found</option>-->
+<!--                  &lt;!&ndash; Options will be populated dynamically &ndash;&gt;-->
+<!--                </select>-->
+<!--              </div>-->
+ <div class="d-inline-flex align-items-center gap-2">
+  <label for="orderName" class="form-label mb-0">Select Order:</label>
+  <select id="orderName" class="form-select">
+    <option value="" disabled selected>No Order Found</option>
+    <!-- Options will be populated dynamically -->
+  </select>
+</div>
+
             </div>
             <div class="d-flex gap-1 mt-3">
               <button class="btn btn-primary" id="newOrder" >Get Form</button>
@@ -98,7 +109,7 @@
 <!--              <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>-->
               <button class="btn btn-primary" id="closeOrder"   disabled>Close Form</button>
 <!--              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>-->
-              <button class="btn btn-danger" id="resetQty"  disabled>Reset Count</button>
+              <button class="btn btn-danger" id="resetQty" data-bs-placement="bottom" data-bs-original-title="Reset all order quantity to zero" disabled>Reset Count</button>
             </div>
 
               <!--Handle the csv file -->
@@ -140,28 +151,67 @@
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
 
-    $("#newOrder").on("click", function (event) {
-        // Set the order name based on shop customer and current date
-        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}C`);
+    // Assuming replenish_orders is a list of objects passed from Flask
+    const replenish_orders = JSON.parse('{{ replenish_orders | safe }}');
+    console.log('Replenish Orders:', replenish_orders);
 
-        // Fetch stock data
-        fetch('/get_stock_count_form')
+    // Filter the replenish_orders based on the shop_id
+    const orderIds = replenish_orders
+        .filter(order => order.shop_id === '{{shop.customer}}') // Use shop.customer to filter
+        .map(order => order.order_id); // Get order_id for each filtered order
+
+
+
+    console.log(orderIds);
+
+    // Get the jQuery object for the #orderName select element
+    const orderNameSelect = $("#orderName");
+
+    // Clear any existing options except the default one
+    orderNameSelect.empty();
+
+    // If no orders are found, keep the "No Order Found" option
+    if (orderIds.length === 0) {
+        orderNameSelect.append('<option value="" disabled selected>No Order Found</option>');
+    } else {
+        // Populate the dropdown with order IDs
+        orderIds.forEach(orderId => {
+            orderNameSelect.append(`<option value="${orderId}">${orderId}</option>`);
+        });
+    }
+
+
+    $("#newOrder").on("click", function (event) {
+        // Get the selected value from the orderName dropdown
+        const selectedOrder = $("#orderName").val();
+
+        // Check if no option is selected
+        if (!selectedOrder) {
+            alert("Please select order");
+            return;  // Exit the function if no order is selected
+        }
+
+        // Fetch stock data with the selected order_id as a query parameter
+        fetch(`/get_receive_stock_form?order_id=${selectedOrder}`)
             .then(response => response.json())
             .then(data => {
-                // Pass the fetched data to loadStockData function
-                $("#loadOrder").prop("disabled",true);
+                // If data is successfully fetched, enable/disable relevant buttons
+                $("#loadOrder").prop("disabled", true);
                 $("#saveOrder").prop("disabled", false);
                 $("#resetQty").prop("disabled", false);
                 $("#submitOrder").prop("disabled", false);
                 $("#cancelOrder").prop("disabled", false);
                 $("#closeOrder").prop("disabled", false);
                 $("#newOrder").prop("disabled", true);
+
+                // Pass the fetched data to loadStockData function
                 loadStockData(data);
             })
             .catch(error => {
-                console.error('Error fetching stock count form:', error);
+                console.error('Error fetching replenish form:', error);
             });
     });
+
 
 
 function loadStockData(rows) {
@@ -177,17 +227,16 @@ function loadStockData(rows) {
         data: rows,
         columns: [
             { title: "SKU", data: "sku" },
-            { title: "Product Name", data: "product_name" },
-            { title: "Last Stock Count", data: "last_stock_count" },
-            { title: "Last Stock Count Date", data: "last_stock_count_date" },
-            { title: "Sold Quantity", data: "sold_qty" },
-            { title: "Current Quantity", data: "current_qty" },
+            { title: "Product Name", data: "item_name" },
+            { title: "HQ User", data: "replenish_user" },
+            { title: "Replenish Date", data: "replenish_date" },
+            { title: "Sent Qty", data: "replenish_qty" },
             {
-                title: "Stock Count",
+                title: "Received Qty",
                 data: null,
                 className: 'editable',
                 render: function (data, type, row) {
-                    const currentStockCount = row.current_qty;
+                    const currentStockCount = row.replenish_qty;
                     return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
                 }
             },
@@ -239,11 +288,12 @@ function loadStockData(rows) {
     // Update variance dynamically when the current stock count changes
     $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
         const row = $(this).closest('tr');
-        const currentQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-        const initialQty = parseFloat(row.find('td:nth-child(6)').text()) || 0;
-        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0; // Correctly fetch input value
+        const rowData = table.row(row).data();  // Get the row data object
+        const receiveQty = rowData.replenish_qty;  // Correctly get "Sent Qty" from the row data
+        const countQty = parseFloat(row.find('.current-stock-count').val()) || 0;
+        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
 
-        const variance = currentQty - initialQty + rejectedQty;
+        const variance = receiveQty - countQty - rejectedQty;
 
         row.find('.variance').text(variance);
     });
@@ -404,7 +454,7 @@ function loadStockData(rows) {
 $("#saveOrder").on("click", function () {
 
     if ($("#ProductOrderTemplate_filter input").val().length > 0){
-        dialog("Filter Is On","Can't submit count stock while fitler is on. Please close the table filter before submit");
+        dialog("Filter Is On","Can't submit count stock while filter is on. Please close the table filter before submit");
         return;
     }
 
@@ -419,19 +469,17 @@ $("#saveOrder").on("click", function () {
         // Collect data from each cell in the row
         rowData.sku = row.find("td:nth-child(1)").text().trim(); // SKU
         rowData.product_name = row.find("td:nth-child(2)").text().trim(); // Product Name
-        rowData.last_stock_count = parseFloat(row.find("td:nth-child(3)").text().trim()) || 0; // Last Stock Count
-        rowData.last_stock_count_date = row.find("td:nth-child(4)").text().trim(); // Last Stock Count Date
-        rowData.sold_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sold Quantity
-        rowData.current_qty = parseFloat(row.find("td:nth-child(6)").text().trim()) || 0; // Current Quantity
-        rowData.stock_count = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Stock Count
-        rowData.stock_rejected = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
+        rowData.hq_user = row.find("td:nth-child(3)").text().trim(); // HQ User
+        rowData.replenish_date = row.find("td:nth-child(4)").text().trim(); // Replenish Date
+        rowData.sent_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sent Quantity
+        rowData.received_qty = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Received Quantity
+        rowData.rejected_qty = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
         rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
         rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments
 
-        // Validate the data (example: stock count and rejected stock cannot be negative)
-        if (rowData.stock_count < 0 || rowData.stock_rejected < 0) {
-            isValid = false;
+        // Validate the data (example: received quantity and rejected quantity cannot be negative)
+        if (rowData.received_qty < 0 || rowData.rejected_qty < 0) {
             alert(`Invalid stock values for SKU: ${rowData.sku}. Please enter valid data.`);
             return false; // Exit loop if invalid data is found
         }
@@ -458,10 +506,11 @@ $("#saveOrder").on("click", function () {
     const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
     const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized
     const date = getCurrentDate(); // Get current date in YYYYMMDD format
-    const shop_name = {{shop.name | tojson}}
+    const shop_name = {{shop.name | tojson}};
+    const replenish_order_id = $("#orderName").val();
 
     $.ajax({
-        url: "/update_count_stock", // Flask route for updating stock data
+        url: "/update_count_receive_stock", // Flask route for updating stock data
         method: "POST",
         contentType: "application/json",
         data: JSON.stringify({
@@ -470,8 +519,7 @@ $("#saveOrder").on("click", function () {
             user_name: user_name,
             date: date,
             shop_name: shop_name,
-            replenish_order_id : "NA",
-
+            replenish_order_id : replenish_order_id,
         }),
         success: function (response) {
             console.log("Data submitted successfully:", response);
@@ -487,6 +535,7 @@ $("#saveOrder").on("click", function () {
         }
     });
 });
+
 
     $("#submitOrder").on("click", async function(event) {
 

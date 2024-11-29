@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .models import *
 from . import db
 from .db_queries import *
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -99,6 +99,52 @@ def count_stock():
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
     return render_template('count_stock.html', user=user, shop=shop)
+
+import json
+
+@main.route('/receive_stock')
+def receive_stock():
+    try:
+        # Get user and shop data
+        user_data = session.get('user')
+        user = json.loads(user_data)
+        shop_data = session.get('shop')
+        shop = json.loads(shop_data)
+
+        # Query all records where order_status is 'New'
+        replenish_orders_query = TOCReplenishCtrl.query.filter_by(order_status='New').all()
+
+        # Convert query results into a list of dictionaries
+        replenish_orders = [
+            {
+                "order_id": order.order_id,
+                "shop_id": order.shop_id,
+                "order_open_date": order.order_open_date.isoformat() if order.order_open_date else None,
+                "user": order.user,
+                "order_status": order.order_status,
+                "order_status_date": order.order_status_date.isoformat() if order.order_status_date else None,
+                "tracking_code": order.tracking_code,
+                "comments": order.comments,
+            }
+            for order in replenish_orders_query
+        ]
+
+        # Serialize replenish_orders as JSON
+        replenish_orders_json = json.dumps(replenish_orders)
+
+        # Pass JSON data to the template
+        return render_template(
+            'receive_stock.html',
+            user=user,
+            shop=shop,
+            replenish_orders=replenish_orders_json,
+        )
+    except Exception as e:
+        print(f"Error in receive_stock route: {e}")
+        return render_template('error.html', message="Failed to load receive stock data")
+
+
+
 
 @main.route('/order_stock')
 def order_stock():
@@ -305,6 +351,47 @@ def get_stock_count_form():
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
+@main.route('/get_receive_stock_form', methods=['GET'])
+def get_receive_stock_form():
+    try:
+        # Retrieve the order_id parameter from the query string
+        order_id = request.args.get('order_id')  # This will get the order_id from the URL query parameter
+        if not order_id:
+            return jsonify({"message": "Order ID is required"}), 400  # Return an error if no order_id is provided
+
+        # Retrieve the shop data from session
+        shop_data = json.loads(session.get('shop'))
+        selected_shop = shop_data['customer']
+        print(f"Selected shop from client: {selected_shop}")
+        print(f"Received order_id: {order_id}")
+
+        # Assuming get_receive_stock_order is a function that now accepts order_id
+        data = get_receive_stock_order(selected_shop, order_id)
+
+        # If no data is returned, respond with an error
+        if not data:
+            return jsonify({"message": "Error fetching stock order form data"}), 500
+
+        # Format the data for the client
+        formatted_data = [
+            {
+                "sku": row[2],
+                "replenish_date": row[3],
+                "replenish_user": row[4],
+                "item_name": row[5],
+                "replenish_qty": row[6],
+            }
+            for row in data
+        ]
+
+        # Return the formatted data as a JSON response
+        return jsonify(formatted_data)
+
+    except Exception as e:
+        # Handle any errors that occur during execution
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route('/delete_order', methods=['POST'])
@@ -701,6 +788,7 @@ def update_count_stock():
         shop_name = data.get('shop_name', '')
         user_name = data.get('user_name', '')
         date = data.get('date', '')
+        replenish_order_id = data.get('replenish_order_id', '')
 
         # Print the received data for debugging purposes
         print("Shop:", shop)
@@ -728,7 +816,7 @@ def update_count_stock():
 
             if existing_record:
                 # Update the existing record in TocStock
-                existing_record.stock_qty_date = datetime.utcnow()
+                existing_record.stock_qty_date = datetime.now(timezone.utc)
                 existing_record.product_name = product_name
                 existing_record.last_stock_qty = last_stock_count
                 existing_record.stock_count = float(stock_count)
@@ -740,6 +828,7 @@ def update_count_stock():
                 existing_record.calc_stock_qty = float(calc_stock_qty)
                 existing_record.final_stock_qty = float(stock_count)
                 existing_record.shop_name = shop_name
+                existing_record.replenish_id = replenish_order_id
             else:
                 raise Exception("Shop SKU combination does not exist")
 
@@ -760,9 +849,105 @@ def update_count_stock():
                     shop_name=shop_name,
                     rejects_qty=float(stock_rejected),
                     final_stock_qty=float(stock_count),
-                    comments=comments
+                    comments=comments,
+                    replenish_id=replenish_order_id
                 )
                 db.session.add(new_variance_record)
+
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Stock data updated successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to update stock data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+@main.route('/update_count_receive_stock', methods=['POST'])
+def update_count_receive_stock():
+    try:
+        # Get JSON data from the request
+        data = request.get_json()
+
+        # Extract relevant information
+        table = data.get('table', [])
+        shop = data.get('shop', '')
+        shop_name = data.get('shop_name', '')
+        user_name = data.get('user_name', '')
+        date = data.get('date', '')
+        replenish_order_id = data.get('replenish_order_id', '')
+
+        # Process each row and update the database
+        for row in table:
+            sku = row.get('sku', '')
+            product_name = row.get('product_name', '')
+            stock_sent = row.get('sent_qty', 0)
+            stock_count = row.get('received_qty', 0)
+            variance = row.get('variance', 0)
+            variance_rsn = row.get('variance_reason', 'NA')
+            stock_rejected = row.get('rejected_qty', 0)
+            comments = row.get('comments', '')
+
+            # Check if the record exists in TocStock
+            existing_record = TocStock.query.filter_by(
+                shop_id=shop,
+                sku=sku
+            ).first()
+
+            if existing_record:
+                # Update the existing record in TocStock
+                existing_record.stock_qty_date = datetime.now(timezone.utc)
+                existing_record.product_name = product_name
+                existing_record.last_stock_qty = float(existing_record.last_stock_qty + stock_count)
+                existing_record.stock_count = float(existing_record.stock_count + stock_count)
+                existing_record.variance = float(existing_record.variance + variance)
+                existing_record.variance_rsn = variance_rsn
+                existing_record.rejects_qty = float(existing_record.rejects_qty + stock_rejected)
+                existing_record.comments = comments
+                existing_record.count_by = user_name
+                existing_record.calc_stock_qty = float(existing_record.calc_stock_qty + stock_count)
+                existing_record.final_stock_qty = float(stock_count)
+                existing_record.shop_name = shop_name
+                existing_record.replenish_id = replenish_order_id
+            else:
+                raise Exception("Shop SKU combination does not exist")
+
+            # Insert into TOCStockVariance if Variance > 0
+            if variance != 0:
+                new_variance_record = TOCStockVariance(
+                    shop_id=shop,
+                    sku=sku,
+                    stock_qty_date=datetime.strptime(date, '%Y%m%d'),
+                    product_name=product_name,
+                    stock_count=float(stock_count),
+                    count_by=user_name,
+                    last_stock_qty=float(stock_count),
+                    calc_stock_qty=float(stock_sent),
+                    variance=float(variance),
+                    variance_rsn=variance_rsn,
+                    stock_recount=0,  # Add a default value if not provided
+                    shop_name=shop_name,
+                    rejects_qty=float(stock_rejected),
+                    final_stock_qty=float(stock_count),
+                    comments=comments,
+                    replenish_id = replenish_order_id
+                )
+                db.session.add(new_variance_record)
+
+        # Update stock control
+        toc_replenish_ctrl = TOCReplenishCtrl.query.filter_by(
+            order_id=replenish_order_id,
+            order_status="New"
+        ).first()
+
+        toc_replenish_ctrl.order_status = "Completed"
+        toc_replenish_ctrl.order_status_date = datetime.now(timezone.utc)
 
         # Commit changes to the database
         db.session.commit()

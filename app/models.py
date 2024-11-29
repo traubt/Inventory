@@ -135,7 +135,7 @@ class TocStock(db.Model):
     shop_name = db.Column(db.String(45), nullable=True)
     rejects_qty = db.Column(db.Float, nullable=True)
     final_stock_qty = db.Column(db.Float, nullable=True)
-    transfer_id = db.Column(db.Integer, nullable=True)
+    replenish_id = db.Column(db.String(45), nullable=True)
     comments = db.Column(db.String(150), nullable=True)
 
 class TOCStockVariance(db.Model):
@@ -157,5 +157,5 @@ class TOCStockVariance(db.Model):
     shop_name = db.Column(db.String(45), nullable=True)
     rejects_qty = db.Column(db.Float, nullable=True)
     final_stock_qty = db.Column(db.Float, nullable=True)
-    transfer_id = db.Column(db.Integer, nullable=True)
+    replenish_id = db.Column(db.String(45), nullable=True)
     comments = db.Column(db.String(150), nullable=True)
