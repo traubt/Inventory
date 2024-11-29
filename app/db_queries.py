@@ -502,6 +502,26 @@ def get_stock_count_per_shop(shop):
 
     return result
 
+def get_receive_stock_order(shop,order_id):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+                select * from toc_replenish_order where shop_id = %s and order_id = %s
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (shop,order_id))
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
 def get_sales_by_shop_last_three_months():
     # Connect to the database
     conn = get_db_connection()
