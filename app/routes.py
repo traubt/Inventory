@@ -106,7 +106,7 @@ def user_profile():
     user = json.loads(user_data)
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
-    return render_template('user-profile.html', user=user, shop=shop)
+    return render_template('users-profile.html', user=user, shop=shop)
 
 
 @main.route('/receive_stock')
