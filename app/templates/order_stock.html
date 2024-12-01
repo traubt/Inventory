@@ -564,6 +564,21 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
     }
 });
 
+        //log activity
+    $(".btn").on("click", function () {
+        // Get the text of the clicked button
+        const buttonText = $(this).text().trim();
+
+        // Get the current file name without the ".html" postfix
+        const fileName = window.location.pathname.split("/").pop().replace(".html", "");
+
+        // Create a combined activity description
+        const activityDescription = `${fileName}: ${buttonText}`;
+
+        // Call the logUserActivity function with the combined description
+        logUserActivity(activityDescription);
+    });
+
 
 
 

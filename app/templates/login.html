@@ -21,7 +21,8 @@
 
 <script>
      $("#register").on("click", function(event) {
-              var username = $("#username").val();
+
+        var username = $("#username").val();
         if (username !== "Itsik") {
             alert("You are not allowed to register a new user");
             event.preventDefault(); // Prevent the default action (navigation)

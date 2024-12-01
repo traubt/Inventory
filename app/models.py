@@ -155,7 +155,7 @@ class TOCStockVariance(db.Model):
     __tablename__ = 'toc_stock_variance'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    creation_date = db.Column(db.DateTime, default=datetime.utcnow())  # Use datetime.utcnow for default
+    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))  # Use datetime.utcnow for default
     shop_id = db.Column(db.String(20), nullable=True)
     sku = db.Column(db.String(45), nullable=True)
     stock_qty_date = db.Column(db.DateTime, nullable=True)
@@ -179,3 +179,13 @@ class TocRole(db.Model):
 
     role = db.Column(db.String(20), primary_key=True, nullable=False)
     exclusions = db.Column(db.String(200), default=None)
+
+
+class TOCUserActivity(db.Model):
+    __tablename__ = 'toc_user_activity'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    actv_date = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=True)
+    user = db.Column(db.String(45), nullable=True)
+    shop = db.Column(db.String(45), nullable=True)
+    activity = db.Column(db.String(100), nullable=True)
