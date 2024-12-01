@@ -100,7 +100,14 @@ def count_stock():
     shop = json.loads(shop_data)
     return render_template('count_stock.html', user=user, shop=shop)
 
-import json
+@main.route('/user_profile')
+def user_profile():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    return render_template('user-profile.html', user=user, shop=shop)
+
 
 @main.route('/receive_stock')
 def receive_stock():
@@ -339,7 +346,8 @@ def get_stock_count_form():
                 "last_stock_count": row[4],
                 "last_stock_count_date": row[5],
                 "sold_qty": row[6],
-                "current_qty": row[7]
+                "current_qty": row[7],
+                "received_qty" : row[8]
             }
             for row in data
         ]
@@ -895,26 +903,19 @@ def update_count_receive_stock():
             comments = row.get('comments', '')
 
             # Check if the record exists in TocStock
-            existing_record = TocStock.query.filter_by(
-                shop_id=shop,
+            existing_record = TocReplenishOrder.query.filter_by(
+                order_id=replenish_order_id,
                 sku=sku
             ).first()
 
             if existing_record:
                 # Update the existing record in TocStock
-                existing_record.stock_qty_date = datetime.now(timezone.utc)
-                existing_record.product_name = product_name
-                existing_record.last_stock_qty = float(existing_record.last_stock_qty + stock_count)
-                existing_record.stock_count = float(existing_record.stock_count + stock_count)
-                existing_record.variance = float(existing_record.variance + variance)
-                existing_record.variance_rsn = variance_rsn
-                existing_record.rejects_qty = float(existing_record.rejects_qty + stock_rejected)
-                existing_record.comments = comments
-                existing_record.count_by = user_name
-                existing_record.calc_stock_qty = float(existing_record.calc_stock_qty + stock_count)
-                existing_record.final_stock_qty = float(stock_count)
-                existing_record.shop_name = shop_name
-                existing_record.replenish_id = replenish_order_id
+                existing_record.received_date = datetime.now(timezone.utc)
+                existing_record.received_qty = stock_count
+                existing_record.rejected_qty = stock_rejected
+                existing_record.variance = variance
+                existing_record.received_by = user_name
+                existing_record.received_comment = comments
             else:
                 raise Exception("Shop SKU combination does not exist")
 
