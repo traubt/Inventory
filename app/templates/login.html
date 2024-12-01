@@ -14,8 +14,22 @@
         <input type="password" class="form-control" id="password" name="password" required>
       </div>
       <button type="submit" class="btn btn-primary">Login</button>
-      <a href="{{ url_for('main.register') }}" class="btn btn-secondary">Register</a>
+      <a id="register" href="{{ url_for('main.register') }}" class="btn btn-secondary">Register</a>
     </form>
   </div>
 </div>
+
+<script>
+     $("#register").on("click", function(event) {
+              var username = $("#username").val();
+        if (username !== "Itsik") {
+            alert("You are not allowed to register a new user");
+            event.preventDefault(); // Prevent the default action (navigation)
+        }
+    })
+
+</script>
+
+
+
 {% endblock %}

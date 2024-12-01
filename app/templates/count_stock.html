@@ -282,6 +282,10 @@ function loadStockData(rows) {
     function loadOrderTemplate(rows) {
         console.log(rows);
 
+        var roles = {{ roles | tojson }};
+        var user_role = "{{user.role}}";
+        disableControlsPerRole(roles,user_role);
+
         if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
             $('#ProductOrderTemplate').DataTable().destroy();
         }

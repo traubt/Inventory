@@ -172,3 +172,10 @@ class TOCStockVariance(db.Model):
     final_stock_qty = db.Column(db.Float, nullable=True)
     replenish_id = db.Column(db.String(45), nullable=True)
     comments = db.Column(db.String(150), nullable=True)
+
+
+class TocRole(db.Model):
+    __tablename__ = 'toc_roles'
+
+    role = db.Column(db.String(20), primary_key=True, nullable=False)
+    exclusions = db.Column(db.String(200), default=None)

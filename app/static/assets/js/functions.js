@@ -70,6 +70,46 @@ function getShopCodeByBlName(blName) {
     return shop ? shop.customer : null; // Return the customer or null if not found
 }
 
+// disable controls
+function disableControlsPerRole(roles,userRole){
+    // Pass the roles data from Flask to JavaScript as a JSON string
+
+  console.log("Roles:", roles, userRole);
+
+  var exclusions = "";  // To hold the exclusions list
+
+  // Find the exclusions list for the current user's role
+  roles.forEach(function(role) {
+    if (role.role === userRole) {
+      exclusions = role.exclusions;
+    }
+  });
+
+  // If exclusions exist, disable the elements with corresponding IDs
+  if (exclusions) {
+    // Split the exclusions string by commas and loop through each exclusion
+    var excludedIds = exclusions.split(',');
+
+    excludedIds.forEach(function(id) {
+      // Disable the element with the corresponding ID
+      var element = $('#' + id);
+      element.prop('disabled', true);  // This won't work for non-form elements
+
+      // Add a 'disabled' class and make the item non-clickable
+      element.css({
+        'opacity': '0.5',  // Dim the item to indicate it's disabled
+        'pointer-events': 'none',  // Disable any click interaction
+      });
+
+      // Optionally, you can also change the cursor to indicate it's not clickable
+      element.css('cursor', 'not-allowed');
+
+      console.log('Disabled element:', id);
+    });
+  }
+
+};
+
 
 
 

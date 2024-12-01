@@ -174,7 +174,7 @@
                     </div>
                     <div class="ps-3">
                       <h6 id="count_customers"></h6>
-                      <span class="text-danger small pt-1 fw-bold">-%</span> <span class="text-muted small pt-2 ps-1">decrease</span>
+                      <span class="text-success small pt-1 fw-bold">-%</span> <span class="text-muted small pt-2 ps-1">increase</span>
 
                     </div>
                   </div>
@@ -430,20 +430,20 @@
   var _top_selling;
 
   $(document).ready(async function() {
-
-      let fetchInterval;
-      // Trigger the click event
-       await  $(".today").trigger("click");
-       await  $("#refresh_recent_sell").trigger("click");
-           // Ensure #reportsChart exists in the DOM
+    var roles = {{ roles | tojson }};
+    var user_role = "{{user.role}}";
+    disableControlsPerRole(roles,user_role);
+    let fetchInterval;
+    // Trigger the click event
+     await  $(".today").trigger("click");
+     await  $("#refresh_recent_sell").trigger("click");
+         // Ensure #reportsChart exists in the DOM
     if ($("#reportsChart").length > 0) {
         await populate_sales_chart("daily");
     } else {
         alert("#reportsChart element not found in the DOM.");
     }
       await sales_three_months()
-
-
        // get notifications
             async function fetchNotifications() {
                 await fetch('/get_unread_notifications')
