@@ -18,12 +18,18 @@ main = Blueprint('main', __name__)
 def login():
     return render_template('login.html')
 
+
 @main.route('/index')
 def index():
     user_data = session.get('user')
+    roles = TocRole.query.all()
+
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+
     if user_data:
         user = json.loads(user_data)
-        return render_template('index.html', user=user)
+        return render_template('index.html', user=user, roles=roles_list)
     else:
         return redirect(url_for('main.login'))
 
@@ -71,7 +77,10 @@ def welcome(username):
 @main.route('/register')
 def register():
     shops = TOC_SHOPS.query.all()
-    return render_template('register.html', shops=shops)
+    # Fetch all roles from the TocRole table
+    roles = TocRole.query.all()
+    role_list = [role.role for role in roles]  # Extract roles as a list
+    return render_template('register.html', shops=shops, roles = role_list)
 
 @main.route('/faq')
 def faq():
@@ -98,7 +107,10 @@ def count_stock():
     user = json.loads(user_data)
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
-    return render_template('count_stock.html', user=user, shop=shop)
+    roles = TocRole.query.all()
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('count_stock.html', user=user, shop=shop , roles=roles_list)
 
 @main.route('/user_profile')
 def user_profile():
@@ -117,6 +129,9 @@ def receive_stock():
         user = json.loads(user_data)
         shop_data = session.get('shop')
         shop = json.loads(shop_data)
+        roles = TocRole.query.all()
+        # Convert the roles to a list of dictionaries
+        roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
 
         # Query all records where order_status is 'New'
         replenish_orders_query = TOCReplenishCtrl.query.filter_by(order_status='New').all()
@@ -145,10 +160,11 @@ def receive_stock():
             user=user,
             shop=shop,
             replenish_orders=replenish_orders_json,
+            roles = roles_list
         )
     except Exception as e:
         print(f"Error in receive_stock route: {e}")
-        return render_template('error.html', message="Failed to load receive stock data")
+        return render_template('pages-error-404.html', message="Failed to load receive stock data")
 
 
 
@@ -159,7 +175,10 @@ def order_stock():
     user = json.loads(user_data)
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
-    return render_template('order_stock.html', user=user, shop=shop)
+    roles = TocRole.query.all()
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('order_stock.html', user=user, shop=shop , roles=roles_list)
 
 @main.route('/replenish_stock')
 def replenish_stock():
@@ -169,7 +188,10 @@ def replenish_stock():
     shop = json.loads(shop_data)
     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
     list_of_shops = [shop.blName for shop in shops]
-    return render_template('replenishment.html', user=user, shop=shop, shops=list_of_shops)
+    roles = TocRole.query.all()
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('replenishment.html', user=user, shop=shop, shops=list_of_shops , roles=roles_list)
 
 
 
@@ -181,13 +203,14 @@ def register_post():
     last_name = request.form.get('last_name')
     email = request.form.get('email')
     shop = request.form.get('shop')
-    role = 'Agent'
+    role = request.form.get('role')
 
     user = User.query.filter_by(username=username).first()
 
     if user:
         flash('Username already exists')
         return redirect(url_for('main.register'))
+
 
     if not username or not password or not first_name or not last_name or not email or '@' not in email:
         flash('Please fill out all fields correctly')
@@ -200,28 +223,6 @@ def register_post():
     flash('User registered successfully')
     return redirect(url_for('main.login'))
 
-
-# @main.route('/get_product_order_template')
-# def get_product_order_template():
-#     user_data = json.loads(session.get('user'))
-#     shop_data = json.loads(session.get('shop'))
-#     print(f"shop_data: {shop_data}")
-#
-#     shop_directory = os.path.join("app/static", shop_data['customer'])
-#     print(f"Check if file exists in {shop_directory}")
-#
-#     if os.path.exists(shop_directory):
-#         print(f"Directory exists: {shop_directory}")
-#         if os.listdir(shop_directory):
-#             file_name = os.listdir(shop_directory)[0]
-#             print(f"Serving file: {file_name}")
-#             return send_from_directory(os.path.join('static', shop_data['customer']), file_name)
-#         else:
-#             print("Directory is empty")
-#     else:
-#         print("Directory does not exist")
-#
-#     return send_from_directory('static', 'products_template.csv')
 
 @main.route('/get_product_order_template', methods=['GET'])
 def get_product_order_template():

@@ -137,6 +137,10 @@
 
  $(document).ready(async function() {
 
+    var roles = {{ roles | tojson }};
+    var user_role = "{{user.role}}";
+    disableControlsPerRole(roles,user_role);
+
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
 

@@ -236,30 +236,30 @@
           <i class="bi bi-journal-text"></i><span>Inventory</span><i class="bi bi-chevron-down ms-auto"></i>
         </a>
         <ul id="inventory-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
+          <li id="countStock">
             <a href="{{ url_for('main.count_stock') }}">
               <i class="bi bi-circle"></i><span>Stock Count</span>
             </a>
           </li>
-          <li>
+          <li id="orderStock">
             <a href="{{ url_for('main.order_stock') }}">
               <i class="bi bi-circle"></i><span>Order Stock</span>
             </a>
           </li>
-          <li>
+          <li id="replenishment">
             <a href="{{ url_for('main.replenish_stock') }}">
               <i class="bi bi-circle"></i><span>Replenishment</span>
             </a>
           </li>
-          <li>
+          <li id="receiveStock">
             <a href="{{ url_for('main.receive_stock') }}">
               <i class="bi bi-circle"></i><span>Receive Stock</span>
               <span class="badge bg-primary badge-number" id="receive_stock_counter">4</span>
             </a>
           </li>
-          <li>
+          <li id="createProduct">
             <a href="forms-validation.html">
-              <i class="bi bi-circle"></i><span>Create Product</span>
+              <i class="bi bi-circle"></i><span>Manage Products</span>
             </a>
           </li>
         </ul>
@@ -270,7 +270,7 @@
           <i class="bi bi-bar-chart"></i><span>Reports</span><i class="bi bi-chevron-down ms-auto"></i>
         </a>
         <ul id="reports-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
-          <li>
+          <li id="salesReport">
             <a href="{{ url_for('main.sales_report') }}">
               <i class="bi bi-circle"></i><span>Sales Reports</span>
             </a>

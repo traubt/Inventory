@@ -161,23 +161,27 @@
     var _open_orders = []
 
  $(document).ready(async function() {
+    var roles = {{ roles | tojson }};
+    var user_role = "{{user.role}}";
+    disableControlsPerRole(roles,user_role);
 
-// Load reference tables shops, products
-await fetchTOCShops();
-await fetchProducts();
-await fetchOpenOrders();
 
-// Parse the `shops` list rendered by Flask
-const shops = {{ shops|tojson }};
+    // Load reference tables shops, products
+    await fetchTOCShops();
+    await fetchProducts();
+    await fetchOpenOrders();
 
-// Get the select box element
-const $selectBox = $('#replenishShop');
+    // Parse the `shops` list rendered by Flask
+    const shops = {{ shops|tojson }};
 
-// Populate the select box with options using `blName`
-// Since `shops` is already an array of strings, no need to access `.blName`
-shops.forEach(shop => {
-    $selectBox.append(new Option(shop, shop));
-});
+    // Get the select box element
+    const $selectBox = $('#replenishShop');
+
+    // Populate the select box with options using `blName`
+    // Since `shops` is already an array of strings, no need to access `.blName`
+    shops.forEach(shop => {
+        $selectBox.append(new Option(shop, shop));
+    });
 
 
 

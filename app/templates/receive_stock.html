@@ -148,6 +148,10 @@
 
  $(document).ready(async function() {
 
+    var roles = {{ roles | tojson }};
+    var user_role = "{{user.role}}";
+    disableControlsPerRole(roles,user_role);
+
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
 
@@ -160,9 +164,8 @@
         .filter(order => order.shop_id === '{{shop.customer}}') // Use shop.customer to filter
         .map(order => order.order_id); // Get order_id for each filtered order
 
-
-
     console.log(orderIds);
+    $("#receive_stock_counter").text(orderIds.length);
 
     // Get the jQuery object for the #orderName select element
     const orderNameSelect = $("#orderName");
