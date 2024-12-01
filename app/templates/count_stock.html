@@ -182,12 +182,13 @@ function loadStockData(rows) {
             { title: "Last Stock Count Date", data: "last_stock_count_date" },
             { title: "Sold Quantity", data: "sold_qty" },
             { title: "Current Quantity", data: "current_qty" },
+            { title: "Received Quantity", data: "received_qty" },
             {
                 title: "Stock Count",
                 data: null,
                 className: 'editable',
                 render: function (data, type, row) {
-                    const currentStockCount = row.current_qty;
+                    const currentStockCount = row.current_qty + row.received_qty;
                     return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
                 }
             },
@@ -241,9 +242,10 @@ function loadStockData(rows) {
         const row = $(this).closest('tr');
         const currentQty = parseFloat(row.find('.current-stock-count').val()) || 0;
         const initialQty = parseFloat(row.find('td:nth-child(6)').text()) || 0;
+        const receivedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
         const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0; // Correctly fetch input value
 
-        const variance = currentQty - initialQty + rejectedQty;
+        const variance = currentQty - receivedQty - initialQty + rejectedQty;
 
         row.find('.variance').text(variance);
     });
