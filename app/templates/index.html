@@ -428,12 +428,12 @@
 <script>
 
   var _top_selling;
+  var _count_replenish;
 
   $(document).ready(async function() {
-    var roles = {{ roles | tojson }};
-    var user_role = "{{user.role}}";
-    disableControlsPerRole(roles,user_role);
+
     let fetchInterval;
+
     // Trigger the click event
      await  $(".today").trigger("click");
      await  $("#refresh_recent_sell").trigger("click");
@@ -443,6 +443,8 @@
     } else {
         alert("#reportsChart element not found in the DOM.");
     }
+
+
       await sales_three_months()
        // get notifications
             async function fetchNotifications() {

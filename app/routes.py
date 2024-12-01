@@ -67,6 +67,17 @@ def login_post():
     }
     session['shop'] = json.dumps(shop_data)
 
+    # Create a new TOCUserActivity record
+    new_activity = TOCUserActivity(
+        user=user.username,  # Assuming the username is stored in user["username"]
+        shop=shop.customer,  # Assuming the shop name is stored in shop["customer"]
+        activity="User login"
+    )
+
+    # Add the record to the session and commit to the database
+    db.session.add(new_activity)
+    db.session.commit()
+
 
     return redirect(url_for('main.index'))
 
@@ -134,7 +145,7 @@ def receive_stock():
         roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
 
         # Query all records where order_status is 'New'
-        replenish_orders_query = TOCReplenishCtrl.query.filter_by(order_status='New').all()
+        replenish_orders_query = TOCReplenishCtrl.query.filter_by(order_status='New', shop_id=shop["customer"]).all()
 
         # Convert query results into a list of dictionaries
         replenish_orders = [
@@ -218,6 +229,17 @@ def register_post():
 
     new_user = User(username=username, password=password, first_name=first_name, last_name=last_name, email=email, shop=shop, role=role)
     db.session.add(new_user)
+    db.session.commit()
+
+    # Create a new TOCUserActivity record
+    new_activity = TOCUserActivity(
+        user=username,  # Assuming the username is stored in user["username"]
+        shop=shop,  # Assuming the shop name is stored in shop["customer"]
+        activity="New registration"
+    )
+
+    # Add the record to the session and commit to the database
+    db.session.add(new_activity)
     db.session.commit()
 
     flash('User registered successfully')
@@ -966,6 +988,42 @@ def update_count_receive_stock():
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
 
 
+from datetime import datetime
+
+from flask import request
+
+@main.route('/log_user_activity', methods=['POST'])
+def log_user_activity():
+    try:
+        # Retrieve user and shop data from the session
+        user_data = session.get('user')
+        user = json.loads(user_data)
+        shop_data = session.get('shop')
+        shop = json.loads(shop_data)
+
+        # Get the activity description from the client
+        activity = request.json.get('activity')
+        if not activity:
+            return {"error": "Activity description is required"}, 400
+
+        # Create a new TOCUserActivity record
+        new_activity = TOCUserActivity(
+            user=user["username"],  # Assuming the username is stored in user["username"]
+            shop=shop["customer"],  # Assuming the shop name is stored in shop["customer"]
+            activity=activity
+        )
+
+        # Add the record to the session and commit to the database
+        db.session.add(new_activity)
+        db.session.commit()
+
+        return {"message": "User activity logged successfully"}, 200
+
+    except Exception as e:
+        print(f"Error logging user activity: {e}")
+        return {"error": "Failed to log user activity"}, 500
+
+
 #####################################  Reports Section
 
 @main.route('/sales_report')
@@ -998,6 +1056,13 @@ def get_sales_per_shop_report():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@main.route('/count_new_orders')
+def count_new_orders():
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    count = TOCReplenishCtrl.query.filter_by(order_status='New', shop_id=shop["customer"]).count()
+
+    return jsonify({"count": count})
 
 
 ######################################    database model ###################################################
