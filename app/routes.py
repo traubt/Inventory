@@ -99,18 +99,89 @@ def faq():
 
 @main.route('/template')
 def template():
-    # Database connection details
-    # hostname = "176.58.117.107"
-    # username = "tasteofc_wp268"
-    # password = "]44p7214)S"
-    # database = "tasteofc_wp268" # Route to display the content of the toc_products table @app.route('/template') def template():
-    # conn = pymysql.connect( host=hostname, user=username, password=password, database=database )
-    # cursor = conn.cursor()
-    # cursor.execute("SELECT * FROM toc_products")
-    # products = cursor.fetchall()
-    # cursor.close()
-    # conn.close()
     return render_template('pages-blank.html')
+
+@main.route('/admin_users')
+def admin_users():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    users = User.query.all()
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'user_admin.html',
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        users=users
+    )
+
+
+
+@main.route('/api/get_users')
+def get_users():
+    users = User.query.all()
+    users_list = [{
+        'id': user.id,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email,
+        'shop': user.shop,
+        'password': user.password,
+        'role': user.role,
+    } for user in users]
+    return jsonify(users_list)
+
+
+@main.route('/api/delete_user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    try:
+        # Retrieve the user object by user_id
+        user = User.query.get(user_id)
+
+        if user:
+            # Delete the user if found
+            db.session.delete(user)
+            db.session.commit()
+            return jsonify({"message": f"User {user_id} deleted successfully."}), 200
+        else:
+            # If user not found, return an error
+            return jsonify({"error": f"User {user_id} not found."}), 404
+
+    except Exception as e:
+        # Handle any exceptions that occur during deletion
+        print(f"Error occurred while deleting user: {e}")
+        return jsonify({"error": "An error occurred while deleting the user."}), 500
+
+
+@main.route('/api/update_user/<int:user_id>', methods=['PUT'])
+def update_user(user_id):
+    try:
+        # Get the user by ID
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Update fields with form data
+        user.email = request.form.get('email')
+        user.password = request.form.get('password')
+        user.role = request.form.get('role')
+        user.shop = request.form.get('shop')
+
+        # Commit changes to the database
+        db.session.commit()
+        return jsonify({"message": "User updated successfully"}), 200
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        return jsonify({"error": "An error occurred while updating the user"}), 500
+
+
 
 @main.route('/count_stock')
 def count_stock():
@@ -179,8 +250,6 @@ def receive_stock():
         return render_template('pages-error-404.html', message="Failed to load receive stock data")
 
 
-
-
 @main.route('/order_stock')
 def order_stock():
     user_data = session.get('user')
@@ -243,8 +312,8 @@ def register_post():
     db.session.add(new_activity)
     db.session.commit()
 
-    flash('User registered successfully')
-    return redirect(url_for('main.login'))
+    # flash('User registered successfully')
+    return redirect(url_for('main.admin_users'))
 
 
 @main.route('/get_product_order_template', methods=['GET'])
