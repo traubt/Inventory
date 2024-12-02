@@ -148,6 +148,12 @@
             <input type="text" class="form-control" id="lastName" name="lastName" disabled>
           </div>
 
+          <!-- Last Name (disabled) -->
+          <div class="mb-3">
+            <label for="userName" class="form-label">Username</label>
+            <input type="text" class="form-control" id="userName" name="userName" disabled>
+          </div>
+
           <!-- Email (editable) -->
           <div class="mb-3">
             <label for="email" class="form-label">Email</label>
@@ -162,17 +168,20 @@
 
           <!-- Role (editable) -->
           <div class="mb-3">
-            <label for="role" class="form-label">Role</label>
-            <input type="text" class="form-control" id="role" name="role" required>
+              <label for="role" class="form-label">Role</label>
+              <select class="form-control" id="role" name="role" required>
+                  <option value="" disabled selected>Select a role</option>
+              </select>
           </div>
 
-          <!-- Shop (editable) -->
-<div class="mb-3">
-    <label for="shop" class="form-label">Shop</label>
-    <select class="form-control" id="shop" name="shop" required>
-        <option value="" disabled selected>Select a shop</option>
-    </select>
-</div>
+
+                    <!-- Shop (editable) -->
+          <div class="mb-3">
+              <label for="shop" class="form-label">Shop</label>
+              <select class="form-control" id="shop" name="shop" required>
+                  <option value="" disabled selected>Select a shop</option>
+              </select>
+          </div>
 
         </form>
       </div>
@@ -194,33 +203,64 @@
 
  $(document).ready(async function() {
 
-        const shops = {{ shops | tojson }};
+    var shops = {{ shops | tojson }};
     console.log("List of shops:", shops);
-
-    const shopDropdown = document.getElementById("shop");
-
-    // Populate the dropdown with the list of shops
-    shopDropdown.innerHTML = '<option value="" disabled selected>Select a shop</option>';
-    shops.forEach(shop => {
-        const option = document.createElement("option");
-        option.value = shop;
-        option.textContent = shop;
-        shopDropdown.appendChild(option);
-    });
-
-    // Populate the selected shop when opening the modal for update
-    $('#updateModal').on('show.bs.modal', function (event) {
-        const button = $(event.relatedTarget); // Button that triggered the modal
-        const shop = button.data("shop"); // Extract shop from data attribute
-
-        if (shop) {
-            shopDropdown.value = shop; // Set the dropdown value to the user's shop
-        }
-    });
+    shops.push("Head Office");
 
     var roles = {{ roles | tojson }};
     var user_role = "{{user.role}}";
+    console.log("roles:", roles);
+    const list_of_roles = roles.map(item => item.role);
+    console.log(list_of_roles);
+
+
     disableControlsPerRole(roles,user_role);
+
+// Add click event for the update button
+$('#Users').on('click', '.btn-update', function () {
+    const button = $(this); // The button that was clicked
+
+    // Extract the data attributes for the selected user
+    const userId = button.data('id'); // Extract user ID
+    const userShop = button.data('shop'); // Extract user shop
+    const userRole = button.data('role'); // Extract user role
+
+    // Log the data for debugging
+    console.log('Button clicked. User ID:', userId);
+    console.log('User Shop:', userShop);
+    console.log('User Role:', userRole);
+
+    // Populate the modal with the values from the button
+    $('#userId').val(userId);
+    $('#shop').val(userShop);
+    $('#role').val(userRole);
+
+    // Show the modal
+    $('#updateModal').modal('show');
+});
+
+// Modal population for the Shop and Role dropdowns
+$('#updateModal').on('show.bs.modal', function () {
+    const shopDropdown = $('#shop'); // Shop dropdown
+    const roleDropdown = $('#role'); // Role dropdown
+
+    // Populate the shop dropdown
+    shopDropdown.empty(); // Clear the dropdown first
+    shopDropdown.append('<option value="" disabled>Select a shop</option>');
+    shops.forEach(shop => {
+        shopDropdown.append(new Option(shop, shop)); // Add each shop as an option
+    });
+
+    // Populate the role dropdown
+    roleDropdown.empty(); // Clear the dropdown first
+    roleDropdown.append('<option value="" disabled>Select a role</option>');
+    list_of_roles.forEach(role => {
+        roleDropdown.append(new Option(role, role)); // Add each role as an option
+    });
+});
+
+
+
 
 $("#getUsers").on("click", function (event) {
     event.preventDefault();
@@ -261,11 +301,16 @@ $("#getUsers").on("click", function (event) {
                 });
 
                 rowData.push(`
-                    <button class="btn btn-primary btn-update" data-id="{{ user.id }}">Update</button>
-                    <button class="btn btn-danger btn-delete" data-id="${user.id}">Delete</button>
+                    <button class="btn btn-primary btn-update"
+                            data-id="${user.id}"
+                            data-shop="${user.shop}"
+                            data-role="${user.role}">Update</button>
+                    <button class="btn btn-danger btn-delete"
+                            data-id="${user.id}">Delete</button>
                 `);
                 return rowData;
             });
+
 
             // Initialize the DataTable
             $('#Users').DataTable({
@@ -316,21 +361,24 @@ $("#createUser").on("click", function(event) {
 
 // Open modal and populate fields
 $('#Users').on('click', '.btn-update', function () {
-    const row = $(this).closest('tr'); // Get the row for the selected user
+    const button = $(this); // The clicked button
+    const userId = button.data('id'); // Get user ID from data-id attribute
 
-    // Extract user data from table (adjust indices based on your table structure)
-    const userId = $(this).data('id'); // Assuming the button has a data-id attribute with the user ID
-    const firstName = row.find('td:nth-child(2)').text(); // Column 2: First Name
-    const lastName = row.find('td:nth-child(3)').text();  // Column 3: Last Name
-    const email = row.find('td:nth-child(5)').text();     // Column 4: Email
-    const password = row.find('td:nth-child(6)').text();  // Column 5: Password
-    const role = row.find('td:nth-child(7)').text();      // Column 6: Role
-    const shop = row.find('td:nth-child(8)').text();      // Column 7: Shop
+    // Fetch the parent row and extract the other fields
+    const row = button.closest('tr');
+    const firstName = row.find('td:nth-child(2)').text(); // Adjust column indices as necessary
+    const lastName = row.find('td:nth-child(3)').text();
+    const userName = row.find('td:nth-child(4)').text();
+    const email = row.find('td:nth-child(5)').text();
+    const password = row.find('td:nth-child(6)').text();
+    const role = row.find('td:nth-child(7)').text();
+    const shop = row.find('td:nth-child(8)').text();
 
     // Populate modal fields
     $('#userId').val(userId);
     $('#firstName').val(firstName);
     $('#lastName').val(lastName);
+    $('#userName').val(userName);
     $('#email').val(email);
     $('#password').val(password);
     $('#role').val(role);
@@ -339,6 +387,7 @@ $('#Users').on('click', '.btn-update', function () {
     // Show the modal
     $('#updateModal').modal('show');
 });
+
 
 // Save changes and send to backend
 $('#saveChangesButton').on('click', function () {
