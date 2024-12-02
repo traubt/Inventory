@@ -1031,7 +1031,9 @@ def sales_report():
     shop = json.loads(shop_data)
     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
     list_of_shops = [shop.blName for shop in shops]
-    return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
 
 
 @main.route('/get_sales_per_shop_report')
