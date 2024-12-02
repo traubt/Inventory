@@ -129,7 +129,9 @@ def user_profile():
     user = json.loads(user_data)
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
-    return render_template('users-profile.html', user=user, shop=shop)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('users-profile.html', user=user, shop=shop, roles=roles_list)
 
 
 @main.route('/receive_stock')
@@ -141,7 +143,6 @@ def receive_stock():
         shop_data = session.get('shop')
         shop = json.loads(shop_data)
         roles = TocRole.query.all()
-        # Convert the roles to a list of dictionaries
         roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
 
         # Query all records where order_status is 'New'
@@ -271,17 +272,17 @@ def get_product_order_template():
 def get_product_order_form():
     try:
         # Fetch the shop customer from the session
-        shop = json.loads(session.get('shop'))['customer']  # Assuming 'shop.customer' is stored in the session
+        shop = json.loads(session.get('shop'))['name']  # Assuming 'shop.customer' is stored in the session
 
-        # Query tocStockOrder to check if there is any "New" order for the customer
-        existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
-
-        if not existing_order:
-            # If no "New" order exists, return an empty array with a 200 status
-            return jsonify([]), 200
+        # # Query tocStockOrder to check if there is any "New" order for the customer
+        # existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
+        #
+        # if not existing_order:
+        #     # If no "New" order exists, return an empty array with a 200 status
+        #     return jsonify([]), 200
 
         # Proceed with fetching the stock order form if an existing order is found
-        data = get_stock_order_form()
+        data = get_stock_count_per_shop(shop)
 
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
@@ -291,14 +292,14 @@ def get_product_order_form():
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "stock_count": row[2],
-                "last_stock_qty": row[3],
-                "calc_stock_qty": row[4],
-                "variance": row[5],
-                "variance_rsn": row[6],
-                "stock_recount": row[7],
-                "rejects_qty": row[8],
-                "comments": row[9]
+                "stock_count": row[7],
+                "last_stock_qty": row[4],
+                "calc_stock_qty": row[7],
+                "variance": 0,
+                "variance_rsn": "NA",
+                "stock_recount": 0,
+                "rejects_qty": 0,
+                "comments": "NA"
             }
             for row in data
         ]
@@ -699,7 +700,7 @@ def save_order():
 
         # Insert new records into the table
         for row in table:
-            sku, item_name, count_qty, last_stock_qty, calc_stock_qty, variance_qty, variance_rsn, rejected_qty, order_qty, comments = row
+            sku, item_name, last_stock_qty, last_count_date,qty_sold, qty_bfr_rcv, rcv_qty, stock_count, order_qty,  comments = row
 
             new_record = TocStockOrder(
                 shop_id=shop,
@@ -708,14 +709,10 @@ def save_order():
                 order_id=order_id,
                 user=user_name,
                 item_name=item_name,
-                count_qty=float(count_qty) if count_qty else 0,
-                variance_rsn=variance_rsn,
-                rejected_qty=float(rejected_qty) if rejected_qty else 0,
                 order_qty=float(order_qty) if order_qty else 0,
                 comments=comments,
                 order_status="New",
                 order_status_date=datetime.now(),
-                variance_qty=float(variance_qty) if variance_qty else 0
             )
             db.session.add(new_record)
 

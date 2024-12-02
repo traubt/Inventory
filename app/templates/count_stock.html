@@ -132,10 +132,10 @@
 
 <script>
 
+ $(document).ready(async function() {
+
     var _t_order_product_template;
     var _saved = false;
-
- $(document).ready(async function() {
 
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
@@ -607,7 +607,7 @@ $("#resetQty").on("click", function() {
 
  // Event listener for the custom tableChanged event
 $(document).on("tableChanged", function() {
-    //alert("Change happened");
+    alert("Change happened");
     _saved = true;
 });
 
