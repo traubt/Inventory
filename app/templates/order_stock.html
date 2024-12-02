@@ -92,13 +92,13 @@
               </div>
             </div>
             <div class="d-flex gap-1 mt-3">
-              <button class="btn btn-primary" id="newOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Create new order from plain form">Create Order</button>
-              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>
-              <button class="btn btn-primary" id="saveOrder" data-bs-placement="bottom" data-bs-original-title="Save order to the database" disabled >Save Order</button>
-              <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>
-              <button class="btn btn-primary" id="closeOrder" data-bs-placement="bottom" data-bs-original-title="Close order without saving" disabled>Close Order</button>
-              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>
-              <button class="btn btn-danger" id="resetQty" data-bs-placement="bottom" data-bs-original-title="Reset all order quantity to zero" disabled>Reset Order Qty</button>
+              <button class="btn btn-primary" id="newOrder" >Create Order</button>
+<!--              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>-->
+              <button class="btn btn-primary" id="saveOrder"  disabled >Save Order</button>
+              <button class="btn btn-primary" id="submitOrder"  disabled>Submit Order</button>
+              <button class="btn btn-primary" id="closeOrder"  disabled>Close Order</button>
+              <button class="btn btn-danger" id="cancelOrder"  disabled>Cancel Order</button>
+              <button class="btn btn-danger" id="resetQty"  disabled>Reset Order Qty</button>
             </div>
 
               <!--Handle the csv file -->
@@ -144,16 +144,15 @@
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
 
-    $("#newOrder").on("click", function(event) {
-    // Set the order name based on shop customer and current date
-    $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);
+    $("#newOrder").on("click", function (event) {
+        // Set the order name based on shop customer and current date
+        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}-O`);
 
-    // Check if there is already an open "New" order
-    fetch('/get_product_order_form')
-        .then(response => response.json())
-        .then(data => {
-            if (data.length === 0) {
-                // No existing order, create a new order template
+        // Fetch stock data
+        fetch('/get_stock_count_form')
+            .then(response => response.json())
+            .then(data => {
+                // Pass the fetched data to loadStockData function
                 $("#loadOrder").prop("disabled",true);
                 $("#saveOrder").prop("disabled", false);
                 $("#resetQty").prop("disabled", false);
@@ -161,174 +160,252 @@
                 $("#cancelOrder").prop("disabled", false);
                 $("#closeOrder").prop("disabled", false);
                 $("#newOrder").prop("disabled", true);
-                fetch('/get_product_order_template')
-                    .then(response => response.json())
-                    .then(rows => {
-                        loadOrderTemplate(rows);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching the order template:', error);
-                    });
-            } else {
-                // Existing order exists, alert the user
-                dialog("New Order","An open order already exists. Please click on 'Load Order' to modify the existing order.");
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching the product order form:', error);
-        });
-    });
-
-
-   // Event handler for the "loadOrder" button
-    $("#loadOrder").on("click", function(event) {
-        // Set the order name based on shop customer and current date
-        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);
-
-        // Fetch the product order form data (check for an existing "New" order)
-        fetch('/get_product_order_form')
-            .then(response => response.json())
-            .then(data => {
-                if (Array.isArray(data) && data.length === 0) {
-                    // No existing order found, create a new order template
-                    dialog("Load Order","<p>There is no existing order. <br>Please click on New Order to open a new order form.</p>");
-                } else {
-                    // Existing order found, load the existing order data
-                    loadExistingOrder(data);
-                    $("#newOrder").prop("disabled", true);
-                    $(this).prop("disabled", true);
-                }
+                loadStockData(data);
             })
             .catch(error => {
-                console.error('Error fetching the product order form:', error);
+                console.error('Error fetching stock count form:', error);
             });
     });
 
-    // Function to load the new order template data into the table
-    function loadOrderTemplate(rows) {
-        console.log(rows);
 
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
-        }
+function loadStockData(rows) {
+    console.log(rows);
 
-        const table = $('#ProductOrderTemplate').DataTable({
-            data: rows,
-            columns: [
-                { title: "SKU", data: "sku" },
-                { title: "Product Name", data: "product_name" },
-                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Last Stock Qty", data: "last_stock_qty" },
-                { title: "Calc Stock Qty", data: "calc_stock_qty" },
-                { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
-                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }}
-            ],
-            pageLength: 50,
-            order: [[1, 'asc']],
-            autoWidth: false,
-            paging: true,
-            searching: true,
-            responsive: true,
-            dom: 'frtip',
-        });
-
-        $('#ProductOrderTemplate').show();
+    // Destroy existing DataTable if it exists
+    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+        $('#ProductOrderTemplate').DataTable().destroy();
     }
 
+    // Initialize DataTable
+    const table = $('#ProductOrderTemplate').DataTable({
+        data: rows,
+        columns: [
+            { title: "SKU", data: "sku" },
+            { title: "Product Name", data: "product_name" },
+            { title: "Last Stock Count", data: "last_stock_count" },
+            { title: "Last Stock Count Date", data: "last_stock_count_date" },
+            { title: "Sold Quantity", data: "sold_qty" },
+            { title: "Qty before receive", data: "current_qty" },
+            { title: "Received Quantity", data: "received_qty" },
+            {
+                title: "Stock Count",
+                data: null,
+                className: 'non-editable', // Add a class if needed for styling
+                render: function (data, type, row) {
+                    const currentStockCount = row.current_qty + row.received_qty;
+                    return `<span>${currentStockCount}</span>`; // Render as plain text
+                }
+            },
 
-    // Function to load the existing order data into the table
-    function loadExistingOrder(data) {
-        console.log(data);
+            {
+                title: "Order Qty",
+                data: null,
+                className: 'editable',
+                render: function (data, type, row) {
+                    const currentStockRejected = 0;
+                    return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
+                }
+            },
+<!--            {-->
+<!--                title: "Variance",-->
+<!--                data: null,-->
+<!--                render: function (data, type, row) {-->
+<!--                    const variance = 0;-->
+<!--                    return `<span class="variance">${variance}</span>`;-->
+<!--                }-->
+<!--            },-->
+<!--            {-->
+<!--                title: "Variance Reason",-->
+<!--                data: null,-->
+<!--                className: 'editable',-->
+<!--                render: function (data, type, row) {-->
+<!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
+<!--                }-->
+<!--            },-->
+            {
+                title: "Comments",
+                data: null,
+                className: 'editable',
+                render: function (data, type, row) {
+                    return `<input type="text" class="comments" value="" />`;
+                }
+            }
+        ],
+        pageLength: 50,
+        order: [[1, 'asc']],
+        autoWidth: false,
+        paging: true,
+        searching: true,
+        responsive: true,
+        dom: 'frtip',
+    });
 
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
-        }
+    $('#ProductOrderTemplate').show();
 
-        const table = $('#ProductOrderTemplate').DataTable({
-            data: data,
-            columns: [
-                { title: "SKU", data: "sku" },
-                { title: "Product Name", data: "product_name" },
-                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Last Stock Qty", data: "last_stock_qty" },
-                { title: "Calc Stock Qty", data: "calc_stock_qty" },
-                { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
-                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;
-                    }
-                    return data;
-                }},
-                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }}
-            ],
-            pageLength: 50,
-            order: [[1, 'asc']],
-            autoWidth: false,
-            paging: true,
-            searching: true,
-            responsive: true,
-            dom: 'frtip',
-        });
+    // Update variance dynamically when the current stock count changes
+<!--    $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {-->
+<!--        const row = $(this).closest('tr');-->
+<!--        const currentQty = parseFloat(row.find('.current-stock-count').val()) || 0;-->
+<!--        const initialQty = parseFloat(row.find('td:nth-child(6)').text()) || 0;-->
+<!--        const receivedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;-->
+<!--        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0; // Correctly fetch input value-->
 
-        $('#ProductOrderTemplate').show();
+<!--        const variance = currentQty - receivedQty - initialQty + rejectedQty;-->
 
-        // Disable save order button
-        $("#saveOrder").prop("disabled", false);
-        $("#resetQty").prop("disabled", false);
-        $("#cancelOrder").prop("disabled", false);
-        $("#closeOrder").prop("disabled", false);
-        $("#submitOrder").prop("disabled", false);
-    }
+<!--        row.find('.variance').text(variance);-->
+<!--    });-->
+
+}
+
+<!--   // Event handler for the "loadOrder" button-->
+<!--    $("#loadOrder").on("click", function(event) {-->
+<!--        // Set the order name based on shop customer and current date-->
+<!--        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);-->
+
+<!--        // Fetch the product order form data (check for an existing "New" order)-->
+<!--        fetch('/get_product_order_form')-->
+<!--            .then(response => response.json())-->
+<!--            .then(data => {-->
+<!--                if (Array.isArray(data) && data.length === 0) {-->
+<!--                    // No existing order found, create a new order template-->
+<!--                    dialog("Load Order","<p>There is no existing order. <br>Please click on New Order to open a new order form.</p>");-->
+<!--                } else {-->
+<!--                    // Existing order found, load the existing order data-->
+<!--                    loadExistingOrder(data);-->
+<!--                    $("#newOrder").prop("disabled", true);-->
+<!--                    $(this).prop("disabled", true);-->
+<!--                }-->
+<!--            })-->
+<!--            .catch(error => {-->
+<!--                console.error('Error fetching the product order form:', error);-->
+<!--            });-->
+<!--    });-->
+
+<!--    // Function to load the new order template data into the table-->
+<!--    function loadOrderTemplate(rows) {-->
+<!--        console.log(rows);-->
+
+<!--        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {-->
+<!--            $('#ProductOrderTemplate').DataTable().destroy();-->
+<!--        }-->
+
+<!--        const table = $('#ProductOrderTemplate').DataTable({-->
+<!--            data: rows,-->
+<!--            columns: [-->
+<!--                { title: "SKU", data: "sku" },-->
+<!--                { title: "Product Name", data: "product_name" },-->
+<!--                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Last Stock Qty", data: "last_stock_qty" },-->
+<!--                { title: "Calc Stock Qty", data: "calc_stock_qty" },-->
+<!--                { title: "Variance", data: "variance" },-->
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }}-->
+<!--            ],-->
+<!--            pageLength: 50,-->
+<!--            order: [[1, 'asc']],-->
+<!--            autoWidth: false,-->
+<!--            paging: true,-->
+<!--            searching: true,-->
+<!--            responsive: true,-->
+<!--            dom: 'frtip',-->
+<!--        });-->
+
+<!--        $('#ProductOrderTemplate').show();-->
+<!--    }-->
+
+
+<!--    // Function to load the existing order data into the table-->
+<!--    function loadExistingOrder(data) {-->
+<!--        console.log(data);-->
+
+<!--        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {-->
+<!--            $('#ProductOrderTemplate').DataTable().destroy();-->
+<!--        }-->
+
+<!--        const table = $('#ProductOrderTemplate').DataTable({-->
+<!--            data: data,-->
+<!--            columns: [-->
+<!--                { title: "SKU", data: "sku" },-->
+<!--                { title: "Product Name", data: "product_name" },-->
+<!--                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Last Stock Qty", data: "last_stock_qty" },-->
+<!--                { title: "Calc Stock Qty", data: "calc_stock_qty" },-->
+<!--                { title: "Variance", data: "variance" },-->
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+<!--                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }}-->
+<!--            ],-->
+<!--            pageLength: 50,-->
+<!--            order: [[1, 'asc']],-->
+<!--            autoWidth: false,-->
+<!--            paging: true,-->
+<!--            searching: true,-->
+<!--            responsive: true,-->
+<!--            dom: 'frtip',-->
+<!--        });-->
+
+<!--        $('#ProductOrderTemplate').show();-->
+
+<!--        // Disable save order button-->
+<!--        $("#saveOrder").prop("disabled", false);-->
+<!--        $("#resetQty").prop("disabled", false);-->
+<!--        $("#cancelOrder").prop("disabled", false);-->
+<!--        $("#closeOrder").prop("disabled", false);-->
+<!--        $("#submitOrder").prop("disabled", false);-->
+<!--    }-->
 
 
     $("#saveOrder").on("click", function() {
