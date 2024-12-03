@@ -10,6 +10,7 @@ from . import db
 from .db_queries import *
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
+from sqlalchemy import distinct
 
 app = Flask(__name__)
 main = Blueprint('main', __name__)
@@ -260,6 +261,84 @@ def order_stock():
     # Convert the roles to a list of dictionaries
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('order_stock.html', user=user, shop=shop , roles=roles_list)
+
+
+@main.route('/view_orders')
+def view_orders():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+
+    # Get roles
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+
+    # Get list of open orders
+    distinct_orders = db.session.query(TocStockOrder.order_id) \
+        .filter(TocStockOrder.order_status.in_(["New", "Updated"])) \
+        .distinct() \
+        .all()
+    list_of_orders = [order[0] for order in distinct_orders]
+
+    # Get all shops
+    all_shops = TOC_SHOPS.query.all()
+    shops_list = [{'blName': shop.blName, 'store': shop.store, 'customer': shop.customer} for shop in all_shops]
+
+    return render_template(
+        'view_orders.html',
+        user=user,
+        shop=shop,
+        roles=roles_list,
+        orders=list_of_orders,
+        shops=shops_list
+    )
+
+
+@main.route('/get_order_details', methods=['GET'])
+def get_order_details():
+    order_id = request.args.get('order_id')
+    if not order_id:
+        return jsonify({'error': 'Missing order_id'}), 400
+
+    # Query the database
+    records = TocStockOrder.query.filter(TocStockOrder.order_id == order_id).all()
+
+    # Format the data for response
+    result = [{
+        'order_open_date': record.order_open_date.strftime('%Y-%m-%d %H:%M:%S'),
+        'sku': record.sku,
+        'user': record.user,
+        'item_name': record.item_name,
+        'order_qty': record.order_qty,
+        'comments': record.comments,
+        'order_status': record.order_status,
+        'order_status_date': record.order_status_date.strftime(
+            '%Y-%m-%d %H:%M:%S') if record.order_status_date else None,
+    } for record in records]
+
+    return jsonify(result)
+
+@main.route('/confirm_order/<string:order_id>', methods=['POST'])
+def confirm_order(order_id):
+    try:
+        # Update the database records for the given order_id
+        records_updated = (
+            db.session.query(TocStockOrder)
+            .filter(TocStockOrder.order_id == order_id)
+            .update({
+                TocStockOrder.order_status: "Confirm",
+                TocStockOrder.order_status_date: datetime.utcnow()
+            })
+        )
+        db.session.commit()
+        if records_updated > 0:
+            return jsonify({"message": "Order confirmed successfully."}), 200
+        else:
+            return jsonify({"error": "No records found for the given order ID."}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 @main.route('/replenish_stock')
 def replenish_stock():
