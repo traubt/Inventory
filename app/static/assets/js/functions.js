@@ -1,13 +1,13 @@
-  function dialog(dialog_title, dialog_body) {
-      // Set the title of the modal
-      $('#exampleModalLabel').text(dialog_title);
+function dialog(dialog_title, dialog_body) {
+  // Set the title of the modal
+  $('#exampleModalLabel').text(dialog_title);
 
-      // Set the body content of the modal
-      $('#dialog_body').html(dialog_body);
+  // Set the body content of the modal
+  $('#dialog_body').html(dialog_body);
 
-      // Show the modal directly without triggering the button click
-      $('#exampleModal').modal('show');
-    }
+  // Show the modal directly without triggering the button click
+  $('#exampleModal').modal('show');
+}
 
     // Get the current date in yyyy-mm-dd format
 function getCurrentDate() {
@@ -68,6 +68,22 @@ async function fetchOpenOrders() {
 function getShopCodeByBlName(blName) {
     const shop = _shops.find(item => item.blName === blName);
     return shop ? shop.customer : null; // Return the customer or null if not found
+}
+
+function getShopNameByCode(code) {
+    const shop = _shops.find(item => item.customer === code);
+    return shop ? shop.blName : null; // Return the customer or null if not found
+}
+
+// Function to extract shop code and retrieve the shop name
+function getShopNameFromOrderId(orderID) {
+    // Extract the shop code from the orderID (first part before the '_')
+    const shopCode = orderID.split('_')[0];
+
+    // Use the helper function to get the shop name
+    const shopName = getShopNameByCode(shopCode);
+
+    return shopName; // Return the shop name (or null if not found)
 }
 
 // disable controls
