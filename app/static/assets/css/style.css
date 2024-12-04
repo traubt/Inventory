@@ -1308,6 +1308,16 @@ h6 {
     }
 }
 
+#Users .btn {
+    display: inline-block;  /* Ensure buttons are next to each other */
+    margin-right: 5px;       /* Space between buttons */
+}
+
+#Users td {
+    text-align: center;  /* Ensure text and buttons are centered */
+}
+
+
 
 
 

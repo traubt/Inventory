@@ -41,11 +41,7 @@
               <i class="bi bi-circle"></i><span>View Orders</span>
             </a>
           </li>
-          <li id="createProduct">
-            <a href="forms-validation.html">
-              <i class="bi bi-circle"></i><span>Manage Products</span>
-            </a>
-          </li>
+
         </ul>
       </li><!-- End Forms Nav -->
 
@@ -70,6 +66,11 @@
           <li id="admin">
             <a href="{{ url_for('main.admin_users') }}">
               <i class="bi bi-circle"></i><span>Users</span>
+            </a>
+          </li>
+          <li id="Products">
+            <a href="{{ url_for('main.admin_products') }}">
+              <i class="bi bi-circle"></i><span>Products</span>
             </a>
           </li>
         </ul>
