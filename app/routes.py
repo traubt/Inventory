@@ -123,7 +123,6 @@ def admin_users():
     )
 
 
-
 @main.route('/api/get_users')
 def get_users():
     users = User.query.all()
@@ -181,6 +180,143 @@ def update_user(user_id):
     except Exception as e:
         print(f"Error updating user: {e}")
         return jsonify({"error": "An error occurred while updating the user"}), 500
+
+
+##########################################    Product admin  ##########################################
+@main.route('/admin_products')
+def admin_products():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    products = TocProduct.query.all()
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'product_admin.html',
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        products=products
+    )
+
+
+@main.route('/api/products', methods=['GET'])
+def get_products():
+    # Query all products from the database
+    products = TocProduct.query.all()
+
+    # Serialize the data
+    products_data = [
+        {
+            "item_sku": product.item_sku,
+            "item_name": product.item_name,
+            "stat_group": product.stat_group,
+            "acct_group": product.acct_group,
+            "retail_price": product.retail_price,
+            "cost_price": product.cost_price,
+            "wh_price": product.wh_price,
+            "cann_cost_price": product.cann_cost_price,
+            "product_url": product.product_url,
+            "image_url": product.image_url,
+            "stock_ord_ind": product.stock_ord_ind,
+        }
+        for product in products
+    ]
+
+    # Return the serialized data as JSON
+    return jsonify(products_data)
+
+@main.route('/api/products', methods=['POST'])
+def create_product():
+    # Get data from the request (assuming JSON format)
+    data = request.get_json()
+
+    # Ensure all required fields are in the request
+    if not data or not data.get('item_sku') or not data.get('item_name'):
+        return jsonify({"message": "Missing required fields: item_sku or item_name"}), 400
+
+    try:
+        # Create a new product instance
+        new_product = TocProduct(
+            item_sku=data.get('item_sku'),
+            item_name=data.get('item_name'),
+            stat_group=data.get('stat_group'),
+            acct_group=data.get('acct_group'),
+            retail_price=data.get('retail_price'),
+            cost_price=data.get('cost_price'),
+            wh_price=data.get('wh_price'),
+            cann_cost_price=data.get('cann_cost_price'),
+            product_url=data.get('product_url'),
+            image_url=data.get('image_url'),
+            stock_ord_ind=data.get('stock_ord_ind')
+        )
+
+        # Add the new product to the session and commit to the database
+        db.session.add(new_product)
+        db.session.commit()
+
+        # Call the function to distribute the product to all shops
+        distribute_product_to_shops(new_product.item_sku)
+
+        # Return a success message
+        return jsonify({"message": "Product created and distributed to shops successfully", "product": new_product.item_sku}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Error creating product: {str(e)}"}), 500
+
+
+
+@main.route('/api/products/<string:item_sku>', methods=['DELETE'])
+def delete_product(item_sku):
+    product = TocProduct.query.get(item_sku)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+
+    try:
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({"message": "Product deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@main.route('/api/products/<string:item_sku>', methods=['PUT'])
+def update_product(item_sku):
+    data = request.get_json()
+
+    try:
+        # Find the product by item_sku
+        product = TocProduct.query.get(item_sku)
+        if not product:
+            return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
+
+        # Update fields
+        product.item_name = data.get('item_name', product.item_name)
+        product.stat_group = data.get('stat_group', product.stat_group)
+        product.acct_group = data.get('acct_group', product.acct_group)
+        product.retail_price = data.get('retail_price', product.retail_price)
+        product.cost_price = data.get('cost_price', product.cost_price)
+        product.wh_price = data.get('wh_price', product.wh_price)
+        product.cann_cost_price = data.get('cann_cost_price', product.cann_cost_price)
+        product.product_url = data.get('product_url', product.product_url)
+        product.image_url = data.get('image_url', product.image_url)
+        product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
+
+        # Commit changes
+        db.session.commit()
+        return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+#######################################################################################################
 
 
 
@@ -746,26 +882,6 @@ def get_toc_shops():
     ]
     return jsonify(shops_data)
 
-@main.route('/api/products', methods=['GET'])
-def get_products():
-    products = TocProduct.query.all()  # Query all rows from the table
-    products_data = [
-        {
-            "item_sku": product.item_sku,
-            "item_name": product.item_name,
-            "stat_group": product.stat_group,
-            "acct_group": product.acct_group,
-            "retail_price": product.retail_price,
-            "cost_price": product.cost_price,
-            "wh_price": product.wh_price,
-            "cann_cost_price": product.cann_cost_price,
-            "product_url": product.product_url,
-            "image_url": product.image_url,
-            "stock_ord_ind": product.stock_ord_ind,
-        }
-        for product in products
-    ]
-    return jsonify(products_data)
 
 
 @main.route('/api/open_orders', methods=['GET'])

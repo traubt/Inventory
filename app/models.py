@@ -103,17 +103,19 @@ class TocReplenishOrder(db.Model):
 class TocProduct(db.Model):
     __tablename__ = 'toc_product'
 
-    item_sku = db.Column(db.String(45), primary_key=True)
-    item_name = db.Column(db.String(200))
-    stat_group = db.Column(db.String(45))
-    acct_group = db.Column(db.String(45))
-    retail_price = db.Column(db.Float)
-    cost_price = db.Column(db.Float)
-    wh_price = db.Column(db.Float)
-    cann_cost_price = db.Column(db.Float)
-    product_url = db.Column(db.String(200))
-    image_url = db.Column(db.String(200))
-    stock_ord_ind = db.Column(db.Integer)
+    item_sku = db.Column(db.String(45), primary_key=True, nullable=False)
+    item_name = db.Column(db.String(200), nullable=True)
+    stat_group = db.Column(db.String(45), nullable=True)
+    acct_group = db.Column(db.String(45), nullable=True)
+    retail_price = db.Column(db.Float, nullable=True)
+    cost_price = db.Column(db.Float, nullable=True)
+    wh_price = db.Column(db.Float, nullable=True)
+    cann_cost_price = db.Column(db.Float, nullable=True)
+    product_url = db.Column(db.String(200), nullable=True)
+    image_url = db.Column(db.String(200), nullable=True)
+    stock_ord_ind = db.Column(db.Integer, nullable=True)
+    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    update_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
 
 class TOCReplenishCtrl(db.Model):
     __tablename__ = 'toc_replenish_ctrl'

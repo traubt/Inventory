@@ -319,6 +319,67 @@ def get_stock_order_template():
 
     return result
 
+
+
+def distribute_product_to_shops(sku):
+    # Connect to the database
+    conn = get_db_connection()  # Assuming this function is defined elsewhere to get the connection
+    cursor = conn.cursor()
+
+    # Query to insert the product into the toc_stock table for all shops
+    query = '''
+        INSERT INTO toc_stock (
+            shop_id, sku, stock_qty_date, product_name, shop_name, final_stock_qty,
+            stock_count, count_by, last_stock_qty, calc_stock_qty, variance, variance_rsn,
+            stock_recount, rejects_qty, replenish_id, comments
+        )
+        SELECT 
+            toc_shops.customer AS shop_id,
+            toc_product.item_sku AS sku,
+            NOW() AS stock_qty_date,
+            toc_product.item_name AS product_name,
+            toc_shops.blName AS shop_name,
+            0 AS final_stock_qty,
+            0 AS stock_count,
+            'NA' AS count_by,
+            0 AS last_stock_qty,
+            0 AS calc_stock_qty,
+            0 AS variance,
+            'NA' AS variance_rsn,
+            0 AS stock_recount,
+            0 AS rejects_qty,
+            'NA' AS replenish_id,  -- Replacing transfer_id with replenish_id
+            'NA' AS comments
+        FROM 
+            toc_shops
+        CROSS JOIN 
+            toc_product
+        WHERE 
+            toc_product.item_sku = %s;
+    '''
+
+    try:
+        # Execute the query with the sku parameter
+        cursor.execute(query, (sku,))
+
+        # Commit the transaction to save the changes to the database
+        conn.commit()
+
+    except mysql.connector.Error as err:
+        # Rollback in case of error
+        conn.rollback()
+        print(f"Error occurred: {err}")
+        return {"status": "error", "message": str(err)}
+
+    finally:
+        # Close the cursor and connection
+        cursor.close()
+        conn.close()
+
+    # If successful, return a success message
+    return {"status": "success", "message": f"Product {sku} distributed to shops successfully."}
+
+
 def get_stock_order_form():
     shop_data = json.loads(session.get('shop'))
     shop = shop_data["customer"]
