@@ -1375,6 +1375,13 @@ def hourly_sales(timeframe):
     data = get_hourly_sales(shop_name, timeframe)
     return jsonify(data)
 
+@main.route('/top_agent/<timeframe>', methods=['GET'])
+def top_agent(timeframe):
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    data = get_top_agents(shop_name, timeframe)
+    return jsonify(data)
+
 @main.route('/recent_sales_product/<timeframe>', methods=['GET'])
 def recent_sales_product(timeframe):
     user_data = json.loads(session.get('user'))
