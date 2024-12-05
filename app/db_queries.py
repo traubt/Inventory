@@ -205,13 +205,16 @@ def get_hourly_sales(shop_name, timeframe):
 
     if shop_name == "Head Office":
         if timeframe == "hourly":
-            query = '''
+            query = '''                             
                 SELECT 
                     'Head Office' as store_name,
-                    DATE_FORMAT(time_of_sale, '%Y-%m-%d %H:00') AS sale_hour, 
+                    DATE_FORMAT(s.time_of_sale, '%Y-%m-%d %H:00') AS sale_hour, 
                     ROUND(SUM(tot_amt)) AS total_amount
                 FROM 
-                    toc_ls_sales_item
+                    toc_ls_sales_item i
+				JOIN
+					toc_ls_sales s 
+				ON i.sales_id = s.sales_id
                 GROUP BY 
                     sale_hour
                 ORDER BY 
@@ -223,12 +226,14 @@ def get_hourly_sales(shop_name, timeframe):
             query = '''
                 SELECT 
                     'Head Office' AS store_name,
-                    DATE_FORMAT(time_of_sale, '%Y-%m-%d') AS sale_date,
+                    DATE_FORMAT(i.time_of_sale, '%Y-%m-%d') AS sale_date,
                     ROUND(SUM(tot_amt)) AS total_amount
                 FROM 
-                    toc_ls_sales_item
+                    toc_ls_sales_item i
+                JOIN
+                    toc_ls_sales s on i.sales_id = s.sales_id
                 GROUP BY 
-                    DATE_FORMAT(time_of_sale, '%Y-%m-%d')
+                    DATE_FORMAT(i.time_of_sale, '%Y-%m-%d')
                 ORDER BY 
                     sale_date
                 limit 200;
@@ -318,6 +323,8 @@ def get_stock_order_template():
     conn.close()
 
     return result
+
+
 
 
 
@@ -627,6 +634,104 @@ def get_sales_by_shop_last_three_months():
     conn.close()
 
     return result_as_dicts
+
+
+def get_top_agents(shop_name, timeframe):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print(f"shop_name: {shop_name}")
+    print(f"time_frame: {timeframe}")
+
+    if shop_name == "Head Office":
+        if timeframe == "daily":
+            query = '''                             
+            SELECT 
+                staff_name, 
+                ROUND(SUM(i.net_amt)) AS total_net_amt
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+            WHERE 
+                i.time_of_sale >= CURDATE() - INTERVAL 1 DAY
+                AND i.time_of_sale < CURDATE()
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC
+            LIMIT 10;
+            '''
+            cursor.execute(query)
+        elif timeframe == "monthly":
+            query = '''
+                    SELECT 
+                        staff_name, 
+                        ROUND(SUM(i.net_amt)) AS total_net_amt
+                    FROM 
+                        toc_ls_sales_item i
+                    JOIN 
+                        toc_ls_sales s ON i.sales_id = s.sales_id
+                    WHERE 
+                        i.time_of_sale >= CURDATE() - INTERVAL 1 MONTH
+                        AND i.time_of_sale < CURDATE()
+                    GROUP BY 
+                        staff_name
+                    ORDER BY 
+                        total_net_amt DESC
+                    LIMIT 10;
+            '''
+            cursor.execute(query)
+    else:
+        if timeframe == "daily":
+            query = '''
+            SELECT 
+                staff_name, 
+                ROUND(SUM(i.net_amt)) AS total_net_amt
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+			join
+				toc_shops ts on ts.blName = s.store_name
+            WHERE 
+                i.time_of_sale >= CURDATE() - INTERVAL 1 DAY
+                AND i.time_of_sale < CURDATE()
+                AND store_name = %s
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC
+            LIMIT 10;
+            '''
+            cursor.execute(query, (shop_name,))
+        elif timeframe == "monthly":
+            query = '''
+            SELECT 
+                staff_name, 
+                ROUND(SUM(i.net_amt)) AS total_net_amt
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+			join
+				toc_shops ts on ts.blName = s.store_name
+            WHERE 
+                i.time_of_sale >= CURDATE() - INTERVAL 1 MONTH
+                AND i.time_of_sale < CURDATE()
+                AND store_name = %s
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC
+            LIMIT 10;
+
+            '''
+            cursor.execute(query, (shop_name,))
+
+    result = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return result
 
 ################################################  REPORT SECTION
 
