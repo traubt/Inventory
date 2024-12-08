@@ -237,7 +237,7 @@ function loadStockData(rows) {
                 }
             }
         ],
-        pageLength: 50,
+        pageLength: 300,
         order: [[1, 'asc']],
         autoWidth: false,
         paging: true,
@@ -248,14 +248,33 @@ function loadStockData(rows) {
 
     $('#ProductOrderTemplate').show();
 
+    // After table initialization, check variance for each row
+    table.rows().every(function () {
+        const row = this.node();
+        const data = this.data();
+        const currentQty = data.current_qty || 0;
+        const countedQty = parseFloat($(row).find('.current-stock-count').val()) || 0;
+        const rejectedQty = parseFloat($(row).find('.current-stock-rejected').val()) || 0;
+
+        // Calculate the variance
+        const variance = currentQty + rejectedQty - countedQty;
+
+        // If variance > 20% of current quantity, set red border
+        const threshold = 0.2; // 20%
+        const difference = Math.abs(currentQty - countedQty);
+        if (currentQty > 0 && (difference / currentQty) > threshold) {
+            $(row).find('.current-stock-count').css('border', '5px solid red');
+        }
+    });
+
     // Update variance dynamically when the current stock count changes
     $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
         const row = $(this).closest('tr');
         const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
         const calculatedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
-        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0; // Correctly fetch input value
+        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
 
-        const variance = countedQty - (calculatedQty - rejectedQty);
+        const variance = calculatedQty + rejectedQty - countedQty;
 
         // Update variance
         row.find('.variance').text(variance);
@@ -272,6 +291,7 @@ function loadStockData(rows) {
         }
     });
 }
+
 
 
 
@@ -350,7 +370,7 @@ function loadStockData(rows) {
                     return data;
                 }}
             ],
-            pageLength: 50,
+            pageLength: 300,
             order: [[1, 'asc']],
             autoWidth: false,
             paging: true,
@@ -408,7 +428,7 @@ function loadStockData(rows) {
                     return data;
                 }}
             ],
-            pageLength: 50,
+            pageLength: 300,
             order: [[1, 'asc']],
             autoWidth: false,
             paging: true,
@@ -430,8 +450,9 @@ function loadStockData(rows) {
 
 $("#saveOrder").on("click", function () {
 
-    if ($("#ProductOrderTemplate_filter input").val().length > 0){
-        dialog("Filter Is On","Can't submit count stock while fitler is on. Please close the table filter before submit");
+    // Check if the filter is on
+    if ($("#ProductOrderTemplate_filter input").val().length > 0) {
+        dialog("Filter Is On", "Can't submit count stock while filter is on. Please close the table filter before submit");
         return;
     }
 
@@ -455,6 +476,13 @@ $("#saveOrder").on("click", function () {
         rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
         rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments
+
+        // Check if the current stock count has a red border and comments are empty
+if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' && rowData.comments === "") {
+    alert(`Variance found in count for ${rowData.product_name}. Please enter a comment before confirming count.`);
+    isValid = false; // Invalid if the condition is met
+    return false; // Exit loop
+}
 
         // Validate the data (example: stock count and rejected stock cannot be negative)
         if (rowData.stock_count < 0 || rowData.stock_rejected < 0) {
@@ -497,8 +525,7 @@ $("#saveOrder").on("click", function () {
             user_name: user_name,
             date: date,
             shop_name: shop_name,
-            replenish_order_id : "NA",
-
+            replenish_order_id: "NA",
         }),
         success: function (response) {
             console.log("Data submitted successfully:", response);
@@ -514,6 +541,7 @@ $("#saveOrder").on("click", function () {
         }
     });
 });
+
 
     $("#submitOrder").on("click", async function(event) {
 
