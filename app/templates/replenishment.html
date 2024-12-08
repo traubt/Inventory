@@ -50,6 +50,9 @@
 
 
 
+
+
+
   <!-- =======================================================
   * Template Name: NiceAdmin
   * Template URL: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/
@@ -103,19 +106,19 @@
 
               <!-- Order Input Floating to the Right -->
               <div class="d-flex align-items-center gap-2">
-                <label for="orderName" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Order:</label>
-                <input type="text" id="orderName" class="form-control" style="max-width: 200px;">
+                <label for="orderName" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Replenish ID:</label>
+                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" readonly>
               </div>
             </div>
 
             <div id="tblCtrl" class="d-flex gap-1 mt-3">
-              <button class="btn btn-primary" id="newOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Create new order from plain form">Create Order</button>
-<!--              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>-->
-              <button class="btn btn-primary" id="saveOrder" data-bs-placement="bottom" data-bs-original-title="Save order to the database" disabled>Save Order</button>
-              <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>
-              <button class="btn btn-primary" id="closeOrder" data-bs-placement="bottom" data-bs-original-title="Close order without saving" disabled>Close Order</button>
-              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>
-              <button class="btn btn-danger" id="resetQty" data-bs-placement="bottom" data-bs-original-title="Reset all order quantity to zero" disabled>Reset Order Qty</button>
+              <button class="btn btn-primary" id="newOrder" >Create Order</button>
+              <button class="btn btn-primary" id="loadOrder" >Load Order</button>
+              <button class="btn btn-primary" id="saveOrder"  disabled>Save Order</button>
+              <button class="btn btn-primary" id="submitOrder"  disabled>Submit Order</button>
+              <button class="btn btn-primary" id="closeOrder"  disabled>Close Order</button>
+              <button class="btn btn-danger" id="cancelOrder"  disabled>Cancel Order</button>
+              <button class="btn btn-danger" id="resetQty"  disabled>Reset Order Qty</button>
               <div class="d-flex align-items-center gap-2 ms-auto">
                 <label for="trackingCode" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Tracking Code:</label>
                 <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;">
@@ -150,6 +153,47 @@
         </div>
     </div>
 </div>
+
+<!-- Modal -->
+<div class="modal fade" id="orderHistoryModal" tabindex="-1" aria-labelledby="orderHistoryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl orderHistory"> <!-- Changed modal-lg to modal-xl for a wider layout -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="orderHistoryLabel">Order History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive"> <!-- Added responsive wrapper for better scrolling -->
+                    <table class="table table-bordered" id="orderHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Order ID</th>
+                                <th>Shop Code</th>
+                                <th>Shop Name</th>
+                                <th>Order Open Date</th>
+                                <th>User</th>
+                                <th>Order Status</th>
+                                <th>Order Status Date</th>
+                                <th>Sold Qty</th>
+                                <th>Replenish Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="confirmOrderSelection">Select Order</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 
 
 <script>
@@ -226,7 +270,7 @@
         })
         .then(response => response.json())
         .then(rows => {
-            loadOrderTemplate(rows);
+            loadOrderTemplate(rows,$("#orderName").val(),$("#replenishShop").val());
         })
         .catch(error => {
             console.error('Error fetching the order template:', error);
@@ -234,28 +278,75 @@
     });
 
 
+// Event handler for the "loadOrder" button
+$("#loadOrder").on("click", function () {
+    $("#newOrder").prop("disabled", true);
+    // Fetch the recent orders via AJAX
+    $.ajax({
+        url: "/fetch_recent_orders",
+        method: "GET",
+        success: function (response) {
+            if (!Array.isArray(response) || response.length === 0) {
+                alert("No recent orders found.");
+                return;
+            }
 
-<!--// Event handler for the "loadOrder" button-->
-<!--$("#loadOrder").on("click", async function(event) {-->
-<!--    // Check input values-->
-<!--    if ($("#replenishShop").val() === null || $("#replenishShop").val() === "") {-->
-<!--        dialog("Select Shop", "Please select shop from the drop-down list");-->
-<!--        return;-->
-<!--    }-->
+            // Populate the table with the fetched orders
+            const tableBody = $("#orderHistoryTable tbody");
+            tableBody.empty(); // Clear existing rows
 
-<!--    const shop = $("#replenishShop").val(); // Get selected shop value-->
-<!--    const shop_code = getShopCodeByBlName(shop);-->
-<!--    const open_order = _open_orders.find(order => order.customer === shop_code);-->
-<!--    if(!open_order){-->
-<!--        dialog("Open Order",`No Open Order for shop ${shop}. Please click on Create Order`);-->
-<!--        return 0;-->
-<!--    }-->
-<!--    // load saved order-->
+            response.forEach(order => {
+                const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing
+                const row = `
+                    <tr>
+                        <td>
+                            <input type="radio" name="selectedOrder" value="${order.order_id}"
+                            ${order.order_status === "Saved" ? "" : "disabled"}>
+                        </td>
+                        <td>${order.order_id || "N/A"}</td>
+                        <td>${order.shop_id || "N/A"}</td>
+                        <td>${shopName}</td>
+                        <td>${order.order_open_date || ""}</td>
+                        <td>${order.user || ""}</td>
+                        <td>${order.order_status || ""}</td>
+                        <td>${order.order_status_date || ""}</td>
+                        <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>
+                        <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>
+                    </tr>
+                `;
+                tableBody.append(row);
+            });
 
+            // Show the modal
+            $("#orderHistoryModal").modal("show");
+        },
+        error: function (xhr, status, error) {
+            console.error("Failed to fetch recent orders:", error);
+            alert("An error occurred while fetching recent orders. Please try again.");
+        }
+    });
+});
 
+// Event listener for the Confirm Selection button
+$("#confirmOrderSelection").on("click", function () {
+    // Get the selected radio button
+    const selectedOrder = $("input[name='selectedOrder']:checked").val();
+    if (selectedOrder) {
+        const row = $("input[name='selectedOrder']:checked").closest("tr");
+        const shopCode = row.find("td:nth-child(3)").text().trim(); // Shop Code column
+        const shopName = row.find("td:nth-child(4)").text().trim(); // Shop Name column
+        const soldQty = row.find("td:nth-child(9)").text().trim(); // Sold Qty column
+        const replenishQty = row.find("td:nth-child(10)").text().trim(); // Replenish Qty column
 
-<!--});-->
-function loadOrderTemplate(data) {
+        // Call the loadExistingOrder function with the selected details
+        loadExistingOrder(shopName, selectedOrder, soldQty, replenishQty);
+        $("#orderHistoryModal").modal("hide");
+    } else {
+        alert("Please select a saved order to continue.");
+    }
+});
+
+function loadOrderTemplate(data, orderId, shopName) {
     console.log(data);
 
     if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
@@ -276,32 +367,27 @@ function loadOrderTemplate(data) {
                 className: 'editable',
                 render: function(data, type, row) {
                     if (type === 'display') {
-                        // Calculate Replenish Order based on your logic
                         let replenishOrder = 0;
-
-                        // Get Qty Sold in Period and Current Stock Count
                         const qtySoldInPeriod = row.threshold_qty || 0;
                         const currentStockCount = row.current_stock || 0;
                         const calculatedReplenish = row.replenish_qty || 0;
 
-                        // Apply your logic
                         if (qtySoldInPeriod > currentStockCount) {
                             replenishOrder = calculatedReplenish - currentStockCount;
                         }
 
                         return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
                     }
-                    return data ?? 0; // Ensure null is returned as 0 in other contexts
+                    return data ?? 0;
                 }
             },
             {
                 title: "Comments",
-                data: null, // No corresponding field in the JSON
+                data: null,
                 className: 'editable',
-                defaultContent: '', // Avoid the "unknown parameter" error
+                defaultContent: '',
                 render: function(data, type, row) {
                     if (type === 'display') {
-                        // Use row['comments'] if 'comments' exists in your data, otherwise use an empty string
                         return `<input type="text" class="comments-edit" value="${row.comments || ''}" />`;
                     }
                     return data;
@@ -317,23 +403,16 @@ function loadOrderTemplate(data) {
         dom: 'Bfrtip',
         buttons: [
             {
-                text: "Export CSV",
+                text: 'Save Picking Slip',
                 action: function (e, dt, button, config) {
-                    // Export CSV logic remains the same...
-                },
-            },
-            {
-                text: "Export Excel",
-                action: function (e, dt, button, config) {
-                    alert("Custom Excel export is not yet implemented!");
-                },
-            },
+                    savePickingSlip(orderId, shopName);
+                }
+            }
         ],
     });
 
     $('#ProductOrderTemplate').show();
 
-    // Disable save order button
     $("#saveOrder").prop("disabled", false);
     $("#resetQty").prop("disabled", false);
     $("#cancelOrder").prop("disabled", false);
@@ -341,130 +420,69 @@ function loadOrderTemplate(data) {
     $("#submitOrder").prop("disabled", false);
 }
 
+// Function to save picking slip as a CSV file
+function savePickingSlip(orderId, shopName) {
+    const table = $('#ProductOrderTemplate').DataTable();
+    const data = [];
+    const headers = [];
+
+    // Extract table headers
+    table.columns().every(function () {
+        headers.push(this.header().textContent.trim());
+    });
+    data.push(headers);
+
+    // Extract table data, but filter rows where Replenish Order > 0
+    table.rows().every(function () {
+        const rowData = [];
+        const row = $(this.node());
+        const replenishOrderInput = row.find('td:nth-child(6) input'); // Replenish Order column (input field)
+
+        // Only include row if Replenish Order is greater than 0
+        const replenishOrder = parseFloat(replenishOrderInput.val()) || 0;
+        if (replenishOrder > 0) {
+            // Extract values from each cell
+            row.find('td').each(function () {
+                const input = $(this).find('input');
+                rowData.push(input.length ? input.val() : $(this).text().trim());
+            });
+            data.push(rowData);
+        }
+    });
+
+    // Check if there is data to save
+    if (data.length <= 1) {
+        alert("No records with replenish orders greater than 0 to save.");
+        return;
+    }
+
+    // Create CSV content
+    const csvContent = data.map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `${orderId}_${shopName}.csv`;
+
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+
 
     // Function to load the existing order data into the table
-    function loadExistingOrder(data) {
-        console.log(data);
+    function loadExistingOrder(shop_name, order_id, sold_qty, replenish_qty) {
+        //alert(`Load existing order with Shop Name: ${shop_name}, Order ID: ${order_id}, Sold Qty: ${sold_qty}, Replenish Qty: ${replenish_qty}`);
+            // Set the input fields with the parameters
+            $('#replenishShop').val(shop_name); // Assuming this field accepts the shop name
+            $("#thresholdQty").val(sold_qty);
+            $("#replenishQty").val(replenish_qty);
+            $("#orderName").val(order_id);
 
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
-        }
-
-        const table = $('#ProductOrderTemplate').DataTable({
-            data: data,
-            columns: [
-                { title: "SKU", data: "sku" },
-                { title: "Product Name", data: "product_name" },
-                { title: "Last Stock Qty", data: "last_stock_qty" },
-                { title: "Two Weeks Sold Qty", data: "calc_stock_qty" },
-                { title: "Calculated Stock Qty", data: "current_count" },
-                { title: "Variance", data: "variance" },
-                { title: "Replenish Qty", data: "replenish_qty", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
-                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }}
-            ],
-            pageLength: 50,
-            order: [[1, 'asc']],
-            autoWidth: false,
-            paging: true,
-            searching: true,
-            responsive: true,
-            dom: 'Bfrtip',
-        buttons: [
-            {
-                text: "Export CSV",
-                action: function (e, dt, button, config) {
-                    // Step 1: Convert DataTable with input fields to a flat HTML table
-                    const table = document.createElement("table");
-                    const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
-                        $("#ProductOrderTemplate thead th:contains('Replenish Order')")
-                    );
-
-                    $("#ProductOrderTemplate thead").clone().appendTo(table); // Copy header
-
-                    $("#ProductOrderTemplate tbody tr").each(function () {
-                        let orderQtyValue = 0;
-
-                        // Get the value of the "Replenish Order" column
-                        $(this)
-                            .find("td")
-                            .each(function (index) {
-                                if (index === orderQtyIndex) {
-                                    orderQtyValue = $(this).find("input").length > 0
-                                        ? parseFloat($(this).find("input").val()) || 0
-                                        : parseFloat($(this).text().trim()) || 0;
-                                }
-                            });
-
-                        // Exclude rows where "Replenish Order" is 0
-                        if (orderQtyValue === 0) return;
-
-                        const row = document.createElement("tr");
-
-                        $(this)
-                            .find("td")
-                            .each(function () {
-                                const cellValue = $(this).find("input").length > 0
-                                    ? $(this).find("input").val() // Get input value
-                                    : $(this).text().trim(); // Get text if no input field
-
-                                const newCell = document.createElement("td");
-                                newCell.textContent = cellValue;
-                                row.appendChild(newCell);
-                            });
-
-                        table.appendChild(row); // Append the processed row to the new table
-                    });
-
-                    // Step 2: Convert the modified flat table into CSV format
-                    const csvData = [];
-                    $(table).find("tr").each(function () {
-                        const row = [];
-                        $(this)
-                            .find("td, th")
-                            .each(function () {
-                                row.push($(this).text());
-                            });
-                        csvData.push(row.join(","));
-                    });
-
-                    // Step 3: Trigger CSV download
-                    const csvString = csvData.join("\n");
-                    const blob = new Blob([csvString], { type: "text/csv" });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "exported_table.csv";
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                },
-            },
-            {
-                text: "Export Excel",
-                action: function (e, dt, button, config) {
-                    alert("Custom Excel export is not yet implemented!");
-                },
-            },
-        ],
-        });
-
-        $('#ProductOrderTemplate').show();
-
-        // Disable save order button
-        $("#saveOrder").prop("disabled", false);
-        $("#resetQty").prop("disabled", false);
-        $("#cancelOrder").prop("disabled", false);
-        $("#closeOrder").prop("disabled", false);
-        $("#submitOrder").prop("disabled", false);
+            // Trigger the "newOrder" button click
+            $("#newOrder").trigger("click");
     }
 
 
@@ -534,6 +552,8 @@ function loadOrderTemplate(data) {
             const user_name = {{user.username | tojson}};         // Ensure user_name variable is serialized
             const date = getCurrentDate();                  // Get current date in YYYYMMDD format
             const tracking_code = $("#trackingCode").val()
+            const sold_qty = $("#thresholdQty").val()
+            const replenish_qty = $("#replenishQty").val()
 
             $.ajax({
                 url: "/save_replenish",
@@ -545,7 +565,10 @@ function loadOrderTemplate(data) {
                     user_name: user_name,
                     order_id: order_id,
                     date: date,
-                    tracking_code : tracking_code
+                    tracking_code : tracking_code,
+                    sold_qty : sold_qty,
+                    replenish_qty : replenish_qty,
+                    status : "Saved"
                 }),
                 success: function(response) {
                     console.log("Data submitted successfully:", response);
@@ -561,46 +584,69 @@ function loadOrderTemplate(data) {
     });
 
 
+$("#submitOrder").on("click", async function(event) {
+    const address_to = $("#replenishShop").val();
+    const order_id = $("#orderName").val();
+    const shop_code = getShopCodeByBlName($('#replenishShop').val());
+    const user_name = {{user.username | tojson}};   // Assuming you get the user name somehow, e.g., from a logged-in user session
+    const tracking_code = $("#trackingCode").val(); // You can set the tracking code here, based on your application logic
 
-    $("#submitOrder").on("click", async function(event) {
+    // Check if the order is saved (assuming _saved is updated during saveOrder execution)
+    if (_saved) {
+        const data = {
+            order_id: order_id,
+            user_name: user_name,
+            tracking_code: tracking_code
+        };
 
-        const address_to = $("#replenishShop").val();
-        const order_id = $("#orderName").val();
-        const shop_code = getShopCodeByBlName($('#replenishShop').val())
+        try {
+            // Call the submit_replenish route to submit the order
+            const response = await fetch('/submit_replenish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
 
+            const result = await response.json();
 
+            if (result.status === "success") {
+                // Create a notification
+                const now = new Date();
+                const notificationData = {
+                    not_date: now,
+                    not_address: address_to,
+                    not_subject: "Order From Head Office",
+                    not_body: `New order ${order_id} was created by Head Office`,
+                    not_status: "unread"
+                };
 
-        // Check if the order is saved (assuming _saved is updated during saveOrder execution)
-        if (_saved) {
-            const now = new Date();
-            const data = {
-                not_date: now,
-                not_address: address_to,
-                not_subject: "Order From Head Office",
-                not_body: `New order ${order_id} was created by Head Office`,
-                not_status: "unread"
-            };
-
-            // Create a notification via fetch
-            try {
-                const response = await fetch('/create_notification', {
+                const notificationResponse = await fetch('/create_notification', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(notificationData),
                 });
 
-                const rows = await response.json();
-                dialog("Order Submit", `<p>Order submitted successfully <br>You may close the order now</p>`);
-            } catch (error) {
-                console.error('Error:', error);
-                dialog("Error", `<p>Error in submitting the order <br> ${error}</p>`);
+                const notificationResult = await notificationResponse.json();
+
+                // Show success dialog
+                dialog("Order Submit", `<p>Order submitted successfully.<br>You may close the order now.</p>`);
+            } else {
+                // Handle any errors from the /submit_replenish route
+                dialog("Error", `<p>Error in submitting the order.<br>${result.message}</p>`);
             }
-        } else {
-            dialog("Save Order", "Please save the order before submitting.");
+
+        } catch (error) {
+            console.error('Error:', error);
+            dialog("Error", `<p>Error in submitting the order <br>${error}</p>`);
         }
-    });
+    } else {
+        dialog("Save Order", "Please save the order before submitting.");
+    }
+});
 
 
 

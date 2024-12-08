@@ -243,15 +243,15 @@ function loadStockData(rows) {
                     return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
                 }
             },
-            {
-                title: "Stock Rejected",
-                data: null,
-                className: 'editable',
-                render: function (data, type, row) {
-                    const currentStockRejected = 0;
-                    return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
-                }
-            },
+<!--            {-->
+<!--                title: "Stock Rejected",-->
+<!--                data: null,-->
+<!--                className: 'editable',-->
+<!--                render: function (data, type, row) {-->
+<!--                    const currentStockRejected = 0;-->
+<!--                    return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;-->
+<!--                }-->
+<!--            },-->
             {
                 title: "Variance",
                 data: null,
@@ -294,9 +294,9 @@ function loadStockData(rows) {
         const rowData = table.row(row).data();  // Get the row data object
         const receiveQty = rowData.replenish_qty;  // Correctly get "Sent Qty" from the row data
         const countQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
+        //const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
 
-        const variance = receiveQty - countQty - rejectedQty;
+        const variance = receiveQty - countQty; // - rejectedQty;
 
         row.find('.variance').text(variance);
     });
@@ -476,7 +476,7 @@ $("#saveOrder").on("click", function () {
         rowData.replenish_date = row.find("td:nth-child(4)").text().trim(); // Replenish Date
         rowData.sent_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sent Quantity
         rowData.received_qty = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Received Quantity
-        rowData.rejected_qty = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
+        //rowData.rejected_qty = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
         rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
         rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments

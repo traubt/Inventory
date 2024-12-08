@@ -1317,6 +1317,17 @@ h6 {
     text-align: center;  /* Ensure text and buttons are centered */
 }
 
+/* Add this CSS to your styles */
+.orderHistory {
+    max-width: 90%; /* Allow the modal to expand to 90% of the viewport width */
+    width: auto; /* Ensure the modal width adjusts dynamically */
+}
+
+.table {
+    table-layout: auto; /* Let table columns adjust to their content */
+    width: 100%; /* Ensure the table takes up the modal width */
+    word-wrap: break-word; /* Handle long text gracefully */
+}
 
 
 
