@@ -1006,6 +1006,9 @@ def save_replenish():
         user_name = data.get('user_name', '')
         date = data.get('date', '')
         tracking_code = data.get('tracking_code', '')
+        sold_qty = data.get('sold_qty', '')
+        replenish_qty = data.get('replenish_qty', '')
+        status = "New"
 
         # Print the received data for debugging
         print("order_id:", order_id)
@@ -1020,6 +1023,9 @@ def save_replenish():
         if order_id:
             db.session.query(TocReplenishOrder).filter_by(order_id=order_id).delete()
             db.session.query(TOCReplenishCtrl).filter_by(order_id=order_id).delete()
+            status = "Saved"
+        else:
+            status = "New"
 
         # Insert new records into the table
         for row in table:
@@ -1039,18 +1045,16 @@ def save_replenish():
 
         #Add tracking code
 
-        status = "New"
-        comment = "NA"
-
         new_record = TOCReplenishCtrl(
             order_id = order_id,
             shop_id = shop,
-            order_open_date=datetime.now(),
+            order_open_date=date,
             user=user_name,
             order_status = status,
             order_status_date = datetime.now(),
             tracking_code = tracking_code,
-            comments=comment
+            sold_qty=sold_qty,
+            replenish_qty=replenish_qty,
         )
         db.session.add(new_record)
 
@@ -1067,6 +1071,69 @@ def save_replenish():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+@main.route('/submit_replenish', methods=['POST'])
+def submit_replenish():
+    try:
+        data = request.get_json()
+
+
+        order_id = data.get('order_id', '')
+
+        user_name = data.get('user_name', '')
+
+        tracking_code = data.get('tracking_code', '')
+
+        # Check for order_id and delete existing records
+        rec = TOCReplenishCtrl.query.filter_by(order_id=order_id).first()
+
+        rec.order_status_date = datetime.now()
+        rec.tracking_code = tracking_code
+        rec.user = user_name
+        rec.order_status = "Submitted"
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Data submitted successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to save data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+
+
+@main.route('/fetch_recent_orders', methods=['GET'])
+def fetch_recent_orders():
+    # Fetch the 20 most recent orders sorted by `order_open_date` in descending order
+    recent_orders = (
+        db.session.query(TOCReplenishCtrl)
+        .order_by(TOCReplenishCtrl.order_open_date.desc())
+        .limit(20)
+        .all()
+    )
+
+    # Convert records to JSON
+    result = [
+        {
+            "order_id": order.order_id,
+            "shop_id": order.shop_id,
+            "order_open_date": order.order_open_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_open_date else None,
+            "user": order.user,
+            "order_status": order.order_status,
+            "order_status_date": order.order_status_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_status_date else None,
+            "sold_qty" : order.sold_qty,
+            "replenish_qty" :order.replenish_qty
+        }
+        for order in recent_orders
+    ]
+
+    return jsonify(result)
 
 @main.route('/update_count_stock', methods=['POST'])
 def update_count_stock():
