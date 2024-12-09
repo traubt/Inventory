@@ -480,9 +480,25 @@ SELECT
     s.sales_since_stock_read,  -- Include the new column in the final SELECT
     st.final_stock_qty AS last_stock_update,
     st.stock_qty_date AS last_stock_update_date,
-    st.final_stock_qty - s.sales_since_stock_read AS current_stock_qty,
+    st.final_stock_qty 
+        - s.sales_since_stock_read 
+        + COALESCE((
+            SELECT SUM(tro.received_qty) 
+            FROM toc_replenish_order tro
+            WHERE tro.shop_id = s.store_customer 
+              AND tro.sku = s.item_sku
+              AND tro.received_date > st.stock_qty_date
+        ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
     CASE 
-        WHEN st.final_stock_qty - s.sales_since_stock_read > s.threshold_sold_qty THEN 0
+        WHEN st.final_stock_qty 
+            - s.sales_since_stock_read 
+            + COALESCE((
+                SELECT SUM(tro.received_qty) 
+                FROM toc_replenish_order tro
+                WHERE tro.shop_id = s.store_customer 
+                  AND tro.sku = s.item_sku
+                  AND tro.received_date > st.stock_qty_date
+            ), 0) > s.threshold_sold_qty THEN 0
         ELSE s.replenish_qty
     END AS replenish_order  -- Add the replenish_order column
 FROM 
