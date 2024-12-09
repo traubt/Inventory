@@ -17,7 +17,7 @@ def get_top_items():
     conn = get_db_connection()
     cursor = conn.cursor()
     query = """
-    SELECT item_name, SUM(tot_amt) AS total_amount
+    SELECT item_name, SUM(net_amt) AS total_amount
     FROM toc_ls_sales_item
     WHERE time_of_sale >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
     GROUP BY item_name
@@ -51,7 +51,7 @@ def get_sales_data_for_lineChart():
     cursor = conn.cursor()
     # Query to get the sales data
     query = """
-    SELECT ts.time_of_sale, SUM(tsi.tot_amt)
+    SELECT ts.time_of_sale, SUM(tsi.net_amt)
     FROM toc_ls_sales ts
     JOIN toc_ls_sales_item tsi ON ts.sales_id = tsi.sales_id
     WHERE ts.store_name = 'TOC - Sandton City'
@@ -81,7 +81,7 @@ def get_recent_sales(shop_name):
                 s.sales_id,
                 CONCAT(m.first_name, ' ', m.last_name) AS customer,
                 i.item_name as product,
-                i.tot_amt as price,
+                i.net_amt as price,
                 s.time_of_sale,
                 s.store_name
             FROM 
@@ -103,7 +103,7 @@ def get_recent_sales(shop_name):
                 s.sales_id,
                 CONCAT(m.first_name, ' ', m.last_name) AS customer,
                 i.item_name as product,
-                i.tot_amt as price,
+                i.net_amt as price,
                 s.time_of_sale,
                 s.store_name
             FROM 
@@ -171,20 +171,57 @@ def get_recent_product_sales(timeframe, shop_name):
 
     if shop_name == "Head Office":
         query = f'''
-            SELECT product_name, SUM(count_sales_{timeframe}) AS total_count , SUM(total_sales_{timeframe}) AS total_sales
-            FROM toc_sales_summary_product
-            WHERE total_sales_{timeframe} IS NOT NULL 
-            GROUP BY product_name
-            ORDER BY total_sales DESC;          
+                SELECT 
+                    p.product_name, 
+                    SUM(p.count_sales_{timeframe}) AS total_count, 
+                    SUM(p.total_sales_{timeframe}) AS total_sales, 
+                    prod.cost_price * SUM(p.count_sales_{timeframe}) AS total_cost, 
+                    (CASE 
+                        WHEN SUM(p.total_sales_{timeframe}) IS NOT NULL AND prod.cost_price IS NOT NULL 
+                        THEN (SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 
+                        ELSE NULL 
+                    END) AS gross_profit_percentage
+                FROM 
+                    toc_sales_summary_product p
+                JOIN 
+                    toc_product prod 
+                ON 
+                    p.product_name = prod.item_name
+                WHERE 
+                    p.total_sales_{timeframe} IS NOT NULL
+                    and prod.acct_group <> 'Specials'
+                GROUP BY 
+                    p.product_name, prod.cost_price
+                ORDER BY 
+                    total_sales DESC;
+        
         '''
         cursor.execute(query)
     else:
-        query = f'''
-            SELECT product_name, SUM(count_sales_{timeframe}) AS total_count , SUM(total_sales_{timeframe}) AS total_sales
-            FROM toc_sales_summary_product
-            WHERE total_sales_{timeframe} IS NOT NULL AND shop_name = %s
-            GROUP BY product_name
-            ORDER BY total_sales DESC;
+        query = f'''       
+                SELECT 
+                    p.product_name, 
+                    SUM(p.count_sales_{timeframe}) AS total_count, 
+                    SUM(p.total_sales_{timeframe}) AS total_sales, 
+                    prod.cost_price * SUM(p.count_sales_{timeframe}) AS total_cost,
+                    (CASE 
+                        WHEN SUM(p.total_sales_{timeframe}) IS NOT NULL AND prod.cost_price IS NOT NULL 
+                        THEN (SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 
+                        ELSE NULL 
+                    END) AS gross_profit_percentage
+                FROM 
+                    toc_sales_summary_product p
+                JOIN 
+                    toc_product prod 
+                ON 
+                    p.product_name = prod.item_name
+                WHERE 
+                    p.total_sales_{timeframe} IS NOT NULL and shop_name = %s
+                    and prod.acct_group <> 'Specials'
+                GROUP BY 
+                    p.product_name, prod.cost_price
+                ORDER BY 
+                    total_sales DESC;           
         '''
         cursor.execute(query, (shop_name,))
 
@@ -209,7 +246,7 @@ def get_hourly_sales(shop_name, timeframe):
                 SELECT 
                     'Head Office' as store_name,
                     DATE_FORMAT(s.time_of_sale, '%Y-%m-%d %H:00') AS sale_hour, 
-                    ROUND(SUM(tot_amt)) AS total_amount
+                    ROUND(SUM(net_amt)) AS total_amount
                 FROM 
                     toc_ls_sales_item i
 				JOIN
@@ -227,7 +264,7 @@ def get_hourly_sales(shop_name, timeframe):
                 SELECT 
                     'Head Office' AS store_name,
                     DATE_FORMAT(i.time_of_sale, '%Y-%m-%d') AS sale_date,
-                    ROUND(SUM(tot_amt)) AS total_amount
+                    ROUND(SUM(net_amt)) AS total_amount
                 FROM 
                     toc_ls_sales_item i
                 JOIN
@@ -245,7 +282,7 @@ def get_hourly_sales(shop_name, timeframe):
                 SELECT 
                     ts.store_name,
                     DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d %%H:00') AS sale_hour,
-                    ROUND(SUM(tlsi.tot_amt)) AS total_amount
+                    ROUND(SUM(tlsi.net_amt)) AS total_amount
                 FROM 
                     toc_ls_sales_item tlsi
                 JOIN 
@@ -264,7 +301,7 @@ def get_hourly_sales(shop_name, timeframe):
                 SELECT 
                     ts.store_name,
                     DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d') AS sale_date,
-                    ROUND(SUM(tlsi.tot_amt)) AS total_amount
+                    ROUND(SUM(tlsi.net_amt)) AS total_amount
                 FROM 
                     toc_ls_sales_item tlsi
                 JOIN 
@@ -311,7 +348,7 @@ def get_stock_order_template():
         CROSS JOIN 
             toc_product
         WHERE 
-            toc_product.stat_group <> 'Specials'
+            toc_product.acct_group <> 'Specials'
             AND toc_shops.customer = %s;
     '''
 
@@ -323,10 +360,6 @@ def get_stock_order_template():
     conn.close()
 
     return result
-
-
-
-
 
 def distribute_product_to_shops(sku):
     # Connect to the database
@@ -419,7 +452,7 @@ def get_stock_order_form():
             AND p.item_sku = o.sku
             AND o.order_status = 'New'
         WHERE 
-            p.stat_group <> 'Specials'
+            p.acct_group <> 'Specials'
             AND s.customer = %s
 		ORDER BY order_qty desc, product_name asc;
     '''
@@ -465,7 +498,7 @@ WITH sales_data AS (
         toc_stock st
         ON d.item_sku = st.sku AND b.store_customer = st.shop_id  -- Joining toc_stock for stock_qty_date
     WHERE 
-        d.stat_group <> 'Specials'
+        d.acct_group <> 'Specials'
         AND c.blName = %s  -- Ensures we only get sales related to this shop
     GROUP BY 
         d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date  -- Group by stock_qty_date
@@ -551,7 +584,7 @@ WITH sales_data AS (
         toc_stock st
         ON d.item_sku = st.sku AND b.store_customer = st.shop_id
     WHERE 
-        d.stat_group <> 'Specials'
+        d.acct_group <> 'Specials'
         AND c.blName = %s -- Ensures we only get sales related to this shop
     GROUP BY 
         d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
@@ -623,7 +656,7 @@ def get_sales_by_shop_last_three_months():
             SELECT 
                 ts.store_name,
                 DATE_FORMAT(tlsi.time_of_sale, '%Y-%m') AS sale_month,
-                ROUND(SUM(tlsi.tot_amt)) AS total_sales
+                ROUND(SUM(tlsi.net_amt)) AS total_sales
             FROM 
                 toc_ls_sales_item tlsi
             JOIN 
@@ -762,7 +795,7 @@ def get_sales_by_shop():
                     a.store_name, 
                     DATE_FORMAT(a.time_of_sale, '%b/%Y') AS month,  -- Format as MON/YEAR (e.g., OCT/2024)
                     ROUND(SUM(b.quantity)) AS total_sales_quantity,
-                    ROUND(SUM(b.tot_amt)) AS total_sales_amount
+                    ROUND(SUM(b.net_amt)) AS total_sales_amount
                 FROM 
                     toc_ls_sales a
                 JOIN 
