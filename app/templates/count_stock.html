@@ -238,7 +238,7 @@ function loadStockData(rows) {
             }
         ],
         pageLength: 300,
-        order: [[1, 'asc']],
+        order: [[6, 'desc']],
         autoWidth: false,
         paging: true,
         searching: true,
@@ -260,9 +260,10 @@ function loadStockData(rows) {
         const variance = currentQty + rejectedQty - countedQty;
 
         // If variance > 20% of current quantity, set red border
-        const threshold = 0.2; // 20%
+        //const threshold = 0.2; // 20%
         const difference = Math.abs(currentQty - countedQty);
-        if (currentQty > 0 && (difference / currentQty) > threshold) {
+        //if (currentQty > 0 && (difference / currentQty) > threshold) {
+        if (difference != 0) {
             $(row).find('.current-stock-count').css('border', '5px solid red');
         }
     });
@@ -478,11 +479,13 @@ $("#saveOrder").on("click", function () {
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments
 
         // Check if the current stock count has a red border and comments are empty
-if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' && rowData.comments === "") {
-    alert(`Variance found in count for ${rowData.product_name}. Please enter a comment before confirming count.`);
-    isValid = false; // Invalid if the condition is met
-    return false; // Exit loop
-}
+        if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' && rowData.comments === "") {
+            alert(`Variance found in count  "${rowData.product_name}". Please enter a comment before confirming count.`);
+            isValid = false; // Invalid if the condition is met
+            return false; // Exit loop
+        }
+
+
 
         // Validate the data (example: stock count and rejected stock cannot be negative)
         if (rowData.stock_count < 0 || rowData.stock_rejected < 0) {
@@ -499,6 +502,9 @@ if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' &&
     if (!isValid) {
         return;
     }
+
+    // Disable confirmation if all good : PONR
+    $(this).prop("disabled", true);
 
     // Show spinner and text
     const spinnerWrapper = $(`
