@@ -167,7 +167,7 @@
                 </div>
 
                 <div class="card-body">
-                  <h5 class="card-title" id="customer-title">Customers <span>| Today</span></h5>
+                  <h5 class="card-title" id="customer-title">Avg. Basket <span>| Today</span></h5>
 
                   <div class="d-flex align-items-center">
                     <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
@@ -578,9 +578,9 @@
             $("#revenue-title").html('Revenue <span>| Today</span>');
       };
       if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[7];
+            const c_customer = data.find(store => store[0] === shop)[11];
             $("#count_customers").text(c_customer);
-            $("#customer-title").html('Customers <span>| Today</span>');
+            $("#customer-title").html('Avg. Basket <span>| Today</span>');
       }
 
 
@@ -608,9 +608,9 @@
             $("#revenue-title").html('Revenue <span>| Month</span>');
       };
       if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[8];
+            const c_customer = data.find(store => store[0] === shop)[12];
             $("#count_customers").text(c_customer);
-            $("#customer-title").html('Customers <span>| Month</span>');
+            $("#customer-title").html('Avg. Basket <span>| Month</span>');
       }
 
   });
@@ -633,9 +633,9 @@
             $("#revenue-title").html('Revenue <span>| Year</span>');
       };
       if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[9];
+            const c_customer = data.find(store => store[0] === shop)[13];
             $("#count_customers").text(c_customer);
-            $("#customer-title").html('Customers <span>| Year</span>');
+            $("#customer-title").html('Avg. Basket <span>| Year</span>');
       }
 
   });
@@ -694,23 +694,32 @@ fetch('/recent_sales')
 
   $("#product_selling_day").on("click", async function(event) {
     try{
-<!--          alert("product top day selling");-->
           fetch('/recent_sales_product/day')
           .then(data => data.json())
           .then(rows => {
               //console.log(rows);
-                  if(rows != 0){
-                      _top_selling = $('#topSelling').DataTable({
-                                                      data: rows,
-                                                      columns: [
-                                                          { title: "Product" },
-                                                          { title: "Sold" },
-                                                          { title: "Revenue" },
-                                                      ],
-                                                      order: [[2, 'desc']],
-                                                      "autoWidth": false,
-                                                  });
-                  }
+            // Initialize DataTable
+              if (rows != 0) {
+                  _top_selling = $('#topSelling').DataTable({
+                      data: rows,
+                      columns: [
+                          { title: "Product" },
+                          { title: "Sold" },
+                          { title: "Revenue" },
+                          { title: "Cost" },
+                          {
+                              title: "GP(%)",
+                              render: function(data, type, row) {
+                                  return type === 'display' && data !== null
+                                      ? parseFloat(data).toFixed(1)
+                                      : data;
+                              }
+                          },
+                      ],
+                      order: [[2, 'desc']],
+                      "autoWidth": false,
+                  });
+              }
           });
     }
     catch(e){
@@ -733,18 +742,28 @@ fetch('/recent_sales')
           .then(data => data.json())
           .then(rows => {
               //console.log(rows);
-                  if(rows != 0){
-                      _top_selling = $('#topSelling').DataTable({
-                                                      data: rows,
-                                                      columns: [
-                                                          { title: "Product" },
-                                                          { title: "Sold" },
-                                                          { title: "Revenue" },
-                                                      ],
-                                                      order: [[2, 'desc']],
-                                                      "autoWidth": false,
-                                                  });
-                  }
+            // Initialize DataTable
+            if (rows != 0) {
+                _top_selling = $('#topSelling').DataTable({
+                    data: rows,
+                    columns: [
+                        { title: "Product" },
+                        { title: "Sold" },
+                        { title: "Revenue" },
+                        { title: "Cost" },
+                        {
+                            title: "GP(%)",
+                            render: function(data, type, row) {
+                                return type === 'display' && data !== null
+                                    ? parseFloat(data).toFixed(1)
+                                    : data;
+                            }
+                        },
+                    ],
+                    order: [[2, 'desc']],
+                    "autoWidth": false,
+                });
+            }
           });
     }
     catch(e){
