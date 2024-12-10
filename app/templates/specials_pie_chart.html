@@ -1,4 +1,4 @@
-<!-- product_pie_chart.html -->
+<!-- specials_pie_chart.html -->
 <div class="card">
   <div class="filter">
     <a class="icon"  data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -6,15 +6,15 @@
       <li class="dropdown-header text-start">
         <h6>Filter</h6>
       </li>
-      <li><a class="dropdown-item" id="today" >Today</a></li>
-      <li><a class="dropdown-item" id="month" >This Month</a></li>
-      <li><a class="dropdown-item" id="year" >This Year</a></li>
+      <li><a class="dropdown-item" id="stoday" >Today</a></li>
+      <li><a class="dropdown-item" id="smonth" >This Month</a></li>
+      <li><a class="dropdown-item" id="syear" >This Year</a></li>
     </ul>
   </div>
 
   <div class="card-body pb-0">
-    <h5 class="card-title" id="product_pie">Product Sales  (top 5)<span>| Today</span></h5>
-    <div id="trafficChart" style="min-height: 400px;" class="echart"></div>
+    <h5 class="card-title" id="specials_pie">Top Specials<span>| Today</span></h5>
+    <div id="specialChart" style="min-height: 400px;" class="echart"></div>
   </div>
 </div>
 
@@ -22,7 +22,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     function fetchAndRenderChart(timeframe) {
       $.ajax({
-        url: `/top-products/${timeframe}`,
+        url: `/top-specials/${timeframe}`,
         method: 'GET',
         success: function(data) {
           const topItems = data.map(item => ({
@@ -30,7 +30,7 @@
             name: item[0]
           }));
 
-          echarts.init(document.querySelector("#trafficChart")).setOption({
+          echarts.init(document.querySelector("#specialChart")).setOption({
             tooltip: {
               trigger: 'item'
             },
@@ -39,7 +39,7 @@
               left: 'center'
             },
             series: [{
-              name: 'Top Items',
+              name: 'Top Specials',
               type: 'pie',
               radius: ['40%', '70%'],
               avoidLabelOverlap: false,
@@ -68,19 +68,19 @@
     }
 
     // Attach click event to the "today" filter
-    $('#today').on('click', function() {
-    $("#product_pie").html('Product Sales  (top 5)<span>| Today</span>');
+    $('#stoday').on('click', function() {
+    $("#specials_pie").html('Top Specials<span>| Today</span>');
       fetchAndRenderChart('day');
     });
 
     // You can add similar click events for "month" and "year" if needed
-    $('#month').on('click', function() {
-    $("#product_pie").html('Product Sales  (top 5)<span>| Month</span>');
+    $('#smonth').on('click', function() {
+    $("#specials_pie").html('Top Specials<span>| Month</span>');
       fetchAndRenderChart('month');
     });
 
-    $('#year').on('click', function() {
-      $("#product_pie").html('Product Sales  (top 5)<span>| Year</span>');
+    $('#syear').on('click', function() {
+      $("#specials_pie").html('Top Specials<span>| Year</span>');
       fetchAndRenderChart('year');
     });
 

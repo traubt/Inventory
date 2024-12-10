@@ -164,6 +164,41 @@ def get_product_sales(timeframe, shop_name):
 
     return result
 
+def get_specials_sales(timeframe, shop_name):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if shop_name == "Head Office":
+        query = f'''
+            SELECT product_name, SUM(count_sales_{timeframe}) AS total_sales
+            FROM toc_sales_summary_product ts
+            join toc_product p ON p.item_name = ts.product_name
+            WHERE count_sales_{timeframe} IS NOT NULL AND p.acct_group = 'Specials'
+            GROUP BY product_name
+            ORDER BY total_sales DESC
+            LIMIT 10;
+        '''
+        cursor.execute(query)
+    else:
+        query = f'''
+            SELECT product_name, SUM(count_sales_{timeframe}) AS total_sales
+            FROM toc_sales_summary_product ts
+            join toc_product p ON p.item_name = ts.product_name
+            WHERE count_sales_{timeframe} IS NOT NULL AND p.acct_group = 'Specials' and ts.shop_name = %s
+            GROUP BY product_name
+            ORDER BY total_sales DESC
+            LIMIT 10;
+        '''
+        cursor.execute(query, (shop_name,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
 def get_recent_product_sales(timeframe, shop_name):
     # Connect to the database
     conn = get_db_connection()
@@ -696,7 +731,8 @@ def get_top_agents(shop_name, timeframe):
             query = '''                             
             SELECT 
                 staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt
+                ROUND(SUM(i.net_amt)) AS total_net_amt,
+                s.store_name
             FROM 
                 toc_ls_sales_item i
             JOIN 
@@ -713,21 +749,22 @@ def get_top_agents(shop_name, timeframe):
             cursor.execute(query)
         elif timeframe == "monthly":
             query = '''
-                    SELECT 
-                        staff_name, 
-                        ROUND(SUM(i.net_amt)) AS total_net_amt
-                    FROM 
-                        toc_ls_sales_item i
-                    JOIN 
-                        toc_ls_sales s ON i.sales_id = s.sales_id
-                    WHERE 
-                        i.time_of_sale >= CURDATE() - INTERVAL 1 MONTH
-                        AND i.time_of_sale < CURDATE()
-                    GROUP BY 
-                        staff_name
-                    ORDER BY 
-                        total_net_amt DESC
-                    LIMIT 10;
+            SELECT 
+                staff_name, 
+                ROUND(SUM(i.net_amt)) AS total_net_amt,
+                s.store_name
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+            WHERE 
+                i.time_of_sale >= CURDATE() - INTERVAL 1 MONTH
+                AND i.time_of_sale < CURDATE()
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC
+            LIMIT 10;
             '''
             cursor.execute(query)
     else:
@@ -735,7 +772,8 @@ def get_top_agents(shop_name, timeframe):
             query = '''
             SELECT 
                 staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt
+                ROUND(SUM(i.net_amt)) AS total_net_amt,
+                s.store_name
             FROM 
                 toc_ls_sales_item i
             JOIN 
@@ -757,7 +795,8 @@ def get_top_agents(shop_name, timeframe):
             query = '''
             SELECT 
                 staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt
+                ROUND(SUM(i.net_amt)) AS total_net_amt,
+                s.store_name
             FROM 
                 toc_ls_sales_item i
             JOIN 
