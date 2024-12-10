@@ -8,9 +8,9 @@ async function populateTopAgentChart(timeframe) {
 
         const data = await response.json();
 
-        // Extract labels (staff names) and data (total net amount)
-        const labels = data.map(agent => agent[0]); // First element is staff_name
-        const totalNetAmounts = data.map(agent => agent[1]); // Second element is total_net_amt
+        // Extract labels (staff name with shop) and data (total net amount)
+        const labels = data.map(agent => `${agent[0]} (${agent[2]})`); // Combine name and shop
+        const totalNetAmounts = data.map(agent => agent[1]); // Total quantity sold
 
         // Remove existing chart instance if it exists
         if (window.topAgentChartInstance) {
@@ -37,7 +37,7 @@ async function populateTopAgentChart(timeframe) {
                     x: {
                         title: {
                             display: true,
-                            text: "Staff Name"
+                            text: "Staff Name (Shop)"
                         }
                     },
                     y: {

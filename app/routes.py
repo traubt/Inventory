@@ -1432,6 +1432,13 @@ def get_top_products(timeframe):
     data = get_product_sales(timeframe, shop_name)
     return jsonify(data)
 
+@main.route('/top-specials/<timeframe>', methods=['GET'])
+def get_top_specials(timeframe):
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    data = get_specials_sales(timeframe, shop_name)
+    return jsonify(data)
+
 # routes.py
 from flask import session, jsonify
 
