@@ -1367,23 +1367,43 @@ def sales_report():
     return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
 
 
-@main.route('/get_sales_per_shop_report')
-def get_sales_per_shop_report():
+from flask import request, jsonify
+
+@main.route('/get_business_report')
+def get_business_report():
     try:
+        # Retrieve parameters from the request
+        report_type = request.args.get('reportType')  # Selected report type
+        group_by = request.args.get('groupBy')        # Grouping option
+        from_date = request.args.get('fromDate')      # Start date
+        to_date = request.args.get('toDate')          # End date
+
+        # Log the received parameters (for debugging purposes)
+        print(f"Received Parameters:")
+        print(f"Report Type: {report_type}")
+        print(f"Group By: {group_by}")
+        print(f"From Date: {from_date}")
+        print(f"To Date: {to_date}")
+
         # Fetch the data from the function
-        data = get_sales_by_shop()
+        data = get_sales_report(report_type,from_date,to_date,group_by)
 
         # Check if no data is returned
         if not data:
             return jsonify({"message": "Error fetching sales report"}), 500
 
-        # Return the formatted data as JSON
-        return jsonify(data)
+        # Extract column titles dynamically
+        columns = [{"title": key} for key in data[0].keys()] if data else []
+
+        # Return the formatted data along with column titles as JSON
+        return jsonify({"columns": columns, "data": data})
 
     except Exception as e:
         # Handle any errors
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
 
 
 @main.route('/count_new_orders')

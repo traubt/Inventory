@@ -440,7 +440,7 @@ def distribute_product_to_shops(sku):
         # Commit the transaction to save the changes to the database
         conn.commit()
 
-    except mysql.connector.Error as err:
+    except Exception  as err:
         # Rollback in case of error
         conn.rollback()
         print(f"Error occurred: {err}")
@@ -823,34 +823,125 @@ def get_top_agents(shop_name, timeframe):
 
 ################################################  REPORT SECTION
 
-def get_sales_by_shop():
+def get_sales_report(report_type, from_date, to_date, group_by):
     # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Query to retrieve the stock order form
-    query = '''
-                SELECT 
-                    a.store_name, 
-                    DATE_FORMAT(a.time_of_sale, '%b/%Y') AS month,  -- Format as MON/YEAR (e.g., OCT/2024)
-                    ROUND(SUM(b.quantity)) AS total_sales_quantity,
-                    ROUND(SUM(b.net_amt)) AS total_sales_amount
-                FROM 
-                    toc_ls_sales a
-                JOIN 
-                    toc_ls_sales_item b ON a.sales_id = b.sales_id
-                JOIN 
-                    toc_product d ON b.item_sku = d.item_sku 
-                LEFT JOIN 
-                    toc_ls_payments c ON b.sales_id = c.sales_id
-                GROUP BY 
-                    a.store_name, DATE_FORMAT(a.time_of_sale, '%b/%Y')
-                ORDER BY 
-                    a.store_name ASC, month ASC;
-            '''
+    if report_type == "Sales Report Per Shop":
 
-    # Execute the query
-    cursor.execute(query)
+        # Start with the base query for all report types
+        query = '''
+                    SELECT 
+                        a.store_name, 
+                '''
+
+        # Conditionally add DATE_FORMAT based on group_by
+        if group_by == 'none':
+            query += '''
+                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_sales_amount
+                    '''
+        elif group_by == 'day':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d') AS Date,  -- Format as YYYY-MM-DD
+                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_sales_amount
+                    '''
+        elif group_by == 'month':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%b/%%Y') AS month,  -- Format as Mon/Year (e.g., Oct/2024)
+                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_sales_amount
+                    '''
+
+        query += '''
+                    FROM 
+                        toc_ls_sales a
+                    JOIN 
+                        toc_ls_sales_item b ON a.sales_id = b.sales_id
+                    JOIN 
+                        toc_product d ON b.item_sku = d.item_sku 
+                    LEFT JOIN 
+                        toc_ls_payments c ON b.sales_id = c.sales_id
+                    WHERE 
+                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                '''
+
+        # Add dynamic GROUP BY clause based on 'group_by' parameter
+        if group_by == 'none':
+            query += ''' 
+                        GROUP BY a.store_name
+                    '''
+        elif group_by == 'day':
+            query += ''' 
+                        GROUP BY a.store_name, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d')  -- Group by Day
+                    '''
+        elif group_by == 'month':
+            query += ''' 
+                        GROUP BY a.store_name, DATE_FORMAT(a.time_of_sale, '%%b/%%Y')  -- Group by Month (e.g., Oct/2024)
+                    '''
+
+        # Add ORDER BY clause
+        query += '''
+                    ORDER BY a.store_name ASC, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d') ASC;
+                '''
+
+    elif report_type == "Sales Report Per Staff":
+        # Start the query with columns specific to "Sales Report Per Staff"
+        query = '''
+                    SELECT 
+                        a.store_name,
+                        b.staff_name,
+                '''
+
+        # Conditionally add DATE_FORMAT based on group_by
+        if group_by == 'none':
+            query += '''
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+        elif group_by == 'day':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d') AS Date,  -- Format as YYYY-MM-DD
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+        elif group_by == 'month':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%b/%%Y') AS month,  -- Format as Mon/Year (e.g., Oct/2024)
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+
+        # Add the FROM and JOIN clauses
+        query += '''
+                    FROM 
+                        toc_ls_sales a
+                    JOIN 
+                        toc_ls_sales_item b ON a.sales_id = b.sales_id
+                    WHERE 
+                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                '''
+
+        # Add dynamic GROUP BY clause based on 'group_by' parameter
+        if group_by == 'none':
+            query += ''' 
+                        GROUP BY a.store_name, b.staff_name
+                    '''
+        elif group_by == 'day':
+            query += ''' 
+                        GROUP BY a.store_name, b.staff_name, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d')  -- Group by Day
+                    '''
+        elif group_by == 'month':
+            query += ''' 
+                        GROUP BY a.store_name, b.staff_name, DATE_FORMAT(a.time_of_sale, '%%b/%%Y')  -- Group by Month
+                    '''
+
+        # Add ORDER BY clause
+        query += '''
+                    ORDER BY total_net_amt DESC;
+                '''
+
+    # Execute the query with the given date range
+    cursor.execute(query, (from_date, to_date))  # Pass dates as parameters to prevent SQL injection
     result = cursor.fetchall()
 
     # Fetch column names
@@ -863,6 +954,10 @@ def get_sales_by_shop():
     conn.close()
 
     return result_as_dicts
+
+
+
+
 
 
 
