@@ -1,20 +1,20 @@
 <!-- specials_pie_chart.html -->
 <div class="card">
   <div class="filter">
-    <a class="icon"  data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+    <a class="icon" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
       <li class="dropdown-header text-start">
         <h6>Filter</h6>
       </li>
-      <li><a class="dropdown-item" id="stoday" >Today</a></li>
-      <li><a class="dropdown-item" id="smonth" >This Month</a></li>
-      <li><a class="dropdown-item" id="syear" >This Year</a></li>
+      <li><a class="dropdown-item" id="stoday">Today</a></li>
+      <li><a class="dropdown-item" id="smonth">This Month</a></li>
+      <li><a class="dropdown-item" id="syear">This Year</a></li>
     </ul>
   </div>
 
   <div class="card-body pb-0">
     <h5 class="card-title" id="specials_pie">Top Specials<span>| Today</span></h5>
-    <div id="specialChart" style="min-height: 400px;" class="echart"></div>
+    <div id="specialChart" style="min-height: 400px; width: 100%;" class="echart"></div>
   </div>
 </div>
 
@@ -32,33 +32,31 @@
 
           echarts.init(document.querySelector("#specialChart")).setOption({
             tooltip: {
-              trigger: 'item'
+              trigger: 'item',
+              formatter: '{a} <br/>{b}: {c} ({d}%)'
             },
             legend: {
-              top: '5%',
-              left: 'center'
+              show: false
             },
-            series: [{
-              name: 'Top Specials',
-              type: 'pie',
-              radius: ['40%', '70%'],
-              avoidLabelOverlap: false,
-              label: {
-                show: false,
-                position: 'center'
-              },
-              emphasis: {
+            series: [
+              {
+                name: 'Top Specials',
+                type: 'pie',
+                radius: '50%',
                 label: {
-                  show: true,
-                  fontSize: '18',
-                  fontWeight: 'bold'
+                  formatter: '{b}: {d}%',
+                  show: true
+                },
+                data: topItems,
+                emphasis: {
+                  itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                  }
                 }
-              },
-              labelLine: {
-                show: false
-              },
-              data: topItems
-            }]
+              }
+            ]
           });
         },
         error: function(error) {
@@ -69,13 +67,13 @@
 
     // Attach click event to the "today" filter
     $('#stoday').on('click', function() {
-    $("#specials_pie").html('Top Specials<span>| Today</span>');
+      $("#specials_pie").html('Top Specials<span>| Today</span>');
       fetchAndRenderChart('day');
     });
 
-    // You can add similar click events for "month" and "year" if needed
+    // Click events for "month" and "year"
     $('#smonth').on('click', function() {
-    $("#specials_pie").html('Top Specials<span>| Month</span>');
+      $("#specials_pie").html('Top Specials<span>| Month</span>');
       fetchAndRenderChart('month');
     });
 
@@ -84,7 +82,7 @@
       fetchAndRenderChart('year');
     });
 
-    // Optionally, fetch and render the chart for the default timeframe on page load
+    // Fetch and render the chart for the default timeframe on page load
     fetchAndRenderChart('day');
   });
 </script>
