@@ -535,6 +535,7 @@ WITH sales_data AS (
     WHERE 
         d.acct_group <> 'Specials'
         AND c.blName = %s  -- Ensures we only get sales related to this shop
+        and d.item_sku <> '9568' -- Refund item
     GROUP BY 
         d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date  -- Group by stock_qty_date
 )
@@ -839,19 +840,19 @@ def get_sales_report(report_type, from_date, to_date, group_by):
         # Conditionally add DATE_FORMAT based on group_by
         if group_by == 'none':
             query += '''
-                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        count(*) AS total_sales_quantity,
                         ROUND(SUM(b.net_amt)) AS total_sales_amount
                     '''
         elif group_by == 'day':
             query += '''
                         DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d') AS Date,  -- Format as YYYY-MM-DD
-                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        count(*) AS total_sales_quantity,
                         ROUND(SUM(b.net_amt)) AS total_sales_amount
                     '''
         elif group_by == 'month':
             query += '''
                         DATE_FORMAT(a.time_of_sale, '%%b/%%Y') AS month,  -- Format as Mon/Year (e.g., Oct/2024)
-                        ROUND(SUM(b.quantity)) AS total_sales_quantity,
+                        count(*) AS total_sales_quantity,
                         ROUND(SUM(b.net_amt)) AS total_sales_amount
                     '''
 
@@ -862,8 +863,8 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
                     JOIN 
                         toc_product d ON b.item_sku = d.item_sku 
-                    LEFT JOIN 
-                        toc_ls_payments c ON b.sales_id = c.sales_id
+           --         LEFT JOIN 
+           --             toc_ls_payments c ON b.sales_id = c.sales_id
                     WHERE 
                         a.time_of_sale >= %s AND a.time_of_sale <= %s
                 '''
@@ -1090,8 +1091,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_canna_member m ON p.email = m.email
                     WHERE 
-                        p.email <> 'Unidentified'
-                        AND a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= %s
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
