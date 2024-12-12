@@ -225,6 +225,7 @@ function loadStockData(rows) {
     });
 
     $('#ProductOrderTemplate').show();
+ }
 
 
     $("#saveOrder").on("click", function() {
@@ -348,9 +349,6 @@ function loadStockData(rows) {
         }
     });
 
-
-
-
  });
   //////// EVENTS //////////
 $("#cancelOrder").on("click", function(event) {
@@ -360,7 +358,7 @@ $("#cancelOrder").on("click", function(event) {
     }
     // Show the confirmation modal
     $('#cancelModal').modal('show');
-});
+ });
 
 // Handle the confirmation action when the user clicks "Yes, Cancel"
 $("#confirmCancel").on("click", function() {

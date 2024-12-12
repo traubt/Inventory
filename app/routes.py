@@ -10,7 +10,7 @@ from . import db
 from .db_queries import *
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
-from sqlalchemy import distinct
+from sqlalchemy import distinct, or_
 
 app = Flask(__name__)
 main = Blueprint('main', __name__)
@@ -354,7 +354,13 @@ def receive_stock():
         roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
 
         # Query all records where order_status is 'New'
-        replenish_orders_query = TOCReplenishCtrl.query.filter_by(order_status='New', shop_id=shop["customer"]).all()
+        replenish_orders_query = TOCReplenishCtrl.query.filter(
+            or_(
+                TOCReplenishCtrl.order_status == 'New',
+                TOCReplenishCtrl.order_status == 'Submitted'
+            ),
+            TOCReplenishCtrl.shop_id == shop["customer"]
+        ).all()
 
         # Convert query results into a list of dictionaries
         replenish_orders = [
@@ -366,7 +372,7 @@ def receive_stock():
                 "order_status": order.order_status,
                 "order_status_date": order.order_status_date.isoformat() if order.order_status_date else None,
                 "tracking_code": order.tracking_code,
-                "comments": order.comments,
+                # "comments": order.comments,
             }
             for order in replenish_orders_query
         ]
@@ -558,14 +564,6 @@ def get_product_order_form():
         # Fetch the shop customer from the session
         shop = json.loads(session.get('shop'))['name']  # Assuming 'shop.customer' is stored in the session
 
-        # # Query tocStockOrder to check if there is any "New" order for the customer
-        # existing_order = TocStockOrder.query.filter_by(shop_id=shop, order_status="New").first()
-        #
-        # if not existing_order:
-        #     # If no "New" order exists, return an empty array with a 200 status
-        #     return jsonify([]), 200
-
-        # Proceed with fetching the stock order form if an existing order is found
         data = get_stock_count_per_shop(shop)
 
         if not data:
@@ -1161,7 +1159,7 @@ def update_count_stock():
             product_name = row.get('product_name', '')
             stock_count = row.get('stock_count', 0)
             variance = row.get('variance', 0)
-            variance_rsn = row.get('variance_reason', 'NA')
+            # variance_rsn = row.get('variance_reason', 'NA')
             stock_rejected = row.get('stock_rejected', 0)
             comments = row.get('comments', '')
             calc_stock_qty = row.get('current_qty', 0)
@@ -1180,7 +1178,7 @@ def update_count_stock():
                 existing_record.last_stock_qty = last_stock_count
                 existing_record.stock_count = float(stock_count)
                 existing_record.variance = float(variance)
-                existing_record.variance_rsn = variance_rsn
+                # existing_record.variance_rsn = variance_rsn
                 existing_record.rejects_qty = float(stock_rejected)
                 existing_record.comments = comments
                 existing_record.count_by = user_name
@@ -1192,7 +1190,7 @@ def update_count_stock():
                 raise Exception("Shop SKU combination does not exist")
 
             # Insert into TOCStockVariance if Variance > 0
-            if calc_stock_qty != stock_count:
+            if comments != '': #Assuming comments entered in client form only when there is variance
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
@@ -1203,7 +1201,7 @@ def update_count_stock():
                     last_stock_qty=float(last_stock_count),
                     calc_stock_qty=float(calc_stock_qty),
                     variance=float(variance),
-                    variance_rsn=variance_rsn,
+                    # variance_rsn=variance_rsn,
                     stock_recount=0,  # Add a default value if not provided
                     shop_name=shop_name,
                     rejects_qty=float(stock_rejected),
@@ -1249,8 +1247,8 @@ def update_count_receive_stock():
             stock_sent = row.get('sent_qty', 0)
             stock_count = row.get('received_qty', 0)
             variance = row.get('variance', 0)
-            variance_rsn = row.get('variance_reason', 'NA')
-            stock_rejected = row.get('rejected_qty', 0)
+            # variance_rsn = row.get('variance_reason', 'NA')
+            # stock_rejected = row.get('rejected_qty', 0)
             comments = row.get('comments', '')
 
             # Check if the record exists in TocStock
@@ -1263,7 +1261,7 @@ def update_count_receive_stock():
                 # Update the existing record in TocStock
                 existing_record.received_date = datetime.now(timezone.utc)
                 existing_record.received_qty = stock_count
-                existing_record.rejected_qty = stock_rejected
+                # existing_record.rejected_qty = stock_rejected
                 existing_record.variance = variance
                 existing_record.received_by = user_name
                 existing_record.received_comment = comments
@@ -1282,10 +1280,10 @@ def update_count_receive_stock():
                     last_stock_qty=float(stock_count),
                     calc_stock_qty=float(stock_sent),
                     variance=float(variance),
-                    variance_rsn=variance_rsn,
+                    # variance_rsn=variance_rsn,
                     stock_recount=0,  # Add a default value if not provided
                     shop_name=shop_name,
-                    rejects_qty=float(stock_rejected),
+                    # rejects_qty=float(stock_rejected),
                     final_stock_qty=float(stock_count),
                     comments=comments,
                     replenish_id = replenish_order_id
@@ -1293,9 +1291,9 @@ def update_count_receive_stock():
                 db.session.add(new_variance_record)
 
         # Update stock control
-        toc_replenish_ctrl = TOCReplenishCtrl.query.filter_by(
-            order_id=replenish_order_id,
-            order_status="New"
+        toc_replenish_ctrl = TOCReplenishCtrl.query.filter(
+            or_(TOCReplenishCtrl.order_status == "New", TOCReplenishCtrl.order_status == "Submitted"),
+            TOCReplenishCtrl.order_id == replenish_order_id,
         ).first()
 
         toc_replenish_ctrl.order_status = "Completed"
@@ -1314,6 +1312,8 @@ def update_count_receive_stock():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+    finally:
+        db.session.close()
 
 
 from datetime import datetime
@@ -1366,6 +1366,18 @@ def sales_report():
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
 
+@main.route('/variance_report')
+def variance_report():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('variance_report.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
+
 
 from flask import request, jsonify
 
@@ -1403,6 +1415,39 @@ def get_business_report():
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@main.route('/get_variance_report')
+def get_variance_report():
+    try:
+        # Retrieve parameters from the request
+        report_type = request.args.get('reportType')  # Selected report type
+        group_by = request.args.get('groupBy')        # Grouping option
+        from_date = request.args.get('fromDate')      # Start date
+        to_date = request.args.get('toDate')          # End date
+
+        # Log the received parameters (for debugging purposes)
+        print(f"Received Parameters:")
+        print(f"Report Type: {report_type}")
+        print(f"Group By: {group_by}")
+        print(f"From Date: {from_date}")
+        print(f"To Date: {to_date}")
+
+        # Fetch the data from the function
+        data = get_db_variance_report(report_type,from_date,to_date,group_by)
+
+        # Check if no data is returned
+        if not data:
+            return jsonify({"message": "Error fetching sales report"}), 500
+
+        # Extract column titles dynamically
+        columns = [{"title": key} for key in data[0].keys()] if data else []
+
+        # Return the formatted data along with column titles as JSON
+        return jsonify({"columns": columns, "data": data})
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 
@@ -1410,7 +1455,15 @@ def get_business_report():
 def count_new_orders():
     shop_data = session.get('shop')
     shop = json.loads(shop_data)
-    count = TOCReplenishCtrl.query.filter_by(order_status='New', shop_id=shop["customer"]).count()
+
+    # Use or_ to combine conditions for order_status
+    count = TOCReplenishCtrl.query.filter(
+        or_(
+            TOCReplenishCtrl.order_status == 'New',
+            TOCReplenishCtrl.order_status == 'Submitted'
+        ),
+        TOCReplenishCtrl.shop_id == shop["customer"]
+    ).count()
 
     return jsonify({"count": count})
 
