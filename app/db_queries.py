@@ -650,7 +650,8 @@ ON
 WHERE 
     st.shop_name = %s -- Filter to include only entries for the specified shop
 ORDER BY 
-    COALESCE(s.sales_since_stock_read, 0) DESC;
+    COALESCE(s.sales_since_stock_read, 0) DESC
+    limit 10;
             '''
 
     # Execute the query with the parameter
@@ -1129,9 +1130,105 @@ def get_sales_report(report_type, from_date, to_date, group_by):
 
     return result_as_dicts
 
+def get_db_variance_report(report_type, from_date, to_date, group_by):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    # Base query initialization
+    query = """
+        SELECT 
+    """
 
+    # Add fields for `group_by == 'none'`
+    if group_by == 'none':
+        query += """
+            creation_date,
+            shop_id,
+            sku,
+            stock_qty_date,
+            product_name,
+            stock_count,
+            count_by,
+            last_stock_qty,
+            calc_stock_qty,
+            variance,
+            stock_recount,
+            shop_name,
+            rejects_qty,
+            final_stock_qty,
+            replenish_id,
+            comments
+        """
+    elif group_by == 'day':
+        query += """
+            shop_name,
+            DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS Date,
+            COUNT(*) AS total_records,
+            ROUND(SUM(ABS(variance)), 2) AS total_variance
+        """
+    elif group_by == 'month':
+        query += """
+            shop_name,
+            DATE_FORMAT(stock_qty_date, '%%b/%%Y') AS Month,
+            COUNT(*) AS total_records,
+            ROUND(SUM(ABS(variance)), 2) AS total_variance
+        """
+    elif group_by == 'user':
+        query += """
+            count_by AS user,
+            COUNT(*) AS total_records,
+            ROUND(SUM(ABS(variance)), 2) AS total_variance
+        """
+    elif group_by == 'shop':
+        query += """
+            shop_name,
+            COUNT(*) AS total_records,
+            ROUND(SUM(ABS(variance)), 2) AS total_variance
+        """
 
+    # Add FROM clause
+    query += """
+        FROM toc_stock_variance
+        WHERE stock_qty_date >= %s AND stock_qty_date <= %s
+    """
+
+    # Filter by report type
+    if report_type == "Stock Count Variance":
+        query += " AND replenish_id LIKE '%%C'"
+    elif report_type == "Stock Receive Variance":
+        query += " AND replenish_id LIKE '%%R'"
+
+    # Add dynamic GROUP BY clause if not `none`
+    if group_by == 'day':
+        query += " GROUP BY shop_name, DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d')"
+    elif group_by == 'month':
+        query += " GROUP BY shop_name, DATE_FORMAT(stock_qty_date, '%%b/%%Y')"
+    elif group_by == 'user':
+        query += " GROUP BY count_by"
+    elif group_by == 'shop':
+        query += " GROUP BY shop_name"
+
+    # Add ORDER BY clause
+    if group_by != 'none':
+        query += " ORDER BY shop_name ASC"
+        if group_by in ['day', 'month']:
+            query += ", stock_qty_date ASC"
+
+    # Execute the query with the given parameters
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
 
 
 

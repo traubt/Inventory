@@ -220,14 +220,14 @@ function loadStockData(rows) {
                     return `<span class="variance">${data || 0}</span>`;
                 }
             },
-            {
-                title: "Variance Reason",
-                data: null,
-                className: 'editable',
-                render: function (data, type, row) {
-                    return `<input type="text" class="variance-reason" value="NA" />`;
-                }
-            },
+<!--            {-->
+<!--                title: "Variance Reason",-->
+<!--                data: null,-->
+<!--                className: 'editable',-->
+<!--                render: function (data, type, row) {-->
+<!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
+<!--                }-->
+<!--            },-->
             {
                 title: "Comments",
                 data: null,
@@ -257,10 +257,10 @@ function loadStockData(rows) {
         const rejectedQty = parseFloat($(row).find('.current-stock-rejected').val()) || 0;
 
         // Calculate the variance
-        const variance = currentQty + rejectedQty - countedQty;
+        const variance = currentQty - countedQty;
 
-        // If variance > 20% of current quantity, set red border
-        //const threshold = 0.2; // 20%
+        // If variance > 10% of current quantity, set red border
+        //const threshold = 0.1; // 10%
         const difference = Math.abs(currentQty - countedQty);
         //if (currentQty > 0 && (difference / currentQty) > threshold) {
         if (difference != 0) {
@@ -275,13 +275,13 @@ function loadStockData(rows) {
         const calculatedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
         const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
 
-        const variance = calculatedQty + rejectedQty - countedQty;
+        const variance = calculatedQty - countedQty;
 
         // Update variance
         row.find('.variance').text(variance);
 
-        // Check if the difference exceeds 20%
-        const threshold = 0.2; // 20%
+        // Check if the difference exceeds 10%
+        const threshold = 0.1; // 10%
         const difference = Math.abs(calculatedQty - countedQty);
         if (calculatedQty > 0 && (difference / calculatedQty) > threshold) {
             // Set border to solid red 1px
@@ -346,12 +346,12 @@ function loadStockData(rows) {
                 { title: "Last Stock Qty", data: "last_stock_qty" },
                 { title: "Calc Stock Qty", data: "calc_stock_qty" },
                 { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
                 { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
                     if (type === 'display') {
                         return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
@@ -404,12 +404,12 @@ function loadStockData(rows) {
                 { title: "Last Stock Qty", data: "last_stock_qty" },
                 { title: "Calc Stock Qty", data: "calc_stock_qty" },
                 { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
                 { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
                     if (type === 'display') {
                         return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
@@ -471,11 +471,11 @@ $("#saveOrder").on("click", function () {
         rowData.last_stock_count = parseFloat(row.find("td:nth-child(3)").text().trim()) || 0; // Last Stock Count
         rowData.last_stock_count_date = row.find("td:nth-child(4)").text().trim(); // Last Stock Count Date
         rowData.sold_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sold Quantity
-        rowData.current_qty = parseFloat(row.find("td:nth-child(6)").text().trim()) || 0; // Current Quantity
+        rowData.current_qty = parseFloat(row.find("td:nth-child(7)").text().trim()) || 0; // Current Quantity
         rowData.stock_count = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Stock Count
         rowData.stock_rejected = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
         rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
-        rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
+        //rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments
 
         // Check if the current stock count has a red border and comments are empty
@@ -519,7 +519,8 @@ $("#saveOrder").on("click", function () {
     const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
     const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized
     const date = getCurrentDate(); // Get current date in YYYYMMDD format
-    const shop_name = {{shop.name | tojson}}
+    const shop_name = {{shop.name | tojson}};
+    const order_id = $("#orderName").val();
 
     $.ajax({
         url: "/update_count_stock", // Flask route for updating stock data
@@ -531,7 +532,7 @@ $("#saveOrder").on("click", function () {
             user_name: user_name,
             date: date,
             shop_name: shop_name,
-            replenish_order_id: "NA",
+            replenish_order_id: order_id,
         }),
         success: function (response) {
             console.log("Data submitted successfully:", response);

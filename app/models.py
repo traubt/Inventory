@@ -12,7 +12,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(45), nullable=True)
     password = db.Column(db.String(45), nullable=True)
-    creation_date = db.Column(db.DateTime, nullable=False, default=datetime.now(timezone.utc))
+    creation_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     first_name = db.Column(db.String(45), nullable=True)
     last_name = db.Column(db.String(45), nullable=True)
     email = db.Column(db.String(100), unique=True, nullable=True)
@@ -154,7 +154,7 @@ class TOCStockVariance(db.Model):
     __tablename__ = 'toc_stock_variance'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))  # Use datetime.utcnow for default
+    creation_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))  # Use datetime.utcnow for default
     shop_id = db.Column(db.String(20), nullable=True)
     sku = db.Column(db.String(45), nullable=True)
     stock_qty_date = db.Column(db.DateTime, nullable=True)
@@ -164,7 +164,7 @@ class TOCStockVariance(db.Model):
     last_stock_qty = db.Column(db.Float, nullable=True)
     calc_stock_qty = db.Column(db.Float, nullable=True)
     variance = db.Column(db.Float, default=0)  # Ensure default is numeric
-    variance_rsn = db.Column(db.String(45), nullable=True)
+    # variance_rsn = db.Column(db.String(45), nullable=True)
     stock_recount = db.Column(db.Float, nullable=True)
     shop_name = db.Column(db.String(45), nullable=True)
     rejects_qty = db.Column(db.Float, nullable=True)
@@ -184,7 +184,7 @@ class TOCUserActivity(db.Model):
     __tablename__ = 'toc_user_activity'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    actv_date = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=True)
+    actv_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     user = db.Column(db.String(45), nullable=True)
     shop = db.Column(db.String(45), nullable=True)
     activity = db.Column(db.String(100), nullable=True)

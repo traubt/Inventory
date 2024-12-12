@@ -260,14 +260,14 @@ function loadStockData(rows) {
                     return `<span class="variance">${variance}</span>`;
                 }
             },
-            {
-                title: "Variance Reason",
-                data: null,
-                className: 'editable',
-                render: function (data, type, row) {
-                    return `<input type="text" class="variance-reason" value="NA" />`;
-                }
-            },
+<!--            {-->
+<!--                title: "Variance Reason",-->
+<!--                data: null,-->
+<!--                className: 'editable',-->
+<!--                render: function (data, type, row) {-->
+<!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
+<!--                }-->
+<!--            },-->
             {
                 title: "Comments",
                 data: null,
@@ -351,12 +351,12 @@ function loadStockData(rows) {
                 { title: "Last Stock Qty", data: "last_stock_qty" },
                 { title: "Calc Stock Qty", data: "calc_stock_qty" },
                 { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
                 { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
                     if (type === 'display') {
                         return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
@@ -409,12 +409,12 @@ function loadStockData(rows) {
                 { title: "Last Stock Qty", data: "last_stock_qty" },
                 { title: "Calc Stock Qty", data: "calc_stock_qty" },
                 { title: "Variance", data: "variance" },
-                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;
-                    }
-                    return data;
-                }},
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
                 { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
                     if (type === 'display') {
                         return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
@@ -456,8 +456,8 @@ function loadStockData(rows) {
 
 $("#saveOrder").on("click", function () {
 
-    if ($("#ProductOrderTemplate_filter input").val().length > 0){
-        dialog("Filter Is On","Can't submit count stock while filter is on. Please close the table filter before submit");
+    if ($("#ProductOrderTemplate_filter input").val().length > 0) {
+        dialog("Filter Is On", "Can't submit count stock while filter is on. Please close the table filter before submit");
         return;
     }
 
@@ -476,15 +476,21 @@ $("#saveOrder").on("click", function () {
         rowData.replenish_date = row.find("td:nth-child(4)").text().trim(); // Replenish Date
         rowData.sent_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sent Quantity
         rowData.received_qty = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Received Quantity
-        //rowData.rejected_qty = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected
         rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
-        rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason
         rowData.comments = row.find(".comments").val().trim(); // Editable Comments
 
         // Validate the data (example: received quantity and rejected quantity cannot be negative)
-        if (rowData.received_qty < 0 || rowData.rejected_qty < 0) {
+        if (rowData.received_qty < 0) {
             alert(`Invalid stock values for SKU: ${rowData.sku}. Please enter valid data.`);
+            isValid = false;
             return false; // Exit loop if invalid data is found
+        }
+
+        // Check for variance without comments
+        if (rowData.variance !== 0 && !rowData.comments) {
+            alert(`There is a variance in count for ${rowData.product_name}. Please enter a comment before confirming stock count.`);
+            isValid = false;
+            return false; // Exit loop
         }
 
         // Push the row data to `tableData` array
@@ -522,7 +528,7 @@ $("#saveOrder").on("click", function () {
             user_name: user_name,
             date: date,
             shop_name: shop_name,
-            replenish_order_id : replenish_order_id,
+            replenish_order_id: replenish_order_id,
         }),
         success: function (response) {
             console.log("Data submitted successfully:", response);
@@ -538,6 +544,7 @@ $("#saveOrder").on("click", function () {
         }
     });
 });
+
 
 
     $("#submitOrder").on("click", async function(event) {
