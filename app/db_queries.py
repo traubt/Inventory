@@ -650,8 +650,7 @@ ON
 WHERE 
     st.shop_name = %s -- Filter to include only entries for the specified shop
 ORDER BY 
-    COALESCE(s.sales_since_stock_read, 0) DESC
-    limit 10;
+    COALESCE(s.sales_since_stock_read, 0) DESC;
             '''
 
     # Execute the query with the parameter
