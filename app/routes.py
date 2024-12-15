@@ -1186,6 +1186,8 @@ def update_count_stock():
                 existing_record.final_stock_qty = float(stock_count)
                 existing_record.shop_name = shop_name
                 existing_record.replenish_id = replenish_order_id
+                existing_record.pastel_ind = 0
+                existing_record.pastel_count = -99
             else:
                 raise Exception("Shop SKU combination does not exist")
 
