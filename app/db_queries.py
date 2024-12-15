@@ -311,6 +311,37 @@ def get_hourly_sales(shop_name, timeframe):
                 limit 200;
             '''
             cursor.execute(query)
+    elif shop_name == "Online":
+        if timeframe == "hourly":
+            query = '''                             
+                SELECT 
+                    'Online' AS store_name,
+                    DATE_FORMAT(o.creation_date, '%Y-%m-%d %H:00') AS sale_hour, 
+                    ROUND(SUM(o.total_amount / 1.15), 2) AS total_amount -- Removing 15% VAT
+                FROM 
+                    toc_wc_sales_order o
+                GROUP BY 
+                    sale_hour
+                ORDER BY 
+                    sale_hour DESC
+                LIMIT 200;
+            '''
+            cursor.execute(query)
+        elif timeframe == "daily":
+            query = '''
+                SELECT 
+                    'Online' AS store_name,
+                    DATE_FORMAT(o.creation_date, '%Y-%m-%d') AS sale_hour, 
+                    ROUND(SUM(o.total_amount / 1.15), 2) AS total_amount -- Removing 15% VAT
+                FROM 
+                    toc_wc_sales_order o
+                GROUP BY 
+                    sale_hour
+                ORDER BY 
+                    sale_hour DESC
+                LIMIT 200;
+            '''
+            cursor.execute(query)
     else:
         if timeframe == "hourly":
             query = '''
@@ -576,8 +607,7 @@ LEFT JOIN
     toc_stock st
 ON 
     s.item_sku = st.sku AND s.store_customer = st.shop_id
-ORDER BY 
-    s.sales_since_stock_read DESC;
+ORDER BY  s.sales_since_stock_read DESC;
             '''
 
     # Execute the query with the parameter
@@ -650,7 +680,8 @@ ON
 WHERE 
     st.shop_name = %s -- Filter to include only entries for the specified shop
 ORDER BY 
-    COALESCE(s.sales_since_stock_read, 0) DESC;
+    COALESCE(s.sales_since_stock_read, 0) DESC
+    limit 10;
             '''
 
     # Execute the query with the parameter
@@ -697,12 +728,22 @@ def get_sales_by_shop_last_three_months():
                 toc_ls_sales_item tlsi
             JOIN 
                 toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
+            JOIN toc_shops s on ts.store_customer = s.customer
             WHERE 
-                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
+                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                and s.actv_ind = 1
             GROUP BY 
                 ts.store_name, sale_month
-            ORDER BY 
-                sale_month DESC, ts.store_name;
+    union all
+            SELECT 
+                'Online' AS store_name,
+                DATE_FORMAT(creation_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
+                ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
+            FROM 
+                toc_wc_sales_order
+                WHERE 
+                creation_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+            group by store_name,sale_month;
             '''
 
     # Execute the query
@@ -919,7 +960,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= %s                        
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter

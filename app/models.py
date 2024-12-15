@@ -34,6 +34,7 @@ class TOC_SHOPS(db.Model):
     store = db.Column(db.String(10))
     customer = db.Column(db.String(10))
     mt_shop_name = db.Column(db.String(50))
+    actv_ind = db.Column(db.Integer)
 
 class TocMessages(db.Model):
     __tablename__ = 'toc_messages'
@@ -150,6 +151,9 @@ class TocStock(db.Model):
     final_stock_qty = db.Column(db.Float, nullable=True)
     replenish_id = db.Column(db.String(45), nullable=True)
     comments = db.Column(db.String(150), nullable=True)
+    pastel_ind = db.Column(db.Integer, default=0, nullable=True)
+    pastel_count = db.Column(db.Float, nullable=True)
+    pastel_date =  db.Column(db.DateTime, nullable=True)
 
 class TOCStockVariance(db.Model):
     __tablename__ = 'toc_stock_variance'
