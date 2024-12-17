@@ -1,6 +1,7 @@
 import pymysql
 import json
 from flask import session
+from datetime import datetime
 
 # Database connection details
 db_config = {
@@ -905,6 +906,104 @@ def get_top_agents(shop_name, timeframe):
 
     # Return both column names and data
     return column_names, rows
+
+def get_sales_data(shop_name, from_date=None, to_date=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Default query for Head Office or non-specific shop
+    if shop_name == "Head Office":
+        query = '''
+            SELECT
+                DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
+                ROUND(SUM(ti.net_amt), 2) AS total_sales  -- Rounding total sales to 2 decimal places
+            FROM
+                toc_ls_sales ts
+            JOIN
+                toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+            JOIN
+                toc_product p ON ti.item_sku = p.item_sku
+            WHERE
+                1 = 1  -- No shop name filter, includes all shops
+        '''
+        params = []
+    elif shop_name == "Online":
+        query = '''
+            SELECT
+                DATE_FORMAT(wo.order_date, '%Y-%m-%d') AS date,  -- Correct single % sign
+                ROUND(SUM(wsi.total_amount), 2) AS total_sales  -- Rounding total sales to 2 decimal places
+            FROM
+                toc_wc_sales_order wo
+            JOIN
+                toc_wc_sales_items wsi ON wo.order_id = wsi.sales_id
+            WHERE
+                1 = 1  -- No shop name filter, only for online store
+        '''
+        params = []
+    else:
+        query = '''
+            SELECT
+                DATE_FORMAT(ts.time_of_sale, '%Y-%m-%d') AS date,  -- Correct single % sign
+                ROUND(SUM(ti.net_amt), 2) AS total_sales  -- Rounding total sales to 2 decimal places
+            FROM
+                toc_ls_sales ts
+            JOIN
+                toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+            JOIN
+                toc_product p ON ti.item_sku = p.item_sku
+            WHERE
+                ts.store_name = %s
+        '''
+        params = [shop_name]
+
+    # Add date filters to the query if provided
+    if from_date:
+        # Ensure from_date is formatted as 'YYYY-MM-DD'
+        if isinstance(from_date, datetime):
+            from_date = from_date.strftime('%Y-%m-%d')
+        query += " AND ts.time_of_sale >= %s"
+        params.append(from_date)
+
+    if to_date:
+        # Ensure to_date is formatted as 'YYYY-MM-DD'
+        if isinstance(to_date, datetime):
+            to_date = to_date.strftime('%Y-%m-%d')
+        query += " AND ts.time_of_sale < %s"
+        params.append(to_date)
+
+    query += '''
+        GROUP BY
+            date
+        ORDER BY
+            date ASC
+    '''
+
+    # Debugging: Check the query and params
+    print(f"Final Query: {query}")
+    print(f"Params: {params}")
+
+    # Execute the query
+    try:
+        cursor.execute(query, tuple(params))  # Ensure params are passed as a tuple
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
+
+
+
+
+
 
 ################################################  REPORT SECTION
 

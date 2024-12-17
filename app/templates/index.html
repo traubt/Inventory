@@ -61,15 +61,29 @@
 
   <main id="main" class="main">
 
-    <div class="pagetitle">
-      <h1>Dashboard {{user.shop}}</h1>
-      <nav>
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item"><a href="index.html">Home</a></li>
-          <li class="breadcrumb-item active">Dashboard</li>
-        </ol>
-      </nav>
-    </div><!-- End Page Title -->
+<div class="pagetitle d-flex justify-content-between align-items-center">
+  <h1>
+    Dashboard {{ user.shop }}
+  </h1>
+
+  <div class="d-flex align-items-center">
+    <!-- Label for Change Shop -->
+    <div class="col-auto">
+      <label class="form-label fw-bold mb-0 me-2">Change Shop:</label>
+    </div>
+    <!-- Dropdown for Change Shop -->
+    <div class="col-auto">
+      <select id="shopDropdown" class="form-select form-select-sm">
+        <option selected disabled>Select New Shop</option> <!-- Default placeholder -->
+        {% for shop in shops %}
+          <option value="{{ shop }}">{{ shop }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+
 
     <!-- Date Range Selector Section -->
 <div class="container mt-4">
@@ -221,8 +235,19 @@
 
             </div><!-- End Customers Card -->
 
-  <!-- Include the line chart -->
-  {% include 'line_chart.html' %}
+<div class="col-12">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title" id="line_chart_title">Sales Chart</h5>
+            <!-- Add the "Update" button -->
+            <button class="btn btn-primary" id="updateSalesChart" style="position: absolute; top: 10px; right: 10px;">Update</button>
+            <!-- Line Chart -->
+            <div id="reportsChart"></div>
+            <!-- End Line Chart -->
+        </div>
+    </div>
+</div>
+
 
 
       <!-- Recent Sales -->
@@ -632,8 +657,13 @@
 
   var _top_selling;
   var _count_replenish;
+  var shops;
 
   $(document).ready(async function() {
+
+     // Parse the JSON string passed from Flask
+    shops = JSON.parse('{{ shops | tojson }}');
+    console.log(shops);  // This will log the list of shops as a JavaScript array
 
     let fetchInterval;
 
@@ -692,14 +722,9 @@
      await  $('.dynamic-icon[data-id="top_spenders"]').click();
      await  $('.dynamic-icon[data-id="top_products"').click();
      await  $('.dynamic-icon[data-id="top_agents"').click();
-         // Ensure #reportsChart exists in the DOM
-    if ($("#reportsChart").length > 0) {
-        await populate_sales_chart("daily");
-    } else {
-        alert("#reportsChart element not found in the DOM.");
-    }
 
-    await $(".agent_bar_chart[value='daily']").trigger("click");
+
+     await $(".agent_bar_chart[value='daily']").trigger("click");
 
 
       await sales_three_months()
@@ -1121,7 +1146,28 @@ $('.dynamic-icon').on('click', async function () {
   }
 });
 
+    $('#updateSalesChart').on('click', function() {
+        // Call the function to populate the sales chart
+        populate_sales_chart($("#fromDate").val(),$("#toDate").val() );
+    });
 
+    $('#shopDropdown').on('change', function() {
+        const selectedShop = $(this).val();
+        // Submit the selected shop as a form POST
+        const form = $('<form>', {
+            method: 'POST',
+            action: '/change_shop'
+        }).append($('<input>', {
+            type: 'hidden',
+            name: 'shop',
+            value: selectedShop
+        }));
+
+        $('body').append(form);
+        form.submit(); // Submit the form to trigger the route
+    });
+
+    $("#updateSalesChart").click();
 
 
 
