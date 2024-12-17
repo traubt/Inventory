@@ -719,15 +719,13 @@
 
     // Trigger the click event
      await  $(".today").trigger("click");
+     await  $("#updateSalesChart").click();
      await  $('.dynamic-icon[data-id="top_spenders"]').click();
      await  $('.dynamic-icon[data-id="top_products"').click();
      await  $('.dynamic-icon[data-id="top_agents"').click();
-
-
      await $(".agent_bar_chart[value='daily']").trigger("click");
+     await sales_three_months()
 
-
-      await sales_three_months()
        // get notifications
             async function fetchNotifications() {
                 await fetch('/get_unread_notifications')
@@ -1167,7 +1165,7 @@ $('.dynamic-icon').on('click', async function () {
         form.submit(); // Submit the form to trigger the route
     });
 
-    $("#updateSalesChart").click();
+
 
 
 
