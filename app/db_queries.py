@@ -907,84 +907,75 @@ def get_top_agents(shop_name, timeframe):
     # Return both column names and data
     return column_names, rows
 
-def get_sales_data(shop_name, from_date=None, to_date=None):
+def get_sales_data(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
+    print(f"query input sales")
+    print(f"Shop: {shop_name}")
+    print(f"from date: {from_date}")
+    print(f"to date: {to_date}")
+
+    try:
 
     # Default query for Head Office or non-specific shop
-    if shop_name == "Head Office":
-        query = '''
-            SELECT
-                DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
-                ROUND(SUM(ti.net_amt), 2) AS total_sales  -- Rounding total sales to 2 decimal places
-            FROM
-                toc_ls_sales ts
-            JOIN
-                toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
-            JOIN
-                toc_product p ON ti.item_sku = p.item_sku
-            WHERE
-                1 = 1  -- No shop name filter, includes all shops
-        '''
-        params = []
-    elif shop_name == "Online":
-        query = '''
-            SELECT
-                DATE_FORMAT(wo.order_date, '%Y-%m-%d') AS date,  -- Correct single % sign
-                ROUND(SUM(wsi.total_amount), 2) AS total_sales  -- Rounding total sales to 2 decimal places
-            FROM
-                toc_wc_sales_order wo
-            JOIN
-                toc_wc_sales_items wsi ON wo.order_id = wsi.sales_id
-            WHERE
-                1 = 1  -- No shop name filter, only for online store
-        '''
-        params = []
-    else:
-        query = '''
-            SELECT
-                DATE_FORMAT(ts.time_of_sale, '%Y-%m-%d') AS date,  -- Correct single % sign
-                ROUND(SUM(ti.net_amt), 2) AS total_sales  -- Rounding total sales to 2 decimal places
-            FROM
-                toc_ls_sales ts
-            JOIN
-                toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
-            JOIN
-                toc_product p ON ti.item_sku = p.item_sku
-            WHERE
-                ts.store_name = %s
-        '''
-        params = [shop_name]
+        if shop_name == "Head Office":
+            query = '''
+                SELECT
+                    DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
+                    ROUND(SUM(ti.net_amt), 2) AS total_sales  
+                FROM
+                    toc_ls_sales ts
+                JOIN
+                    toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                where
+                    ts.time_of_sale >= %s and ts.time_of_sale < %s
+                GROUP BY
+                    date
+                ORDER BY
+                    date ASC;
+                               
+            '''
+            cursor.execute(query, (from_date, to_date))
 
-    # Add date filters to the query if provided
-    if from_date:
-        # Ensure from_date is formatted as 'YYYY-MM-DD'
-        if isinstance(from_date, datetime):
-            from_date = from_date.strftime('%Y-%m-%d')
-        query += " AND ts.time_of_sale >= %s"
-        params.append(from_date)
+        elif shop_name == "Online":
+            query = '''
+                SELECT
+                    DATE_FORMAT(wo.order_date, '%%Y-%%m-%%d') AS date,  
+                    ROUND(SUM(wo.total_amount * 0.85), 2) AS total_sales  
+                FROM
+                    toc_wc_sales_order wo
+                WHERE
+                    wo.order_date >= %s and wo.order_date < %s
+                GROUP BY
+                    date
+                ORDER BY
+                    date ASC; 
+            '''
+            cursor.execute(query, (from_date, to_date))
 
-    if to_date:
-        # Ensure to_date is formatted as 'YYYY-MM-DD'
-        if isinstance(to_date, datetime):
-            to_date = to_date.strftime('%Y-%m-%d')
-        query += " AND ts.time_of_sale < %s"
-        params.append(to_date)
+        else:
+            query = '''
+                SELECT
+                    DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date, 
+                    ROUND(SUM(ti.net_amt), 2) AS total_sales
+                FROM
+                    toc_ls_sales ts
+                JOIN
+                    toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                JOIN
+                    toc_product p ON ti.item_sku = p.item_sku
+                WHERE
+                    ts.store_name = %s
+                    AND ts.time_of_sale >= %s AND ts.time_of_sale < %s
+                GROUP BY
+                    date
+                ORDER BY
+                    date ASC;
+            '''
 
-    query += '''
-        GROUP BY
-            date
-        ORDER BY
-            date ASC
-    '''
+            # Execute the query with parameterized values
+            cursor.execute(query, (shop_name, from_date, to_date))
 
-    # Debugging: Check the query and params
-    print(f"Final Query: {query}")
-    print(f"Params: {params}")
-
-    # Execute the query
-    try:
-        cursor.execute(query, tuple(params))  # Ensure params are passed as a tuple
         rows = cursor.fetchall()
 
         # Get column names from the cursor description
