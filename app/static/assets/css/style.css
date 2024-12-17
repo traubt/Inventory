@@ -1329,6 +1329,26 @@ h6 {
     word-wrap: break-word; /* Handle long text gracefully */
 }
 
+.table-row-even {
+    background-color: #f9f9f9 !important; /* Light gray for even rows */
+}
+
+.table-row-odd {
+    background-color: #ffffff !important; /* White for odd rows */
+}
+
+/* CSS to add pointer on hover for the chart icons */
+#pie-chart-icon,
+#bar-chart-icon {
+  cursor: pointer;
+}
+
+/* Optional: Styling the icons to ensure visibility and hover effect */
+#pie-chart-icon:hover,
+#bar-chart-icon:hover {
+  color: #0056b3;  /* Change color on hover (Optional) */
+}
+
 
 
 
