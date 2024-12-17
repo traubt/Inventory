@@ -1349,7 +1349,9 @@ h6 {
   color: #0056b3;  /* Change color on hover (Optional) */
 }
 
-
+#date_range_lbl{
+    width: 100px;
+}
 
 
 

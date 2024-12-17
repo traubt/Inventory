@@ -71,6 +71,42 @@
       </nav>
     </div><!-- End Page Title -->
 
+    <!-- Date Range Selector Section -->
+<div class="container mt-4">
+  <div class="row align-items-center mb-3">
+    <!-- Date Range Label -->
+    <div class="col-auto">
+      <label class="form-label fw-bold mb-0 me-2">Date Range:</label>
+    </div>
+    <!-- Dropdown for Date Range -->
+    <div class="col-auto">
+      <select id="dateRangeSelector" class="form-select form-select-sm">
+        <option value="today">Today</option>
+        <option value="wtd">Week to Date</option>
+        <option value="mtd">Month to Date</option>
+        <option value="qtd">Quarter to Date</option>
+        <option value="ytd">Year to Date</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <!-- From Date -->
+    <div class="col-auto">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">From</span>
+        <input type="date" id="fromDate" class="form-control">
+      </div>
+    </div>
+    <!-- To Date -->
+    <div class="col-auto">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">To</span>
+        <input type="date" id="toDate" class="form-control">
+      </div>
+    </div>
+  </div>
+</div>
+
+
 
     <section class="section dashboard">
       <div class="row">
@@ -600,6 +636,56 @@
   $(document).ready(async function() {
 
     let fetchInterval;
+
+    //Initialize the current date as 'To' date
+  const currentDate = new Date();
+
+  // Set 'To' date as today's date (ensures no timezone issues)
+  const toDate = new Date(Date.UTC(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate()
+  )).toISOString().split('T')[0];
+  $('#toDate').val(toDate);
+
+  // Set 'From' date as the first day of the current year
+  const firstDayOfYear = new Date(Date.UTC(currentDate.getFullYear(), 0, 1))
+    .toISOString()
+    .split('T')[0];
+  $('#fromDate').val(firstDayOfYear);
+
+    // Date range selector event handler
+    $("#dateRangeSelector").on("change", function () {
+      const selectedRange = $(this).val();
+      const today = new Date();
+      let fromDate;
+
+      switch (selectedRange) {
+        case "today":
+          fromDate = today;
+          break;
+        case "wtd":
+          fromDate = new Date(today);
+          fromDate.setDate(today.getDate() - today.getDay()); // Set to start of week
+          break;
+        case "mtd":
+          fromDate = new Date(today.getFullYear(), today.getMonth(), 1); // Start of month
+          break;
+        case "qtd":
+          fromDate = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1); // Start of quarter
+          break;
+        case "ytd":
+          fromDate = new Date(today.getFullYear(), 0, 1); // Start of year
+          break;
+        case "custom":
+          $("#fromDate").focus();
+          return; // Exit early to let user manually input dates
+      }
+
+      // Update From and To input values
+      $("#fromDate").val(formatDate2(fromDate));
+      $("#toDate").val(formatDate2(today));
+    });
 
     // Trigger the click event
      await  $(".today").trigger("click");

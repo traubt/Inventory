@@ -808,9 +808,9 @@ def get_top_agents(shop_name, timeframe):
         if timeframe == "daily":
             query = '''                             
             SELECT 
-                staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt,
-                s.store_name
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
             FROM 
                 toc_ls_sales_item i
             JOIN 
@@ -828,9 +828,9 @@ def get_top_agents(shop_name, timeframe):
         elif timeframe == "monthly":
             query = '''
             SELECT 
-                staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt,
-                s.store_name
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
             FROM 
                 toc_ls_sales_item i
             JOIN 
@@ -849,9 +849,9 @@ def get_top_agents(shop_name, timeframe):
         if timeframe == "daily":
             query = '''
             SELECT 
-                staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt,
-                s.store_name
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
             FROM 
                 toc_ls_sales_item i
             JOIN 
@@ -872,9 +872,9 @@ def get_top_agents(shop_name, timeframe):
         elif timeframe == "monthly":
             query = '''
             SELECT 
-                staff_name, 
-                ROUND(SUM(i.net_amt)) AS total_net_amt,
-                s.store_name
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
             FROM 
                 toc_ls_sales_item i
             JOIN 
