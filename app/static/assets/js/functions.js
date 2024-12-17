@@ -170,6 +170,234 @@ function formatDate(date) {
     return `${year}-${month}-${day}`;
 }
 
+function f_num(num){
+    return new Intl.NumberFormat('en-US').format(num);
+}
+
+///////   Create dynamic Datatable function
+async function setupDynamicTable(buttonId, tableId, apiEndpoint, refIdx) {
+    // Remove any previous click event listeners to avoid duplication
+    $(`#${buttonId}`).off("click").on("click", async function (event) {
+        try {
+            // Check if DataTable exists, then destroy it
+            if ($.fn.DataTable.isDataTable(`#${tableId}`)) {
+                $(`#${tableId}`).DataTable().clear().destroy();
+            }
+
+            // Fetch data from the API endpoint
+            const response = await fetch(apiEndpoint);
+            const result = await response.json();
+
+            // Ensure columns and rows exist in the response
+            if (result.columns && result.rows) {
+                const columns = result.columns.map((col, index) => {
+                    // Add rendering logic for the 3rd column (index 2)
+                    if (index === refIdx) {
+                        return {
+                            title: col,
+                            render: function (data, type, row) {
+                                return `<a href="#" onclick="alert('Clicked: ${data}')">${data}</a>`;
+                            }
+                        };
+                    }
+                    return { title: col };
+                });
+
+                // Initialize DataTable
+                $(`#${tableId}`).DataTable({
+                    data: result.rows, // Use rows from the API
+                    columns: columns, // Use dynamic columns
+                    autoWidth: true,
+                    order: [], // Default ordering
+                    stripeClasses: ["table-row-even", "table-row-odd"] // Define custom classes for striped rows
+                });
+            } else {
+                dialog("Error", "Invalid response structure from the server", BootstrapDialog.TYPE_INFO);
+            }
+        } catch (e) {
+            dialog("Error", `Can't fetch data: ${e.message}`, BootstrapDialog.TYPE_INFO);
+        }
+    });
+}
+
+
+/// create a pie chart dynamic
+  // Function to create the ECharts pie chart
+  function createPieChart(topItems) {
+    const chartDom = document.getElementById('pie-chart');
+    const myChart = echarts.init(chartDom);
+
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)'
+      },
+      legend: {
+        show: false  // Hide default legend
+      },
+      series: [
+        {
+          name: 'Top Spenders',
+          type: 'pie',
+          radius: '50%',
+          label: {
+            formatter: '{b}: {d}%',  // Custom label with percentage
+            show: true
+          },
+          data: topItems,
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+
+    // Set chart options
+    myChart.setOption(option);
+  }
+
+    // Function to create the ECharts bar chart
+  function createBarChart(labels, values) {
+    const chartDom = document.getElementById('bar-chart');
+    const myChart = echarts.init(chartDom);
+
+    const option = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: '{b}: {c} ({d}%)'
+      },
+      xAxis: {
+        type: 'category',
+        data: labels,
+        axisLabel: {
+          rotate: 45,
+          interval: 0
+        }
+      },
+      yAxis: {
+        type: 'value'
+      },
+      series: [
+        {
+          name: 'Total Spent',
+          type: 'bar',
+          data: values,
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+
+    myChart.setOption(option);
+  }
+
+    // Function to generate chart options dynamically
+function generateChartOptions(type, result,title, yAxis) {
+  // Sort rows by 'total_spent' (index 2) in descending order
+  const sortedData = result.rows.sort((a, b) => b[2] - a[2]);
+
+  // Limit to top 10 spenders
+  const top10Data = sortedData.slice(0, 10);
+
+  if (type === 'pie') {
+    // Prepare data for the pie chart
+    const pieData = top10Data.map(row => ({
+      name: row[0],     // Customer name
+      value: row[2]     // Total spent
+    }));
+
+    // Return pie chart options
+    return {
+      title: {
+        text: title,
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} ({d}%)'
+      },
+//      legend: {
+//        orient: 'vertical',
+//        left: 'left'
+//      },
+      series: [
+        {
+          name: yAxis,
+          type: 'pie',
+          radius: '50%',
+          data: pieData,  // Use the formatted pie data
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+
+  } else if (type === 'bar') {
+    // Prepare data for the bar chart
+    const barData = top10Data.map(row => ({
+      name: row[0],     // Customer name
+      value: row[2]     // Total spent
+    }));
+
+    // Return bar chart options
+    return {
+      title: {
+        text: title,
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}'
+      },
+      xAxis: {
+        type: 'category',
+        data: barData.map(item => item.name),  // Customer names on x-axis
+        axisLabel: {
+          rotate: 45  // Rotate labels for better visibility
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Total Spent',
+        axisLabel: {
+          formatter: '{value}'
+        }
+      },
+      series: [
+        {
+          name: yAxis,
+          type: 'bar',
+          data: barData.map(item => item.value),  // Total spent on y-axis
+          itemStyle: {
+            color: '#007bff'  // Optional: Color for bars
+          }
+        }
+      ]
+    };
+  }
+
+  // Return empty object if type is not recognized
+  return {};
+}
+
+
+
+
 
 
 

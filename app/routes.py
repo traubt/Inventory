@@ -1493,12 +1493,19 @@ def sales_three_months():
     data = get_sales_by_shop_last_three_months()
     return jsonify(data)
 
+
 @main.route('/recent_sales', methods=['GET'])
 def recent_sales():
     user_data = json.loads(session.get('user'))
     shop_name = user_data['shop']
-    data = get_recent_sales(shop_name)
-    return jsonify(data)
+
+    # Simulated function to get columns and rows
+    column_names, data = get_recent_sales(shop_name)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
 
 @main.route('/top-products/<timeframe>', methods=['GET'])
 def get_top_products(timeframe):
@@ -1528,15 +1535,23 @@ def hourly_sales(timeframe):
 def top_agent(timeframe):
     user_data = json.loads(session.get('user'))
     shop_name = user_data['shop']
-    data = get_top_agents(shop_name, timeframe)
-    return jsonify(data)
+    column_names, data = get_top_agents(shop_name, timeframe)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
 
 @main.route('/recent_sales_product/<timeframe>', methods=['GET'])
 def recent_sales_product(timeframe):
     user_data = json.loads(session.get('user'))
     shop_name = user_data['shop']
-    data = get_recent_product_sales(timeframe, shop_name)
-    return jsonify(data)
+    column_names, data = get_recent_product_sales(timeframe, shop_name)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

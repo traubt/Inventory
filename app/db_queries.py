@@ -77,57 +77,89 @@ def get_recent_sales(shop_name):
 
     if shop_name == "Head Office":
         query = '''
-            SELECT 
-                s.sales_id,
-                CONCAT(m.first_name, ' ', m.last_name) AS customer,
-                i.item_name as product,
-                i.net_amt as price,
-                s.time_of_sale,
-                s.store_name
-            FROM 
-                toc_ls_sales s
-            JOIN 
-                toc_ls_sales_item i ON s.sales_id = i.sales_id
-            JOIN 
-                toc_ls_payments p ON s.sales_id = p.sales_id
-            JOIN 
-                toc_canna_member m ON p.email = m.email 
-            ORDER BY 
-                s.time_of_sale DESC
-            LIMIT 100;
+                SELECT 
+                    CONCAT(m.first_name, ' ', m.last_name) AS customer,
+                    m.email as email,
+                    ROUND(SUM(i.net_amt)) AS total_spent,
+                    COUNT(DISTINCT s.sales_id) AS total_purchases,
+                    MAX(s.time_of_sale) AS last_purchase_date
+                FROM 
+                    toc_ls_sales s
+                JOIN 
+                    toc_ls_sales_item i ON s.sales_id = i.sales_id
+                JOIN 
+                    toc_ls_payments p ON s.sales_id = p.sales_id
+                JOIN 
+                    toc_canna_member m ON p.email = m.email 
+                GROUP BY 
+                    m.email, m.first_name, m.last_name
+                ORDER BY 
+                    total_spent DESC
+                LIMIT 30;
         '''
         cursor.execute(query)
+
+    elif shop_name == "Online":
+        query = '''
+            SELECT                 
+                wo.customer_name,
+                wo.customer_email,
+                ROUND(SUM(wo.total_amount) / 1.15, 2) AS total_spent_excl_vat, 
+                COUNT(DISTINCT wo.order_id) AS total_orders,
+                MAX(wo.order_date) AS last_order_date
+            FROM 
+                toc_wc_sales_order wo
+            JOIN 
+                toc_wc_sales_items wi 
+            ON 
+                wo.order_id = wi.order_id
+            GROUP BY 
+                wo.customer_name, wo.customer_email
+            ORDER BY 
+                total_spent_excl_vat DESC
+            LIMIT 30;
+        '''
+        cursor.execute(query)  # No placeholders, so no additional parameters
+
     else:
         query = '''
-            SELECT 
-                s.sales_id,
-                CONCAT(m.first_name, ' ', m.last_name) AS customer,
-                i.item_name as product,
-                i.net_amt as price,
-                s.time_of_sale,
-                s.store_name
-            FROM 
-                toc_ls_sales s
-            JOIN 
-                toc_ls_sales_item i ON s.sales_id = i.sales_id
-            JOIN 
-                toc_ls_payments p ON s.sales_id = p.sales_id
-            JOIN 
-                toc_canna_member m ON p.email = m.email 
-            WHERE 
-                s.store_name = %s
-            ORDER BY 
-                s.time_of_sale DESC
-            LIMIT 100;
+                SELECT 
+                    CONCAT(m.first_name, ' ', m.last_name) AS customer,
+                    m.email as email,
+                    ROUND(SUM(i.net_amt)) AS total_spent,
+                    COUNT(DISTINCT s.sales_id) AS total_purchases,
+                    MAX(s.time_of_sale) AS last_purchase_date
+                FROM 
+                    toc_ls_sales s
+                JOIN 
+                    toc_ls_sales_item i ON s.sales_id = i.sales_id
+                JOIN 
+                    toc_ls_payments p ON s.sales_id = p.sales_id
+                JOIN 
+                    toc_canna_member m ON p.email = m.email 
+                WHERE 
+                    s.store_name = %s
+                GROUP BY 
+                    m.email, m.first_name, m.last_name
+                ORDER BY 
+                    total_spent DESC
+                LIMIT 30;
         '''
-        cursor.execute(query, (shop_name,))
+        cursor.execute(query, (shop_name,))  # Only this query uses placeholders
 
-    result = cursor.fetchall()
+    # Fetch all rows from the query result
+    rows = cursor.fetchall()
+
+    # Get column names from the cursor description
+    column_names = [desc[0] for desc in cursor.description]
 
     cursor.close()
     conn.close()
 
-    return result
+    # Return both column names and data
+    return column_names, rows
+
+
 
 
 # db_queries.py
@@ -260,12 +292,16 @@ def get_recent_product_sales(timeframe, shop_name):
         '''
         cursor.execute(query, (shop_name,))
 
-    result = cursor.fetchall()
+    rows = cursor.fetchall()
+
+    # Get column names from the cursor description
+    column_names = [desc[0] for desc in cursor.description]
 
     cursor.close()
     conn.close()
 
-    return result
+    # Return both column names and data
+    return column_names, rows
 
 # db_queries.py
 # db_queries.py
@@ -858,10 +894,17 @@ def get_top_agents(shop_name, timeframe):
             '''
             cursor.execute(query, (shop_name,))
 
-    result = cursor.fetchall()
+    # Fetch all rows from the query result
+    rows = cursor.fetchall()
+
+    # Get column names from the cursor description
+    column_names = [desc[0] for desc in cursor.description]
+
     cursor.close()
     conn.close()
-    return result
+
+    # Return both column names and data
+    return column_names, rows
 
 ################################################  REPORT SECTION
 

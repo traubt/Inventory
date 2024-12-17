@@ -40,7 +40,7 @@
 <!--  Include charts javascripts-->
 <script src="static/assets/js/db_sales_chart.js"></script>
   <script src="static/assets/js/three_month_sales.js"></script>
-  <script src="static/assets/js/top_agents_chart.js"></script>
+<!--  <script src="static/assets/js/top_agents_chart.js"></script>-->
 
 
 
@@ -189,44 +189,206 @@
   {% include 'line_chart.html' %}
 
 
+      <!-- Recent Sales -->
+      <div class="col-12">
+        <div class="card recent-sales overflow-auto">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <h5 class="card-title">Top Spenders</h5>
+            <div class="d-flex align-items-center">
+              <!-- Table Icon -->
+              <i class="bi bi-table dynamic-icon"
+                 data-id="top_spenders"
+                 data-type="table"
+                 data-table-id="recentSell"
+                 data-route="/recent_sales"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
 
-        <!-- Recent Sales -->
-        <div class="col-12">
-          <div class="card recent-sales overflow-auto">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <h5 class="card-title">Recent Sales</h5>
-                <button class="btn btn-primary" id="refresh_recent_sell">Refresh Data</button>
+              <!-- Pie Chart Icon -->
+              <i class="bi bi-pie-chart dynamic-icon"
+                 data-type="pie"
+                 data-table-id="recentSell"
+                 data-chart-container="pie-chart-container"
+                 data-route="/recent_sales"
+                 data-title="Top Spenders (Top 10)"
+                 data-yAxis="Total Spent"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
 
-                </div>
-              <table id="recentSell" style=" margin: 15px; "></table>
+              <!-- Bar Chart Icon -->
+              <i class="bi bi-bar-chart dynamic-icon"
+                 data-type="bar"
+                 data-table-id="recentSell"
+                 data-chart-container="bar-chart-container"
+                 data-route="/recent_sales"
+                 data-title="Top Spenders (Top 10)"
+                 data-yAxis="Total Spent"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
+
+              <!-- Refresh Button -->
+<!--              <button class="btn btn-primary" id="refresh_recent_sell" hidden="true">Refresh Data</button>-->
             </div>
+          </div>
 
+          <!-- Table for Recent Sales -->
+          <table id="recentSell" style="margin: 15px;"></table>
+
+          <!-- Pie Chart Container (Initially hidden) -->
+          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
+          </div>
+
+          <!-- Bar Chart Container (Initially hidden) -->
+          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
+          </div>
         </div>
+      </div>
 
-            <!-- Top Selling -->
-            <div class="col-12">
-              <div class="card top-selling overflow-auto">
 
-                <div class="filter">
-                  <a class="icon"  data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
-                  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                    <li class="dropdown-header text-start">
-                      <h6>Filter</h6>
-                    </li>
+<!-- Top Product Sales -->
+      <div class="col-12">
+        <div class="card top-selling overflow-auto">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <h5 class="card-title">Top Product Selling</h5>
+            <div class="d-flex align-items-center">
+              <!-- Table Icon -->
+              <i class="bi bi-table dynamic-icon"
+                 data-id="top_products"
+                 data-type="table"
+                 data-table-id="topSelling"
+                 data-route="/recent_sales_product/day"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
 
-                    <li><a class="dropdown-item today product_sell"  data-value="day" >Today</a></li>
-                    <li><a class="dropdown-item month product_sell" data-value="month" >This Month</a></li>
-                    <li><a class="dropdown-item year  product_sell" data-value = "year" >This Year</a></li>
-                  </ul>
-                </div>
+              <!-- Pie Chart Icon -->
+              <i class="bi bi-pie-chart dynamic-icon"
+                 data-type="pie"
+                 data-table-id="topSelling"
+                 data-chart-container="pie-chart-container"
+                 data-route="/recent_sales_product/day"
+                 data-title="Top Products (Top 10)"
+                 data-yAxis="Top Products"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
 
-                <div class="card-body pb-0">
-                  <h5 class="card-title" id="top_selling">Top Selling <span>| Today</span></h5>
-                  <table id="topSelling"></table>
-                </div>
+              <!-- Bar Chart Icon -->
+              <i class="bi bi-bar-chart dynamic-icon"
+                 data-type="bar"
+                 data-table-id="topSelling"
+                 data-chart-container="bar-chart-container"
+                 data-route="/recent_sales_product/day"
+                 data-title="Top Products (Top 10)"
+                 data-yAxis="Top Products"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
 
-              </div>
-            </div><!-- End Top Selling -->
+              <!-- Refresh Button -->
+              <button class="btn btn-primary" id="refresh_product_sell" hidden="true">Refresh Data</button>
+            </div>
+          </div>
+
+          <!-- Table for Recent Sales -->
+          <table id="topSelling" style="margin: 15px;"></table>
+
+          <!-- Pie Chart Container (Initially hidden) -->
+          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
+          </div>
+
+          <!-- Bar Chart Container (Initially hidden) -->
+          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
+          </div>
+        </div>
+      </div>
+
+
+  <!-- Top Agents -->
+      <div class="col-12">
+        <div class="card top-selling overflow-auto">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <h5 class="card-title">Top Agents</h5>
+            <div class="d-flex align-items-center">
+              <!-- Table Icon -->
+              <i class="bi bi-table dynamic-icon"
+                 data-id="top_agents"
+                 data-type="table"
+                 data-table-id="topAgents"
+                 data-route="/top_agent/daily"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
+
+              <!-- Pie Chart Icon -->
+              <i class="bi bi-pie-chart dynamic-icon"
+                 data-type="pie"
+                 data-table-id="topAgents"
+                 data-chart-container="pie-chart-container"
+                 data-route="/top_agent/daily"
+                 data-title="Top Agents (Top 10)"
+                 data-yAxis="Top Agents"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
+
+              <!-- Bar Chart Icon -->
+              <i class="bi bi-bar-chart dynamic-icon"
+                 data-type="bar"
+                 data-table-id="topAgents"
+                 data-chart-container="bar-chart-container"
+                 data-route="/top_agent/daily"
+                 data-title="Top Agents (Top 10)"
+                 data-yAxis="Top Agents"
+                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
+              </i>
+
+              <!-- Refresh Button -->
+              <button class="btn btn-primary" id="refresh_agents_sell" hidden="true">Refresh Data</button>
+            </div>
+          </div>
+
+          <!-- Table for Recent Sales -->
+          <table id="topAgents" style="margin: 15px;"></table>
+
+          <!-- Pie Chart Container (Initially hidden) -->
+          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
+          </div>
+
+          <!-- Bar Chart Container (Initially hidden) -->
+          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
+            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
+          </div>
+        </div>
+      </div>
+
+
+
+
+<!--            &lt;!&ndash; Top Selling &ndash;&gt;-->
+<!--            <div class="col-12">-->
+<!--              <div class="card top-selling overflow-auto">-->
+
+<!--                <div class="filter">-->
+<!--                  <a class="icon"  data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>-->
+<!--                  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">-->
+<!--                    <li class="dropdown-header text-start">-->
+<!--                      <h6>Filter</h6>-->
+<!--                    </li>-->
+
+<!--                    <li><a class="dropdown-item today product_sell"  data-value="day" >Today</a></li>-->
+<!--                    <li><a class="dropdown-item month product_sell" data-value="month" >This Month</a></li>-->
+<!--                    <li><a class="dropdown-item year  product_sell" data-value = "year" >This Year</a></li>-->
+<!--                  </ul>-->
+<!--                </div>-->
+
+<!--                <div class="card-body pb-0">-->
+<!--                  <h5 class="card-title" id="top_selling">Top Selling <span>| Today</span></h5>-->
+<!--                  <table id="topSelling"></table>-->
+<!--                </div>-->
+
+<!--              </div>-->
+<!--            </div>&lt;!&ndash; End Top Selling &ndash;&gt;-->
 
           </div>
         </div><!-- End Left side columns -->
@@ -234,7 +396,6 @@
         <!-- Right side columns -->
         <div class="col-lg-4">
 
-          {% include 'top_sellers.html' %}
 
 <!--          &lt;!&ndash; Recent Activity &ndash;&gt;-->
 <!--          <div class="card">-->
@@ -333,7 +494,7 @@
           <!-- End Budget Report -->
 
           <!-- product sales summary -->
-          {% include 'product_pie_chart.html' %}
+
 
           <!-- product sales summary -->
           {% include 'specials_pie_chart.html' %}
@@ -442,7 +603,9 @@
 
     // Trigger the click event
      await  $(".today").trigger("click");
-     await  $("#refresh_recent_sell").trigger("click");
+     await  $('.dynamic-icon[data-id="top_spenders"]').click();
+     await  $('.dynamic-icon[data-id="top_products"').click();
+     await  $('.dynamic-icon[data-id="top_agents"').click();
          // Ensure #reportsChart exists in the DOM
     if ($("#reportsChart").length > 0) {
         await populate_sales_chart("daily");
@@ -533,6 +696,12 @@
 <!--            fetchInterval = setInterval(fetchNotifications, 10000); // Restart the interval-->
 <!--        });-->
 
+   // Top Spenders
+  await setupDynamicTable("refresh_recent_sell", "recentSell", "/recent_sales",1);
+ // Top Product Sales
+  await setupDynamicTable("refresh_product_sell", "topSelling", "/recent_sales_product/day",1);
+
+
 });  // end ready document
 
 
@@ -545,22 +714,6 @@
     // Hide the modal after action
     $('#exampleModal').modal('hide');
   });
-
-// populate top sellers
-   $(".agent_bar_chart").on("click", async function (event) {
-        event.preventDefault(); // Prevent the default action of the link
-
-        // Get the 'value' attribute of the clicked element
-        const timeframe = $(this).attr("value");
-
-        // Update the chart title to reflect the selected timeframe
-        const title = timeframe === "daily" ? "Top Agents<span>|Last Day</span>" : "Top Agents<span>|Last Month</span>";
-        $("#topSellers").html(`${title}`);
-
-        // Call the function to populate the chart with the selected timeframe
-        await populateTopAgentChart(timeframe);
-    });
-
 
 
     $(".today").on("click",async function(event) {
@@ -607,7 +760,8 @@
       }
       if ($(this).closest('.revenue-card').length) {
             const revenue = data.find(store => store[0] === shop)[2];
-            $("#revenue").text("R"+revenue);
+            var formattedRevenue = new Intl.NumberFormat('en-US').format(revenue);
+            $("#revenue").text("R"+formattedRevenue);
             $("#revenue-title").html('Revenue <span>| Month</span>');
       };
       if ($(this).closest('.customers-card').length) {
@@ -643,57 +797,6 @@
 
   });
 
-
- // Recent Sales
-   $("#refresh_recent_sell").on("click", async function(event) {
-    try{
-        // check if datatable exist
-          if ($.fn.DataTable.isDataTable('#recentSell')) {
-            $('#recentSell').DataTable().clear().destroy();
-          }
-fetch('/recent_sales')
-    .then(data => data.json())
-    .then(rows => {
-        //console.log(rows);
-        if (rows.length > 0) {
-            // Convert date strings to Date objects
-            rows.forEach(row => {
-                row[4] = new Date(row[4]); // Assuming the "Selling Date" is the 5th column (index 4)
-            });
-
-            // Initialize DataTable with custom sorting for the "Selling Date" column
-            _top_selling = $('#recentSell').DataTable({
-                data: rows,
-                columns: [
-                    { title: "Sales Id" },
-                    { title: "Customer" },
-                    { title: "Product" },
-                    { title: "Price" },
-                    { title: "Selling Date" },
-                    { title: "Shop" },
-                ],
-                columnDefs: [
-                    {
-                        targets: 4, // Target the "Selling Date" column
-                        render: function (data, type, row) {
-                            if (type === 'display' || type === 'filter') {
-                                return data.toDateString(); // Format the date for display
-                            }
-                            return data;
-                        },
-                        type: 'date' // Specify the column type as date
-                    }
-                ],
-                "autoWidth": true,
-                "order": [[4, 'desc']] // Sort by "Selling Date" in descending order
-            });
-        }
-    });
-    }
-    catch(e){
-        dialog("Error","Can't fetch recent sales "+e,BootstrapDialog.TYPE_INFO);
-    }
-  })
 
   $("#product_selling_day").on("click", async function(event) {
     try{
@@ -859,6 +962,80 @@ fetch('/recent_sales')
         // Call the logUserActivity function with the combined description
         logUserActivity(activityDescription);
     });
+
+
+$('.dynamic-icon').on('click', async function () {
+  const type = $(this).data('type'); // Type of icon (table, pie, bar)
+  const tableId = $(this).data('table-id'); // ID of the table to manage
+  const chartContainerClass = $(this).data('chart-container'); // Chart container class
+  const route = $(this).data('route'); // API endpoint
+  const title = $(this).data('title'); // Chart title
+  const yAxis = $(this).data('yAxis'); // Y-Axis label
+
+  try {
+    // Find the closest card container to scope the changes
+    const $card = $(this).closest('.card');
+
+    // Hide all chart containers inside this card
+    $card.find('.chart-container').hide();
+
+    // Handle Table View
+    if (type === 'table') {
+      // Destroy existing DataTable (if exists)
+      if ($.fn.DataTable.isDataTable(`#${tableId}`)) {
+        $(`#${tableId}`).DataTable().destroy();
+        $(`#${tableId}`).empty().hide(); // Clear the table and hide it
+      }
+
+      // Show the table
+      $(`#${tableId}`).show();
+
+      // Fetch and initialize DataTable
+      const response = await fetch(route);
+      const result = await response.json();
+
+      if (result.columns && result.rows) {
+        const columns = result.columns.map(col => ({ title: col }));
+        $(`#${tableId}`).DataTable({
+          data: result.rows,
+          columns: columns,
+          autoWidth: true,
+          order: []
+        });
+      }
+    }
+
+    // Handle Pie or Bar Chart
+    if (type === 'pie' || type === 'bar') {
+      // Destroy existing DataTable (if exists)
+      if ($.fn.DataTable.isDataTable(`#${tableId}`)) {
+        $(`#${tableId}`).DataTable().destroy();
+        $(`#${tableId}`).empty().hide();
+      }
+
+      // Show the correct chart container inside this card
+      const $chartContainer = $card.find(`.${chartContainerClass}`);
+      $chartContainer.show();
+
+      // Get the chart DOM (the first div inside the container)
+      const chartDom = $chartContainer.find('div')[0];
+      const chart = echarts.init(chartDom);
+
+      // Fetch chart data
+      const response = await fetch(route);
+      const result = await response.json();
+
+      // Generate chart options and render
+      const chartOptions = generateChartOptions(type, result, title, yAxis);
+      chart.setOption(chartOptions);
+    }
+  } catch (e) {
+    console.error('Error:', e.message);
+    alert(`Error: ${e.message}`);
+  }
+});
+
+
 
 
 
