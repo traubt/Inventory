@@ -1,42 +1,34 @@
-async function populate_sales_chart(timeframe) {
-    let url = '';
+async function populate_sales_chart(fromDate, toDate) {
+    let url = '/sales';  // Updated route without timeframe
 
-    if (timeframe === "hourly") {
-        $("#line_chart_title").html('Sales Chart <span>| Hourly</span>');
-        url = '/hourly_sales/hourly';
-    } else if (timeframe === "daily") {
-        $("#line_chart_title").html('Sales Chart <span>| Daily</span>');
-        url = '/hourly_sales/daily';
-    }
+    // Ensure the URL includes the date range parameters
+    url += `?from_date=${fromDate}&to_date=${toDate}`;
 
     try {
         const response = await fetch(url);
         const data = await response.json();
 
-        // Convert dates to ISO 8601 format
-        const salesData = data.map(entry => entry[2]); // Extract sales data
-        const categories = data.map(entry => {
-            const dateStr = entry[1];
-            return timeframe === "daily"
-                ? new Date(dateStr).toISOString() // Convert 'YYYY-MM-DD' to ISO
-                : new Date(dateStr.replace(" ", "T") + ":00").toISOString(); // Convert 'YYYY-MM-DD HH:00' to ISO
-        });
-
-        if (!salesData.length || !categories.length) {
+        // Check if data exists
+        if (!data.rows || data.rows.length === 0) {
             console.warn("No data available to render the chart.");
             return;
         }
+
+        // Extract the sales data and categories correctly from the response
+        const salesData = data.rows.map(entry => entry[1]); // Sales data is at index 1
+        const categories = data.rows.map(entry => {
+            const dateStr = entry[0]; // Date is at index 0
+            return new Date(dateStr).toISOString(); // Convert 'YYYY-MM-DD' to ISO string
+        });
 
         const chartContainer = document.querySelector("#reportsChart");
 
         // Ensure the chart container has proper dimensions
         if (!chartContainer.offsetWidth || !chartContainer.offsetHeight) {
             console.error("Chart container dimensions are not set. Delaying rendering.");
-            setTimeout(() => populate_sales_chart(timeframe), 200); // Retry rendering
+            setTimeout(() => populate_sales_chart(fromDate, toDate), 200); // Retry rendering
             return;
         }
-
-        const tooltipFormat = timeframe === "daily" ? 'dd MMM yyyy' : 'dd MMM yyyy HH:mm';
 
         const options = {
             series: [{
@@ -81,7 +73,7 @@ async function populate_sales_chart(timeframe) {
             },
             tooltip: {
                 x: {
-                    format: tooltipFormat
+                    format: 'dd MMM yyyy' // Date format for the tooltip
                 },
             }
         };

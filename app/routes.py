@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .models import *
 from . import db
 from .db_queries import *
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from sqlalchemy import distinct, or_
 
@@ -24,15 +24,18 @@ def login():
 def index():
     user_data = session.get('user')
     roles = TocRole.query.all()
+    shops = TOC_SHOPS.query.all()
 
     # Convert the roles to a list of dictionaries
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    list_of_shops = [shop.blName for shop in shops]
 
     if user_data:
         user = json.loads(user_data)
-        return render_template('index.html', user=user, roles=roles_list)
+        return render_template('index.html', user=user, roles=roles_list, shops=list_of_shops)  # Pass as JSON
     else:
         return redirect(url_for('main.login'))
+
 
 
 @main.route('/login', methods=['POST'])
@@ -121,6 +124,43 @@ def admin_users():
         roles=roles_list,
         users=users
     )
+
+@main.route('/change_shop', methods=['POST'])
+def change_shop():
+    selected_shop_name = request.form.get('shop')  # Get the shop name from the request
+    shop = TOC_SHOPS.query.filter_by(blName=selected_shop_name).first()
+
+    if not shop:
+        flash('Invalid shop selection')
+        return redirect(url_for('main.index'))
+
+    # Update the session with the selected shop data
+    shop_data = {
+        'name': shop.blName,
+        'code': shop.store,
+        'customer': shop.customer
+    }
+    session['shop'] = json.dumps(shop_data)
+
+    # Update the user data in the session
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    user['shop'] = shop.blName  # Update the user's shop
+    session['user'] = json.dumps(user)  # Save the updated user object back to the session
+
+    # Log the shop change activity
+    new_activity = TOCUserActivity(
+        user=user['username'],
+        shop=shop.customer,
+        activity=f"Changed shop to {shop.blName}"
+    )
+    db.session.add(new_activity)
+    db.session.commit()
+
+    return redirect(url_for('main.index'))  # Redirect to index
+
+
+
 
 
 @main.route('/api/get_users')
@@ -1492,6 +1532,29 @@ def sales_data():
 def sales_three_months():
     data = get_sales_by_shop_last_three_months()
     return jsonify(data)
+
+@main.route('/sales', methods=['GET'])
+def sales():
+    # Retrieve 'from_date' and 'to_date' from request arguments
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Ensure 'to_date' includes the entire day (add 1 day and exclude midnight of the next day)
+    if to_date:
+        to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Get user shop name from session
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Call the updated database query function
+    column_names, data = get_sales_data(shop_name, from_date, to_date)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
 
 
 @main.route('/recent_sales', methods=['GET'])
