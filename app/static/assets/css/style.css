@@ -1358,5 +1358,55 @@ h6 {
   width: 100%;
 }
 
+/* For mobile screens (width <= 576px) */
+@media (max-width: 576px) {
+  .info-card {
+    padding: 10px;  /* Adjust padding */
+    font-size: 14px; /* Smaller font size */
+  }
+
+  .card-body {
+    padding: 8px;  /* Reduce padding within the card */
+  }
+
+  .card-title {
+    font-size: 16px;  /* Smaller title font size */
+  }
+
+  .ps-3 {
+    font-size: 12px; /* Smaller text in the content */
+  }
+
+  /* Ensure the card icons are smaller on mobile */
+  .card-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  /* Adjust card grid column size for mobile */
+  .col-12 {
+    padding: 5px;  /* Reduce the padding between columns */
+  }
+}
+
+/* For larger screens */
+@media (min-width: 576px) {
+  .info-card {
+    padding: 20px;  /* Larger padding for medium and above screens */
+  }
+
+  .card-body {
+    padding: 15px;
+  }
+
+  .card-title {
+    font-size: 18px; /* Standard title font size */
+  }
+}
+
+
+
+
 
 
