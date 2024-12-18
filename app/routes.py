@@ -11,6 +11,7 @@ from .db_queries import *
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from sqlalchemy import distinct, or_
+from flask import session, jsonify
 
 app = Flask(__name__)
 main = Blueprint('main', __name__)
@@ -1555,15 +1556,87 @@ def sales():
         "rows": data  # List of row data
     })
 
+@main.route('/product_sales', methods=['GET'])
+def product_sales():
+    # Retrieve 'from_date' and 'to_date' from request arguments
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Ensure 'to_date' includes the entire day (add 1 day and exclude midnight of the next day)
+    if to_date:
+        to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Get user shop name from session
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Call the updated database query function
+    column_names, data = get_product_sales_data(shop_name, from_date, to_date)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
 
 
 @main.route('/recent_sales', methods=['GET'])
 def recent_sales():
     user_data = json.loads(session.get('user'))
     shop_name = user_data['shop']
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
 
     # Simulated function to get columns and rows
-    column_names, data = get_recent_sales(shop_name)  # Adjust to return column names and rows
+    column_names, data = get_recent_sales(shop_name,from_date,to_date)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
+@main.route('/top_sellers', methods=['GET'])
+def top_sellers():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Simulated function to get columns and rows
+    column_names, data = get_top_sellers(shop_name,from_date,to_date)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
+@main.route('/top_specials', methods=['GET'])
+def top_specials():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Simulated function to get columns and rows
+    column_names, data = get_top_specials (shop_name,from_date,to_date)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
+@main.route('/top_brand', methods=['GET'])
+def top_brand():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Simulated function to get columns and rows
+    column_names, data = get_top_brand (shop_name,from_date,to_date)  # Adjust to return column names and rows
 
     return jsonify({
         "columns": column_names,  # List of column names
@@ -1577,15 +1650,6 @@ def get_top_products(timeframe):
     data = get_product_sales(timeframe, shop_name)
     return jsonify(data)
 
-@main.route('/top-specials/<timeframe>', methods=['GET'])
-def get_top_specials(timeframe):
-    user_data = json.loads(session.get('user'))
-    shop_name = user_data['shop']
-    data = get_specials_sales(timeframe, shop_name)
-    return jsonify(data)
-
-# routes.py
-from flask import session, jsonify
 
 @main.route('/hourly_sales/<timeframe>', methods=['GET'])
 def hourly_sales(timeframe):

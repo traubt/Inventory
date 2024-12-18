@@ -71,7 +71,7 @@ def get_sales_data_for_lineChart():
     return data
 
 # db_queries.py
-def get_recent_sales(shop_name):
+def get_recent_sales(shop_name, from_date, to_date):
     # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -92,13 +92,16 @@ def get_recent_sales(shop_name):
                     toc_ls_payments p ON s.sales_id = p.sales_id
                 JOIN 
                     toc_canna_member m ON p.email = m.email 
+                WHERE
+                    s.time_of_sale >= %s
+                    AND s.time_of_sale < %s               
                 GROUP BY 
                     m.email, m.first_name, m.last_name
                 ORDER BY 
                     total_spent DESC
                 LIMIT 30;
         '''
-        cursor.execute(query)
+        cursor.execute(query, (from_date, to_date))
 
     elif shop_name == "Online":
         query = '''
@@ -114,13 +117,16 @@ def get_recent_sales(shop_name):
                 toc_wc_sales_items wi 
             ON 
                 wo.order_id = wi.order_id
+            WHERE
+                    wo.order_date >= %s
+                    and wo.order_date < %s
             GROUP BY 
                 wo.customer_name, wo.customer_email
             ORDER BY 
                 total_spent_excl_vat DESC
             LIMIT 30;
         '''
-        cursor.execute(query)  # No placeholders, so no additional parameters
+        cursor.execute(query, (from_date,to_date))  # No placeholders, so no additional parameters
 
     else:
         query = '''
@@ -140,13 +146,16 @@ def get_recent_sales(shop_name):
                     toc_canna_member m ON p.email = m.email 
                 WHERE 
                     s.store_name = %s
+                    and
+                    s.time_of_sale >= %s
+                    AND s.time_of_sale < %s   
                 GROUP BY 
                     m.email, m.first_name, m.last_name
                 ORDER BY 
                     total_spent DESC
                 LIMIT 30;
         '''
-        cursor.execute(query, (shop_name,))  # Only this query uses placeholders
+        cursor.execute(query, (shop_name,from_date,to_date))  # Only this query uses placeholders
 
     # Fetch all rows from the query result
     rows = cursor.fetchall()
@@ -799,7 +808,7 @@ def get_sales_by_shop_last_three_months():
     return result_as_dicts
 
 
-def get_top_agents(shop_name, timeframe):
+def get_top_agents (shop_name, timeframe):
     conn = get_db_connection()
     cursor = conn.cursor()
     print(f"shop_name: {shop_name}")
@@ -998,8 +1007,386 @@ def get_sales_data(shop_name, from_date, to_date):
     return column_names, rows
 
 
+def get_product_sales_data(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print(f"query input sales")
+    print(f"Shop: {shop_name}")
+    print(f"from date: {from_date}")
+    print(f"to date: {to_date}")
+
+    try:
+
+        # Default query for Head Office or non-specific shop
+        if shop_name == "Head Office":
+            query = '''
+                    SELECT
+                        p.item_name,  
+                        round(sum(ti.quantity),2) AS count,
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
+                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                        ROUND(
+                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                        ) AS gross_profit_percentage
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                    GROUP BY
+                        p.item_name
+                    ORDER BY
+                        total_net_amount DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        elif shop_name == "Online":
+            query = '''
+                SELECT
+                    a.product_name,  
+                    round(sum(a.quantity),2) AS count,
+                    ROUND(SUM(a.total_amount*0.85), 2) AS total_net_amount,
+                    ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                    ROUND(
+                        (SUM(a.total_amount*0.85) - SUM(p.cost_price)) / SUM(a.total_amount*0.85) * 100, 2
+                    ) AS gross_profit_percentage
+                FROM
+                    toc_wc_sales_items a
+                JOIN
+                    toc_product p ON a.sku = p.item_sku
+                WHERE
+                    a.creation_date >= %s
+                    AND a.creation_date < %s
+                GROUP BY
+                    a.product_name
+                ORDER BY
+                    total_net_amount DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        else:
+            query = '''
+                    SELECT
+                        p.item_name,  
+                        round(sum(ti.quantity),2) AS count,
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
+                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                        ROUND(
+                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                        ) AS gross_profit_percentage
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.store_name = %s
+                        AND ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                    GROUP BY
+                        p.item_name
+                    ORDER BY
+                        total_net_amount DESC;
+            '''
+
+            # Execute the query with parameterized values
+            cursor.execute(query, (shop_name, from_date, to_date))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
 
 
+def get_top_sellers(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print(f"query input sales")
+    print(f"Shop: {shop_name}")
+    print(f"from date: {from_date}")
+    print(f"to date: {to_date}")
+
+    try:
+
+        # Default query for Head Office or non-specific shop
+        if shop_name == "Head Office":
+            query = '''
+            SELECT 
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+            WHERE 
+                i.time_of_sale >= %s
+                AND i.time_of_sale < %s
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC;
+
+
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        else:
+            query = '''
+            SELECT 
+                staff_name,                
+                s.store_name,
+                ROUND(SUM(i.net_amt)) AS total_net_amt
+            FROM 
+                toc_ls_sales_item i
+            JOIN 
+                toc_ls_sales s ON i.sales_id = s.sales_id
+			join
+				toc_shops ts on ts.blName = s.store_name
+            WHERE 
+                i.time_of_sale >= %s
+                AND i.time_of_sale < %s
+                AND store_name = %s
+            GROUP BY 
+                staff_name
+            ORDER BY 
+                total_net_amt DESC;
+            
+            '''
+            # Execute the query with parameterized values
+            cursor.execute(query, (from_date, to_date,shop_name))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
+
+
+def get_top_specials(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print(f"query input sales")
+    print(f"Shop: {shop_name}")
+    print(f"from date: {from_date}")
+    print(f"to date: {to_date}")
+
+    try:
+
+        # Default query for Head Office or non-specific shop
+        if shop_name == "Head Office":
+            query = '''
+                    SELECT
+                        p.item_name,  
+                        p.stat_group,
+                        round(sum(ti.quantity),2) AS count
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                        and p.acct_group = 'Specials'
+                    GROUP BY
+                        p.item_name
+                    ORDER BY
+                        3 DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        elif shop_name == "Online":
+            query = '''
+                SELECT
+                    a.product_name,
+                    p.stat_group,  
+                    round(sum(a.quantity),2) AS count
+                FROM
+                    toc_wc_sales_items a
+                JOIN
+                    toc_product p ON a.sku = p.item_sku
+                WHERE
+                    a.creation_date >= %s
+                    AND a.creation_date < %s
+                    and p.acct_group = 'Specials'
+                GROUP BY
+                    a.product_name
+                ORDER BY
+                    3 DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        else:
+            query = '''
+                    SELECT
+                        p.item_name,  
+                        p.stat_group,
+                        round(sum(ti.quantity),2) AS count
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.store_name = %s
+                        AND ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                        and p.acct_group = 'Specials'
+                    GROUP BY
+                        p.item_name
+                    ORDER BY
+                        3 DESC;
+            '''
+
+            # Execute the query with parameterized values
+            cursor.execute(query, (shop_name, from_date, to_date))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
+
+def get_top_brand(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print(f"query input sales")
+    print(f"Shop: {shop_name}")
+    print(f"from date: {from_date}")
+    print(f"to date: {to_date}")
+
+    try:
+
+        # Default query for Head Office or non-specific shop
+        if shop_name == "Head Office":
+            query = '''
+                    SELECT
+                        p.acct_group as category,  
+                        count(p.acct_group) AS count,
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
+                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                        ROUND(
+                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                        ) AS gross_profit_percentage
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                    GROUP BY
+                        p.acct_group
+                    ORDER BY
+                        3 DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        elif shop_name == "Online":
+            query = '''
+                SELECT
+                    p.acct_group as category,
+                    count(p.acct_group) AS count,
+                    ROUND(SUM(a.total_amount*0.85), 2) AS total_net_amount,
+                    ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                    ROUND(
+                        (SUM(a.total_amount*0.85) - SUM(p.cost_price)) / SUM(a.total_amount*0.85) * 100, 2
+                    ) AS gross_profit_percentage
+                FROM
+                    toc_wc_sales_items a
+                JOIN
+                    toc_product p ON a.sku = p.item_sku
+                WHERE
+                    a.creation_date >= %s
+                    AND a.creation_date < %s
+                GROUP BY
+                    p.acct_group
+                ORDER BY
+                    3 DESC;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        else:
+            query = '''
+                    SELECT
+                        p.acct_group as category,  
+                        count(p.acct_group) AS count,
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
+                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                        ROUND(
+                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                        ) AS gross_profit_percentage
+                    FROM
+                        toc_ls_sales ts
+                    JOIN
+                        toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
+                    JOIN
+                        toc_product p ON ti.item_sku = p.item_sku
+                    WHERE
+                        ts.store_name = %s
+                        AND ts.time_of_sale >= %s
+                        AND ts.time_of_sale < %s
+                    GROUP BY
+                        p.acct_group
+                    ORDER BY
+                        3 DESC;
+            '''
+
+            # Execute the query with parameterized values
+            cursor.execute(query, (shop_name, from_date, to_date))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
 
 
 ################################################  REPORT SECTION
