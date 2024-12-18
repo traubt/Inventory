@@ -121,20 +121,21 @@
   </div>
 </div>
 
-
+<div id="lastUpdate"></div>
 
     <section class="section dashboard">
       <div class="row">
 
         <!-- Left side columns -->
         <div class="col-lg-8">
-          <div class="row">
 
+
+          <div class="row">
              <!-- Revenue Card -->
             <div class="col-xxl-4 col-md-6">
               <div class="card info-card revenue-card">
                 <div class="card-body">
-                  <h5 class="card-title" id="revenue-title">Revenue <span>| Today</span></h5>
+                  <h5 class="card-title top" id="revenue-title">Revenue</h5>
                   <div class="d-flex align-items-center">
                     <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                       <i class="bi bi-bank"></i>
@@ -153,7 +154,7 @@
             <div class="col-xxl-4 col-md-6">
               <div class="card info-card sales-card">
                 <div class="card-body" id="sales_card">
-                  <h5 class="card-title" id="sales-title">Sales <span>| Today</span></h5>
+                  <h5 class="card-title top" id="sales-title">Sales</h5>
                   <div class="d-flex align-items-center">
                     <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                       <i class="bi bi-cart"></i>
@@ -174,7 +175,7 @@
 
               <div class="card info-card customers-card">
                 <div class="card-body">
-                  <h5 class="card-title" id="customer-title">Avg. Basket <span>| Today</span></h5>
+                  <h5 class="card-title top" id="customer-title">Avg. Basket</h5>
 
                   <div class="d-flex align-items-center">
                     <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
@@ -197,7 +198,7 @@
                     <div class="card-body">
                         <h5 class="card-title" id="line_chart_title">Sales Chart</h5>
                         <!-- Add the "Update" button -->
-                        <button class="btn btn-primary" id="updateSalesChart" style="position: absolute; top: 10px; right: 10px;">Update</button>
+                        <button class="btn btn-primary" id="updateSalesChart" style="position: absolute; top: 10px; right: 10px;" hidden="true">Update</button>
                         <!-- Line Chart -->
                         <div id="reportsChart"></div>
                         <!-- End Line Chart -->
@@ -553,6 +554,28 @@
   var shops;
 
   $(document).ready(async function() {
+
+  fetchLastUpdateTime();
+  // Change option from Head Office to All Shops
+    const shopDropdown = document.getElementById('shopDropdown');
+    const options = shopDropdown.options;
+
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].value === 'Head Office') {
+        options[i].text = 'All Shops'; // Change displayed text
+        break;
+      }
+    }
+
+    // Order of shops
+    const $shopDropdown = $('#shopDropdown');
+    const $options = $shopDropdown.find('option').not(':disabled');
+
+    // Sort options alphabetically
+    $options.sort((a, b) => $(a).text().localeCompare($(b).text()));
+
+    // Rebuild the dropdown
+    $shopDropdown.empty().append('<option selected disabled>Select shop:</option>').append($options);
 
      // Parse the JSON string passed from Flask
     shops = JSON.parse('{{ shops | tojson }}');
@@ -919,6 +942,7 @@ $('.dynamic-icon').on('click', async function () {
       const chartOptions = generateChartOptions(type, result, title, yAxis);
       chart.setOption(chartOptions);
     }
+  fetchLastUpdateTime();
   } catch (e) {
     console.error('Error:', e.message);
     alert(`Error: ${e.message}`);
@@ -946,23 +970,15 @@ $('.dynamic-icon').on('click', async function () {
         form.submit(); // Submit the form to trigger the route
     });
 
-  $('#fromDate, #toDate').on('change', function () {
-    const fromDate = $('#fromDate').val();
-    const toDate = $('#toDate').val();
-
-    // Get the current URL
-    const currentUrl = new URL(window.location.href);
-
-    // Update query parameters with the new dates
-    if (fromDate) {
-      currentUrl.searchParams.set('fromDate', fromDate);
-    }
-    if (toDate) {
-      currentUrl.searchParams.set('toDate', toDate);
-    }
-
-    // Redirect to the updated URL
-    window.location.href = currentUrl.toString();
+  $('#fromDate, #toDate').on('change',async function () {
+     fetchLastUpdateTime();
+     await  $("#updateSalesChart").click();
+     await  $('.dynamic-icon[data-id="top_spenders"]').click();
+     await  $('.dynamic-icon[data-id="top_products"').click();
+     await  $('.dynamic-icon[data-id="top_agents"').click();
+     await  $('.dynamic-icon[data-id="top_specials"').click();
+     await  $('.dynamic-icon[data-id="top_brand"').click();
+     await sales_three_months()
   });
 
 
