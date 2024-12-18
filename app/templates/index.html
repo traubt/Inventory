@@ -61,12 +61,34 @@
 
   <main id="main" class="main">
 
-<div class="pagetitle d-flex justify-content-between align-items-center">
+<!--<div class="pagetitle d-flex justify-content-between align-items-center">-->
+<!--  <h1>-->
+<!--    Dashboard {{ user.shop }}-->
+<!--  </h1>-->
+
+<!--  <div class="d-flex align-items-center">-->
+<!--    &lt;!&ndash; Label for Change Shop &ndash;&gt;-->
+<!--    <div class="col-auto">-->
+<!--      <label class="form-label fw-bold mb-0 me-2">Change Shop:</label>-->
+<!--    </div>-->
+<!--    &lt;!&ndash; Dropdown for Change Shop &ndash;&gt;-->
+<!--    <div class="col-auto">-->
+<!--      <select id="shopDropdown" class="form-select form-select-sm">-->
+<!--        <option selected disabled>Select shop:</option> &lt;!&ndash; Default placeholder &ndash;&gt;-->
+<!--        {% for shop in shops %}-->
+<!--          <option value="{{ shop }}">{{ shop }}</option>-->
+<!--        {% endfor %}-->
+<!--      </select>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</div>-->
+
+  <div class="pagetitle d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center">
   <h1>
     Dashboard {{ user.shop }}
   </h1>
 
-  <div class="d-flex align-items-center">
+  <div class="d-flex align-items-center mt-2 mt-sm-0">
     <!-- Label for Change Shop -->
     <div class="col-auto">
       <label class="form-label fw-bold mb-0 me-2">Change Shop:</label>
@@ -82,6 +104,7 @@
     </div>
   </div>
 </div>
+
 
 
 
@@ -131,48 +154,44 @@
 
 
           <div class="row">
-             <!-- Revenue Card -->
-            <div class="col-xxl-4 col-md-6">
-              <div class="card info-card revenue-card">
-                <div class="card-body">
-                  <h5 class="card-title top" id="revenue-title">Revenue</h5>
-                  <div class="d-flex align-items-center">
-                    <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                      <i class="bi bi-bank"></i>
-                    </div>
-                    <div class="ps-3">
-                      <h6 id="revenue"></h6>
-<!--                      <span class="text-success small pt-1 fw-bold">-%</span> <span class="text-muted small pt-2 ps-1">increase</span>-->
-                    </div>
-                  </div>
-                </div>
 
-              </div>
-            </div><!-- End Revenue Card -->
+ <!-- Revenue Card -->
+  <div class="col-12 col-md-6 col-xxl-4">
+    <div class="card info-card revenue-card">
+      <div class="card-body">
+        <h5 class="card-title top" id="revenue-title">Revenue</h5>
+        <div class="d-flex align-items-center">
+          <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+            <i class="bi bi-bank"></i>
+          </div>
+          <div class="ps-3">
+            <h6 id="revenue"></h6>
+            <!-- <span class="text-success small pt-1 fw-bold">-%</span> <span class="text-muted small pt-2 ps-1">increase</span> -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- End Revenue Card -->
 
-            <!-- Sales Card -->
-            <div class="col-xxl-4 col-md-6">
-              <div class="card info-card sales-card">
-                <div class="card-body" id="sales_card">
-                  <h5 class="card-title top" id="sales-title">Sales</h5>
-                  <div class="d-flex align-items-center">
-                    <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                      <i class="bi bi-cart"></i>
-                    </div>
-                    <div class="ps-3">
-                      <h6 id="sales"></h6>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div><!-- End Sales Card -->
-
-
+  <!-- Sales Card -->
+  <div class="col-6 col-md-3 col-xxl-4">
+    <div class="card info-card sales-card">
+      <div class="card-body" id="sales_card">
+        <h5 class="card-title top" id="sales-title">Sales</h5>
+        <div class="d-flex align-items-center">
+          <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+            <i class="bi bi-cart"></i>
+          </div>
+          <div class="ps-3">
+            <h6 id="sales"></h6>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- End Sales Card -->
 
             <!-- Customers Card -->
-            <div class="col-xxl-4 col-xl-12">
-
+            <div class="col-6 col-md-3 col-xxl-4">
               <div class="card info-card customers-card">
                 <div class="card-body">
                   <h5 class="card-title top" id="customer-title">Avg. Basket</h5>
