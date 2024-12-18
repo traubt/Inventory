@@ -409,6 +409,29 @@ function generateChartOptions(type, result,title, yAxis) {
 }
 
 
+function fetchLastUpdateTime() {
+    fetch('/get_last_update') // Call the Flask route
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json(); // Parse the response as JSON
+        })
+        .then(data => {
+            if (data.success) {
+                console.log('Last update time:', data.last_update_time); // Log the result
+                // You can update the UI with the fetched time here
+                document.getElementById('lastUpdate').textContent = `Last update time: ${data.last_update_time} GMT`;
+            } else {
+                console.error('Error fetching last update:', data.error); // Log the error
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error); // Handle fetch errors
+        });
+}
+
+
 
 
 

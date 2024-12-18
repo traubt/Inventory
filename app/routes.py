@@ -10,7 +10,7 @@ from . import db
 from .db_queries import *
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
-from sqlalchemy import distinct, or_
+from sqlalchemy import distinct, or_, text
 from flask import session, jsonify
 
 app = Flask(__name__)
@@ -1679,6 +1679,26 @@ def recent_sales_product(timeframe):
         "columns": column_names,  # List of column names
         "rows": data  # List of row data
     })
+
+
+@main.route('/get_last_update', methods=['GET'])
+def get_last_update():
+    try:
+        # SQL query to get the max end_date formatted as HH:mm
+        query = text("SELECT DATE_FORMAT(MAX(end_date), '%H:%i') AS max_time FROM toc_sales_log WHERE source = 'LS' and comment like 'Compl%';")
+
+        # Execute the query
+        result = db.session.execute(query)
+
+        # Fetch the result
+        max_time = result.fetchone()[0]  # Assuming the result has a single row and single column
+
+        # Return the result as JSON
+        return jsonify({'success': True, 'last_update_time': max_time})
+
+    except Exception as e:
+        # Handle any errors
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

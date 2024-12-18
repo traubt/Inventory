@@ -26,11 +26,11 @@ async function populate_sales_chart(fromDate, toDate) {
         const count_orders = data['rows'].reduce((sum, item) => sum + item[2], 0);
         const avg_basket = Math.round(total_net/count_orders);
         $("#sales").text(f_num(count_orders));
-        $("#sales-title").html('Sales <span>| In dates range</span>');
+        $("#sales-title").html('Sales ');
         $("#revenue").text("R"+f_num(Math.round(total_net)));
-        $("#revenue-title").html('Total Net Amount <span>| In dates range</span>');
+        $("#revenue-title").html('Total Net Amount ');
         $("#count_customers").text(f_num(avg_basket));
-        $("#customer-title").html('Avg. Basket <span>| In dates range</span>');
+        $("#customer-title").html('Avg. Basket ');
 
 
         const chartContainer = document.querySelector("#reportsChart");
