@@ -246,7 +246,7 @@ def get_recent_product_sales(timeframe, shop_name):
                     prod.cost_price * SUM(p.count_sales_{timeframe}) AS total_cost, 
                     (CASE 
                         WHEN SUM(p.total_sales_{timeframe}) IS NOT NULL AND prod.cost_price IS NOT NULL 
-                        THEN (SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 
+                        THEN round((SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 )
                         ELSE NULL 
                     END) AS gross_profit_percentage
                 FROM 
@@ -274,7 +274,7 @@ def get_recent_product_sales(timeframe, shop_name):
                     prod.cost_price * SUM(p.count_sales_{timeframe}) AS total_cost,
                     (CASE 
                         WHEN SUM(p.total_sales_{timeframe}) IS NOT NULL AND prod.cost_price IS NOT NULL 
-                        THEN (SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 
+                        THEN round((SUM(p.total_sales_{timeframe}) - (SUM(p.count_sales_{timeframe}) * prod.cost_price)) / SUM(p.total_sales_{timeframe}) * 100 )
                         ELSE NULL 
                     END) AS gross_profit_percentage
                 FROM 
@@ -922,7 +922,9 @@ def get_sales_data(shop_name, from_date, to_date):
             query = '''
                 SELECT
                     DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
-                    ROUND(SUM(ti.net_amt), 2) AS total_sales  
+                    ROUND(SUM(ti.net_amt), 2) AS total_net_amount  ,
+                    count(ts.sales_id) as count_orders,
+                    round(SUM(ti.net_amt)/count(ts.sales_id)) as average
                 FROM
                     toc_ls_sales ts
                 JOIN
@@ -941,7 +943,9 @@ def get_sales_data(shop_name, from_date, to_date):
             query = '''
                 SELECT
                     DATE_FORMAT(wo.order_date, '%%Y-%%m-%%d') AS date,  
-                    ROUND(SUM(wo.total_amount * 0.85), 2) AS total_sales  
+                    ROUND(SUM(wo.total_amount * 0.85), 2) AS total_net_amount ,
+                    count(wo.order_id) as count_orders,
+                    round(SUM(wo.total_amount * 0.85)/count(wo.order_id)) as average
                 FROM
                     toc_wc_sales_order wo
                 WHERE
@@ -956,8 +960,10 @@ def get_sales_data(shop_name, from_date, to_date):
         else:
             query = '''
                 SELECT
-                    DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date, 
-                    ROUND(SUM(ti.net_amt), 2) AS total_sales
+                    DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
+                    ROUND(SUM(ti.net_amt), 2) AS total_net_amount  ,
+                    count(ts.sales_id) as count_orders,
+                    round(SUM(ti.net_amt)/count(ts.sales_id)) as average
                 FROM
                     toc_ls_sales ts
                 JOIN

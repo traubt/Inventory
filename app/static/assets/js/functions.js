@@ -182,6 +182,11 @@ function f_num(num){
     return new Intl.NumberFormat('en-US').format(num);
 }
 
+function f_num1(num){
+    num = num.toFixed(1)
+    return new Intl.NumberFormat('en-US').format(num);
+}
+
 ///////   Create dynamic Datatable function
 async function setupDynamicTable(buttonId, tableId, apiEndpoint, refIdx) {
     // Remove any previous click event listeners to avoid duplication
