@@ -21,6 +21,18 @@ async function populate_sales_chart(fromDate, toDate) {
             return new Date(dateStr).toISOString(); // Convert 'YYYY-MM-DD' to ISO string
         });
 
+        // update cards
+        const total_net = data['rows'].reduce((sum, item) => sum + item[1], 0);
+        const count_orders = data['rows'].reduce((sum, item) => sum + item[2], 0);
+        const avg_basket = Math.round(total_net/count_orders);
+        $("#sales").text(f_num(count_orders));
+        $("#sales-title").html('Sales <span>| In dates range</span>');
+        $("#revenue").text("R"+f_num(Math.round(total_net)));
+        $("#revenue-title").html('Total Net Amount <span>| In dates range</span>');
+        $("#count_customers").text(f_num(avg_basket));
+        $("#customer-title").html('Avg. Basket <span>| In dates range</span>');
+
+
         const chartContainer = document.querySelector("#reportsChart");
 
         // Ensure the chart container has proper dimensions

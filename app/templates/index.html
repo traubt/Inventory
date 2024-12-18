@@ -74,7 +74,7 @@
     <!-- Dropdown for Change Shop -->
     <div class="col-auto">
       <select id="shopDropdown" class="form-select form-select-sm">
-        <option selected disabled>Select New Shop</option> <!-- Default placeholder -->
+        <option selected disabled>Select shop:</option> <!-- Default placeholder -->
         {% for shop in shops %}
           <option value="{{ shop }}">{{ shop }}</option>
         {% endfor %}
@@ -95,6 +95,7 @@
     <!-- Dropdown for Date Range -->
     <div class="col-auto">
       <select id="dateRangeSelector" class="form-select form-select-sm">
+        <option selected disabled>Select date range:</option>
         <option value="today">Today</option>
         <option value="wtd">Week to Date</option>
         <option value="mtd">Month to Date</option>
@@ -825,86 +826,86 @@
   });
 
 
-    $(".today").on("click",async function(event) {
-      const shop = "{{ user.shop }}";
-      const response = await fetch('/sales_summary');
-      const data = await response.json();
-      // Prevent the default action
-      event.preventDefault();
+<!--    $(".today").on("click",async function(event) {-->
+<!--      const shop = "{{ user.shop }}";-->
+<!--      const response = await fetch('/sales_summary');-->
+<!--      const data = await response.json();-->
+<!--      // Prevent the default action-->
+<!--      event.preventDefault();-->
 
-      if ($(this).closest('.sales-card').length) {
-            const sales = data.find(store => store[0] === shop)[4];
-            $("#sales").text(sales);
-            $("#sales-title").html('Sales <span>| Today</span>');
-      }
-      if ($(this).closest('.revenue-card').length) {
-            const revenue = data.find(store => store[0] === shop)[1];
-            $("#revenue").text("R"+revenue);
-            $("#revenue-title").html('Revenue <span>| Today</span>');
-      };
-      if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[11];
-            $("#count_customers").text(c_customer);
-            $("#customer-title").html('Avg. Basket <span>| Today</span>');
-      }
-
-
-      const last_update = data.find(store => store[0] === shop)[10];
-      $("#last-update").val(last_update);
-
-  });
+<!--      if ($(this).closest('.sales-card').length) {-->
+<!--            const sales = data.find(store => store[0] === shop)[4];-->
+<!--            $("#sales").text(sales);-->
+<!--            $("#sales-title").html('Sales <span>| Today</span>');-->
+<!--      }-->
+<!--      if ($(this).closest('.revenue-card').length) {-->
+<!--            const revenue = data.find(store => store[0] === shop)[1];-->
+<!--            $("#revenue").text("R"+revenue);-->
+<!--            $("#revenue-title").html('Revenue <span>| Today</span>');-->
+<!--      };-->
+<!--      if ($(this).closest('.customers-card').length) {-->
+<!--            const c_customer = data.find(store => store[0] === shop)[11];-->
+<!--            $("#count_customers").text(c_customer);-->
+<!--            $("#customer-title").html('Avg. Basket <span>| Today</span>');-->
+<!--      }-->
 
 
-  $(".month").on("click",async function(event) {
-      const shop = "{{ user.shop }}";
-      const response = await fetch('/sales_summary');
-      const data = await response.json();
-      // Prevent the default action
-      event.preventDefault();
+<!--      const last_update = data.find(store => store[0] === shop)[10];-->
+<!--      $("#last-update").val(last_update);-->
 
-      if ($(this).closest('.sales-card').length) {
-            const sales = data.find(store => store[0] === shop)[5];
-            $("#sales").text(sales);
-            $("#sales-title").html('Sales <span>| Month</span>');
-      }
-      if ($(this).closest('.revenue-card').length) {
-            const revenue = data.find(store => store[0] === shop)[2];
-            var formattedRevenue = new Intl.NumberFormat('en-US').format(revenue);
-            $("#revenue").text("R"+formattedRevenue);
-            $("#revenue-title").html('Revenue <span>| Month</span>');
-      };
-      if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[12];
-            $("#count_customers").text(c_customer);
-            $("#customer-title").html('Avg. Basket <span>| Month</span>');
-      }
+<!--  });-->
 
-  });
 
-    $(".year").on("click",async function(event) {
-      const shop = "{{ user.shop }}";
-      const response = await fetch('/sales_summary');
-      const data = await response.json();
-      // Prevent the default action
-      event.preventDefault();
+<!--  $(".month").on("click",async function(event) {-->
+<!--      const shop = "{{ user.shop }}";-->
+<!--      const response = await fetch('/sales_summary');-->
+<!--      const data = await response.json();-->
+<!--      // Prevent the default action-->
+<!--      event.preventDefault();-->
 
-      if ($(this).closest('.sales-card').length) {
-            const sales = data.find(store => store[0] === shop)[6];
-            $("#sales").text(sales);
-            $("#sales-title").html('Sales <span>| Year</span>');
-      }
-      if ($(this).closest('.revenue-card').length) {
-            const revenue = data.find(store => store[0] === shop)[3];
-            $("#revenue").text("R"+revenue);
-            $("#revenue-title").html('Revenue <span>| Year</span>');
-      };
-      if ($(this).closest('.customers-card').length) {
-            const c_customer = data.find(store => store[0] === shop)[13];
-            $("#count_customers").text(c_customer);
-            $("#customer-title").html('Avg. Basket <span>| Year</span>');
-      }
+<!--      if ($(this).closest('.sales-card').length) {-->
+<!--            const sales = data.find(store => store[0] === shop)[5];-->
+<!--            $("#sales").text(sales);-->
+<!--            $("#sales-title").html('Sales <span>| Month</span>');-->
+<!--      }-->
+<!--      if ($(this).closest('.revenue-card').length) {-->
+<!--            const revenue = data.find(store => store[0] === shop)[2];-->
+<!--            var formattedRevenue = new Intl.NumberFormat('en-US').format(revenue);-->
+<!--            $("#revenue").text("R"+formattedRevenue);-->
+<!--            $("#revenue-title").html('Revenue <span>| Month</span>');-->
+<!--      };-->
+<!--      if ($(this).closest('.customers-card').length) {-->
+<!--            const c_customer = data.find(store => store[0] === shop)[12];-->
+<!--            $("#count_customers").text(c_customer);-->
+<!--            $("#customer-title").html('Avg. Basket <span>| Month</span>');-->
+<!--      }-->
 
-  });
+<!--  });-->
+
+<!--    $(".year").on("click",async function(event) {-->
+<!--      const shop = "{{ user.shop }}";-->
+<!--      const response = await fetch('/sales_summary');-->
+<!--      const data = await response.json();-->
+<!--      // Prevent the default action-->
+<!--      event.preventDefault();-->
+
+<!--      if ($(this).closest('.sales-card').length) {-->
+<!--            const sales = data.find(store => store[0] === shop)[6];-->
+<!--            $("#sales").text(sales);-->
+<!--            $("#sales-title").html('Sales <span>| Year</span>');-->
+<!--      }-->
+<!--      if ($(this).closest('.revenue-card').length) {-->
+<!--            const revenue = data.find(store => store[0] === shop)[3];-->
+<!--            $("#revenue").text("R"+revenue);-->
+<!--            $("#revenue-title").html('Revenue <span>| Year</span>');-->
+<!--      };-->
+<!--      if ($(this).closest('.customers-card').length) {-->
+<!--            const c_customer = data.find(store => store[0] === shop)[13];-->
+<!--            $("#count_customers").text(c_customer);-->
+<!--            $("#customer-title").html('Avg. Basket <span>| Year</span>');-->
+<!--      }-->
+
+<!--  });-->
 
 
   $("#product_selling_day").on("click", async function(event) {
