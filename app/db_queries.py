@@ -784,7 +784,7 @@ def get_sales_by_shop_last_three_months():
             SELECT 
                 'Online' AS store_name,
                 DATE_FORMAT(order_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
-                ROUND(SUM(total_amount * 0.85)) AS total_sales -- Removing 15% VAT
+                ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
             FROM 
                 toc_wc_sales_order
                 WHERE 
@@ -952,9 +952,9 @@ def get_sales_data(shop_name, from_date, to_date):
             query = '''
                 SELECT
                     DATE_FORMAT(wo.order_date, '%%Y-%%m-%%d') AS date,  
-                    ROUND(SUM(wo.total_amount * 0.85), 2) AS total_net_amount ,
+                    ROUND(SUM(wo.total_amount / 1.15), 2) AS total_net_amount ,
                     count(wo.order_id) as count_orders,
-                    round(SUM(wo.total_amount * 0.85)/count(wo.order_id)) as average
+                    round(SUM(wo.total_amount / 1.15)/count(wo.order_id)) as average
                 FROM
                     toc_wc_sales_order wo
                 WHERE
@@ -1049,10 +1049,10 @@ def get_product_sales_data(shop_name, from_date, to_date):
                 SELECT
                     a.product_name,  
                     round(sum(a.quantity),2) AS count,
-                    ROUND(SUM(a.total_amount*0.85), 2) AS total_net_amount,
+                    ROUND(SUM(a.total_amount/1.15), 2) AS total_net_amount,
                     ROUND(SUM(p.cost_price), 2) AS total_cost_price,
                     ROUND(
-                        (SUM(a.total_amount*0.85) - SUM(p.cost_price)) / SUM(a.total_amount*0.85) * 100, 2
+                        (SUM(a.total_amount/1.15) - SUM(p.cost_price)) / SUM(a.total_amount/1.15) * 100, 2
                     ) AS gross_profit_percentage
                 FROM
                     toc_wc_sales_items a
@@ -1325,10 +1325,10 @@ def get_top_brand(shop_name, from_date, to_date):
                 SELECT
                     p.acct_group as category,
                     count(p.acct_group) AS count,
-                    ROUND(SUM(a.total_amount*0.85), 2) AS total_net_amount,
+                    ROUND(SUM(a.total_amount/1.15), 2) AS total_net_amount,
                     ROUND(SUM(p.cost_price), 2) AS total_cost_price,
                     ROUND(
-                        (SUM(a.total_amount*0.85) - SUM(p.cost_price)) / SUM(a.total_amount*0.85) * 100, 2
+                        (SUM(a.total_amount/1.15) - SUM(p.cost_price)) / SUM(a.total_amount/1.15) * 100, 2
                     ) AS gross_profit_percentage
                 FROM
                     toc_wc_sales_items a
