@@ -77,29 +77,45 @@ def get_recent_sales(shop_name, from_date, to_date):
     cursor = conn.cursor()
 
     if shop_name == "Head Office":
-        query = '''
-                SELECT 
-                    CONCAT(m.first_name, ' ', m.last_name) AS customer,
-                    m.email as email,
-                    ROUND(SUM(i.net_amt)) AS total_spent,
-                    COUNT(DISTINCT s.sales_id) AS total_purchases,
-                    MAX(s.time_of_sale) AS last_purchase_date
-                FROM 
-                    toc_ls_sales s
-                JOIN 
-                    toc_ls_sales_item i ON s.sales_id = i.sales_id
-                JOIN 
-                    toc_ls_payments p ON s.sales_id = p.sales_id
-                JOIN 
-                    toc_canna_member m ON p.email = m.email 
-                WHERE
-                    s.time_of_sale >= %s
-                    AND s.time_of_sale < %s               
-                GROUP BY 
-                    m.email, m.first_name, m.last_name
-                ORDER BY 
-                    total_spent DESC
-                LIMIT 30;
+        query = '''              
+            SELECT 
+                CONCAT(m.first_name, ' ', m.last_name) AS customer,
+                m.email as email,
+                ROUND(SUM(i.net_amt)) AS total_spent,
+                COUNT(DISTINCT s.sales_id) AS total_purchases,
+                MAX(s.time_of_sale) AS last_purchase_date,
+                
+                -- Most Frequent Store: find the store with the maximum visits
+                (SELECT ts.blName
+                 FROM toc_ls_sales s2
+                 JOIN toc_shops ts ON s2.store_code = ts.store
+                 WHERE s2.sales_id = s.sales_id
+                 GROUP BY ts.blName
+                 ORDER BY COUNT(ts.blName) DESC
+                 LIMIT 1) AS Most_Frequent_Store,
+            
+                -- Count of unique Store Visits: using blName
+                COUNT(DISTINCT ts.blName) AS Count_Store_Visits
+            
+            FROM 
+                toc_ls_sales s
+            JOIN 
+                toc_ls_sales_item i ON s.sales_id = i.sales_id
+            JOIN 
+                toc_ls_payments p ON s.sales_id = p.sales_id
+            JOIN 
+                toc_canna_member m ON p.email = m.email 
+            JOIN 
+                toc_shops ts ON s.store_code = ts.store  -- Join toc_shops to get blName
+                            WHERE
+                                s.time_of_sale >= %s
+                                AND s.time_of_sale < %s           
+            GROUP BY 
+                m.email, m.first_name, m.last_name
+            ORDER BY 
+                total_spent DESC
+            LIMIT 30               
+                ;
         '''
         cursor.execute(query, (from_date, to_date))
 
