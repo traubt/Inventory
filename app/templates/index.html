@@ -61,28 +61,6 @@
 
   <main id="main" class="main">
 
-<!--<div class="pagetitle d-flex justify-content-between align-items-center">-->
-<!--  <h1>-->
-<!--    Dashboard {{ user.shop }}-->
-<!--  </h1>-->
-
-<!--  <div class="d-flex align-items-center">-->
-<!--    &lt;!&ndash; Label for Change Shop &ndash;&gt;-->
-<!--    <div class="col-auto">-->
-<!--      <label class="form-label fw-bold mb-0 me-2">Change Shop:</label>-->
-<!--    </div>-->
-<!--    &lt;!&ndash; Dropdown for Change Shop &ndash;&gt;-->
-<!--    <div class="col-auto">-->
-<!--      <select id="shopDropdown" class="form-select form-select-sm">-->
-<!--        <option selected disabled>Select shop:</option> &lt;!&ndash; Default placeholder &ndash;&gt;-->
-<!--        {% for shop in shops %}-->
-<!--          <option value="{{ shop }}">{{ shop }}</option>-->
-<!--        {% endfor %}-->
-<!--      </select>-->
-<!--    </div>-->
-<!--  </div>-->
-<!--</div>-->
-
   <div class="pagetitle d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center">
   <h1>
     Dashboard {{ user.shop }}
@@ -105,18 +83,15 @@
   </div>
 </div>
 
-
-
-
     <!-- Date Range Selector Section -->
 <div class="container mt-4">
-  <div class="row align-items-center mb-3">
+  <div class="row align-items-center mb-3" id="date">
     <!-- Date Range Label -->
     <div class="col-auto">
       <label class="form-label fw-bold mb-0 me-2">Date Range:</label>
     </div>
     <!-- Dropdown for Date Range -->
-    <div class="col-auto">
+    <div class="col-auto" id="dateRange">
       <select id="dateRangeSelector" class="form-select form-select-sm">
         <option selected disabled>Select date range:</option>
         <option value="today">Today</option>
@@ -127,20 +102,22 @@
         <option value="custom">Custom</option>
       </select>
     </div>
-    <!-- From Date -->
-    <div class="col-auto">
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">From</span>
-        <input type="date" id="fromDate" class="form-control">
-      </div>
-    </div>
-    <!-- To Date -->
-    <div class="col-auto">
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">To</span>
-        <input type="date" id="toDate" class="form-control">
-      </div>
-    </div>
+        <div class="row g-2 align-items-center">
+          <!-- From Date -->
+          <div class="col-6 col-sm-auto">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">From</span>
+              <input type="date" id="fromDate" class="form-control">
+            </div>
+          </div>
+          <!-- To Date -->
+          <div class="col-6 col-sm-auto">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">To</span>
+              <input type="date" id="toDate" class="form-control">
+            </div>
+          </div>
+        </div>
   </div>
 </div>
 
