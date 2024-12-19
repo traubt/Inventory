@@ -21,8 +21,8 @@
   <header id="header" class="header fixed-top d-flex align-items-center">
 
     <div class="d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center">
-        <img src="static/assets/img/logo.png" alt="">
+      <a href="#" class="logo d-flex align-items-center">
+        <img src="static/assets/img/toc_logo.jpg" alt="">
         <span class="d-none d-lg-block">Taste Of Cannabis</span>
       </a>
       <i class="bi bi-list toggle-sidebar-btn"></i>
@@ -48,7 +48,7 @@
 
           <a class="nav-link nav-icon" id="not_dropdown" data-bs-toggle="dropdown">
             <i class="bi bi-bell"></i>
-            <span class="badge bg-primary badge-number" id="new_notifications_counter">4</span>
+            <span class="badge bg-primary badge-number" id="new_notifications_counter"></span>
           </a><!-- End Notification Icon -->
           <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
             <li class="dropdown-header" id="notification_counter">
@@ -200,14 +200,14 @@
         <li class="nav-item dropdown pe-3">
 
           <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
-            <img src="static/assets/img/profile-img.jpg" alt="Profile" class="rounded-circle">
+            <img src="static/assets/img/profile-img.png" alt="Profile" class="rounded-circle">
             <span class="d-none d-md-block dropdown-toggle ps-2">{{user.first_name}}{{user.last_name}}</span>
           </a><!-- End Profile Iamge Icon -->
 
           <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
             <li class="dropdown-header">
-              <h6>Kevin Anderson</h6>
-              <span>Web Designer</span>
+              <h6>{{user.first_name}} {{user.last_name}}</h6>
+              <span>TOC Employee</span>
             </li>
             <li>
               <hr class="dropdown-divider">
@@ -234,7 +234,7 @@
             </li>
 
             <li>
-              <a class="dropdown-item d-flex align-items-center" href="pages-faq.html">
+              <a class="dropdown-item d-flex align-items-center" href="#">
                 <i class="bi bi-question-circle"></i>
                 <span>Need Help?</span>
               </a>
@@ -257,4 +257,99 @@
     </nav><!-- End Icons Navigation -->
 
   </header><!-- End Header -->
+
+<body>
+  <script>
+    $(document).ready(async function() {
+       // get notifications
+            async function fetchNotifications() {
+                await fetch('/get_unread_notifications')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Notifications:', data);
+                        $("#new_notifications_counter").text(`${data.length}`);
+                        $("#notification_counter").text(`You have ${data.length} new notifications`);
+                        // populate notifications messages
+                              // Clear existing notification items
+                        $('.notification-item').remove();
+
+                        // Add new notification items
+                        data.forEach(notification => {
+                            const notificationItem = `
+                                <li class="notification-item">
+                                    <i class="bi bi-exclamation-circle text-warning"></i>
+                                    <div>
+                                        <h4>${notification.not_subject}</h4>
+                                        <p>${notification.not_body}</p>
+                                        <p><small>${notification.not_date}</small></p>
+                                    </div>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                            `;
+                            $('.dropdown-footer').before(notificationItem);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching notifications:', error);
+                    });
+            }
+
+            // Fetch notifications immediately on page load
+            fetchNotifications();
+
+            // Set interval to fetch notifications every 20 seconds
+            fetchInterval = setInterval(fetchNotifications, 20000);
+    });
+
+  $('#show_all_nots').on('click', async function() {
+
+<!--            clearInterval(fetchInterval); // Stop the interval-->
+
+      try {
+          // Clear existing notification items
+          $('.notification-item').remove();
+          $('.dropdown-divider').remove();
+
+          // Fetch all notifications
+          const response = await fetch('/get_all_notifications');
+          const data = await response.json();
+
+          // Populate the list with the returned notifications
+          data.forEach(notification => {
+              const notificationItem = `
+                  <li class="notification-item">
+                      <i class="bi bi-exclamation-circle text-warning"></i>
+                      <div>
+                          <h4>${notification.not_subject}</h4>
+                          <p>${notification.not_body}</p>
+                          <p><small>${notification.not_date}</small></p>
+                      </div>
+                  </li>
+                  <li>
+                      <hr class="dropdown-divider">
+                  </li>
+              `;
+              $('.dropdown-footer').before(notificationItem);
+          });
+
+          // Update the notification counter
+          //$("#notification_counter").text(`You have ${data.length} new notifications`);
+
+          // Close and reopen the dropdown to refresh the view
+          const dropdown = $('.not_dropdown');
+          dropdown.removeClass('show');
+          dropdown.find('.dropdown-menu').removeClass('show');
+          setTimeout(() => {
+              dropdown.addClass('show');
+              dropdown.find('.dropdown-menu').addClass('show');
+          }, 100); // Adjust the timeout as needed
+      } catch (error) {
+          console.error('Error fetching notifications:', error);
+      }
+  });
+  </script>
+
+</body>
 
