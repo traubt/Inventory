@@ -218,7 +218,7 @@ h6 {
 
 /* Card */
 .card {
-  margin-bottom: 30px;
+  margin-bottom: 1px;
   border: none;
   border-radius: 5px;
   box-shadow: 0px 0 30px rgba(1, 41, 112, 0.1);
@@ -1356,6 +1356,7 @@ h6 {
 .top {
   text-align: center;
   width: 100%;
+  padding: 1px;
 }
 
 /* For mobile screens (width <= 576px) */
@@ -1388,6 +1389,62 @@ h6 {
   .col-12 {
     padding: 5px;  /* Reduce the padding between columns */
   }
+
+  #date{
+    margin-left: -24px;
+    margin-top: -21px;
+  }
+
+  #dateRange{
+    margin-left: -12px
+  }
+
+  .card-icon {
+      display: none !important; /* Hides the element */
+  }
+
+    /* 1. Make the card height smaller */
+  .info-card {
+    height: 80px; /* Adjust as needed for a smaller card */
+  }
+
+  /* 2. Reduce the gap between the title and the number */
+  #revenue-title {
+    margin-bottom: 8px; /* Reduce the gap */
+    font-size: 1rem; /* Optional: Adjust title size */
+  }
+
+  /* 3. Center the number */
+  #revenue {
+    text-align: center; /* Center the text horizontally */
+    font-size: 1.5rem; /* Adjust the number size */
+    margin: 0; /* Remove default margins */
+  }
+
+  /* Optional: Adjust the card icon size */
+  .card-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem; /* Adjust icon size */
+  }
+
+  /* Adjust card body to align content */
+  .info-card.revenue-card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Vertically center content */
+    align-items: center; /* Center content horizontally */
+  }
+
+  /* Align content inside the row */
+  .info-card .d-flex {
+    justify-content: center;
+    align-items: center;
+  }
+
+
+
+
 }
 
 /* For larger screens */
@@ -1404,7 +1461,6 @@ h6 {
     font-size: 18px; /* Standard title font size */
   }
 }
-
 
 
 

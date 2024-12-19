@@ -421,7 +421,7 @@ function fetchLastUpdateTime() {
             if (data.success) {
                 console.log('Last update time:', data.last_update_time); // Log the result
                 // You can update the UI with the fetched time here
-                document.getElementById('lastUpdate').textContent = `Last update time: ${data.last_update_time} GMT`;
+                document.getElementById('lastUpdate').textContent = `Last update time: ${data.last_update_time}`;
             } else {
                 console.error('Error fetching last update:', data.error); // Log the error
             }

@@ -1685,7 +1685,7 @@ def recent_sales_product(timeframe):
 def get_last_update():
     try:
         # SQL query to get the max end_date formatted as HH:mm
-        query = text("SELECT DATE_FORMAT(MAX(end_date), '%H:%i') AS max_time FROM toc_sales_log WHERE source = 'LS' and comment like 'Compl%';")
+        query = text("SELECT DATE_FORMAT(DATE_ADD(MAX(end_date), INTERVAL 2 HOUR), '%H:%i') AS max_time FROM toc_sales_log WHERE source = 'LS' and comment like 'Compl%';")
 
         # Execute the query
         result = db.session.execute(query)
