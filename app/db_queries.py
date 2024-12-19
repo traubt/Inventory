@@ -136,6 +136,7 @@ def get_recent_sales(shop_name, from_date, to_date):
             WHERE
                     wo.order_date >= %s
                     and wo.order_date < %s
+                    and wo.status not in ('wc-cancelled','wc-pending')
             GROUP BY 
                 wo.customer_name, wo.customer_email
             ORDER BY 
@@ -975,6 +976,7 @@ def get_sales_data(shop_name, from_date, to_date):
                     toc_wc_sales_order wo
                 WHERE
                     wo.order_date >= %s and wo.order_date < %s
+                    and wo.status not in ('wc-cancelled','wc-pending')
                 GROUP BY
                     date
                 ORDER BY
