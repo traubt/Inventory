@@ -783,12 +783,12 @@ def get_sales_by_shop_last_three_months():
     union all
             SELECT 
                 'Online' AS store_name,
-                DATE_FORMAT(creation_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
-                ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
+                DATE_FORMAT(order_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
+                ROUND(SUM(total_amount * 0.85)) AS total_sales -- Removing 15% VAT
             FROM 
                 toc_wc_sales_order
                 WHERE 
-                creation_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                order_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
             group by store_name,sale_month;
             '''
 
