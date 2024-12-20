@@ -193,3 +193,15 @@ class TOCUserActivity(db.Model):
     user = db.Column(db.String(45), nullable=True)
     shop = db.Column(db.String(45), nullable=True)
     activity = db.Column(db.String(100), nullable=True)
+
+
+class TocSalesLog(db.Model):
+    __tablename__ = 'toc_sales_log'
+
+    run_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    start_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    search_from = db.Column(db.String(40), nullable=True)
+    num_of_sales = db.Column(db.Integer, nullable=True)
+    source = db.Column(db.String(2), nullable=True)
+    comment = db.Column(db.String(200), nullable=True)
