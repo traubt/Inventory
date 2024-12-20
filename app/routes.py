@@ -10,11 +10,61 @@ from . import db
 from .db_queries import *
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
-from sqlalchemy import distinct, or_, text
+from sqlalchemy import distinct, or_, text, desc
 from flask import session, jsonify
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 main = Blueprint('main', __name__)
+
+SMTP_SERVER = 'smtp.gmail.com'
+SMTP_PORT = 465
+SENDER_EMAIL = 'algott.team@gmail.com'
+SENDER_PASSWORD = 'ebzdcpdiilrurexz'
+
+
+# Function to send email
+def send_email(recipients, subject, body):
+    try:
+        # Create the message
+        msg = MIMEMultipart()
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = ', '.join(recipients)  # Send to multiple recipients
+        msg['Subject'] = subject
+
+        # Add the email body
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Connect to the SMTP server and send the email
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.sendmail(SENDER_EMAIL, recipients, msg.as_string())
+
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+@main.route('/send_email', methods=['POST'])
+def handle_send_email():
+    try:
+        # Get data from the client (list of recipients, subject, and body)
+        data = request.get_json()
+        recipients = data.get('recipients', [])
+        subject = data.get('subject', '')
+        body = data.get('body', '')
+
+        # Validate input data
+        if not recipients or not subject or not body:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Call the function to send the email
+        send_email(recipients, subject, body)
+
+        return jsonify({"message": "Email sent successfully!"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 @main.route('/')
 def login():
@@ -23,6 +73,9 @@ def login():
 
 @main.route('/index')
 def index():
+    # Send email when the page loads
+    print("Trying to send email to myself")
+
     user_data = session.get('user')
     roles = TocRole.query.all()
     shops = TOC_SHOPS.query.all()
@@ -126,6 +179,26 @@ def admin_users():
         users=users
     )
 
+@main.route('/admin_logs')
+def admin_logs():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    users = User.query.all()
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'log_admin.html',
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        users=users
+    )
+
 @main.route('/change_shop', methods=['POST'])
 def change_shop():
     selected_shop_name = request.form.get('shop')  # Get the shop name from the request
@@ -178,6 +251,20 @@ def get_users():
         'role': user.role,
     } for user in users]
     return jsonify(users_list)
+
+@main.route('/api/get_logs')
+def get_logs():
+    logs = TocSalesLog.query.order_by(desc(TocSalesLog.run_id)).limit(50).all()
+    TocSalesLogs_list = [{
+        'id': log.run_id,
+        'start_date': log.start_date,
+        'end_date': log.end_date,
+        'search_from': log.search_from,
+        'num_of_sales': log.num_of_sales,
+        'source': log.source,
+        'comment': log.comment,
+    } for log in logs]
+    return jsonify(TocSalesLogs_list)
 
 
 @main.route('/api/delete_user/<int:user_id>', methods=['DELETE'])
