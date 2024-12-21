@@ -262,11 +262,13 @@
   <script>
     $(document).ready(async function() {
        // get notifications
+    const user = {{ user | tojson }};
+    //console.log(`In header user is:`, user["username"]);
             async function fetchNotifications() {
                 await fetch('/get_unread_notifications')
                     .then(response => response.json())
                     .then(data => {
-                        console.log('Notifications:', data);
+                        //console.log('Notifications:', data);
                         $("#new_notifications_counter").text(`${data.length}`);
                         $("#notification_counter").text(`You have ${data.length} new notifications`);
                         // populate notifications messages
@@ -311,7 +313,8 @@
                         for (let i = 0; i < Math.min(10, data.length); i++) {
                             const log = data[i];
                             const comment = log.comment;
-                            if (comment && comment.toLowerCase().includes("error")) {
+                            if (comment && comment.toLowerCase().includes("error") &&
+                            (user["username"] === "Itsik" || user["username"] === "tom")) {
                                 alert(log.comment);
                                 // Call the /send_email route with the log comment
                                 const emailData = {
@@ -321,7 +324,7 @@
                                         "itsik@tasteofcannabis.co.za",
                                         "orders@tasteofcannabis.co.za"
                                     ],
-                                    subject: "Test system logs message",
+                                    subject: "TOC system error",
                                     body: `Error found in 360. Please check the logs.: ${log.comment}`
                                 };
 
