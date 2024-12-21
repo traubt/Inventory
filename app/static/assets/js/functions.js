@@ -419,9 +419,9 @@ function fetchLastUpdateTime() {
         })
         .then(data => {
             if (data.success) {
-                console.log('Last update:', data.last_update_time); // Log the result
+                //console.log('Last update:', data.last_update_time); // Log the result
                 // You can update the UI with the fetched time here
-                document.getElementById('lastUpdate').textContent = `Last update time: ${data.last_update_time}`;
+                document.getElementById('lastUpdate').textContent = `Last update: ${data.last_update_time}`;
             } else {
                 console.error('Error fetching last update:', data.error); // Log the error
             }
