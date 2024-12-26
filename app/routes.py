@@ -15,6 +15,9 @@ from flask import session, jsonify
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 main = Blueprint('main', __name__)
@@ -1619,6 +1622,7 @@ def sales_data():
 @main.route('/sales_three_months', methods=['GET'])
 def sales_three_months():
     data = get_sales_by_shop_last_three_months()
+    logger.debug(f"Data: {data}")
     return jsonify(data)
 
 @main.route('/sales', methods=['GET'])
