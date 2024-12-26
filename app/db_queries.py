@@ -806,6 +806,7 @@ def get_sales_by_shop_last_three_months():
                 toc_wc_sales_order
                 WHERE 
                 order_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                 and status not in ('wc-cancelled','wc-pending')
             group by store_name,sale_month;
             '''
 
