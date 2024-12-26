@@ -1622,7 +1622,7 @@ def sales_data():
 @main.route('/sales_three_months', methods=['GET'])
 def sales_three_months():
     data = get_sales_by_shop_last_three_months()
-    logger.debug(f"Data: {data}")
+    print(data)
     return jsonify(data)
 
 @main.route('/sales', methods=['GET'])
