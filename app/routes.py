@@ -110,6 +110,7 @@ def login_post():
     user_data = {
         'id': user.id,
         'username' : user.username,
+        'password' : user.password,
         'first_name': user.first_name,
         'last_name': user.last_name,
         'email': user.email,
@@ -308,6 +309,25 @@ def update_user(user_id):
         # Commit changes to the database
         db.session.commit()
         return jsonify({"message": "User updated successfully"}), 200
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        return jsonify({"error": "An error occurred while updating the user"}), 500
+
+@main.route('/api/update_password/<string:password>', methods=['PUT'])
+def update_password(password):
+    try:
+        # Get the user by ID
+        user_data = session.get('user')
+        user = User.query.get(json.loads(user_data)["id"])
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Update fields with form data
+        user.password = password
+
+        # Commit changes to the database
+        db.session.commit()
+        return jsonify({"message": "User password updated successfully"}), 200
     except Exception as e:
         print(f"Error updating user: {e}")
         return jsonify({"error": "An error occurred while updating the user"}), 500
@@ -1606,6 +1626,7 @@ def count_new_orders():
 @main.route('/get_top_items', methods=['GET'])
 def get_top_items_route():
     top_items = get_top_items()
+    return jsonify({'top_items': top_items})
     return jsonify({'top_items': top_items})
 
 @main.route('/sales_summary', methods=['GET'])

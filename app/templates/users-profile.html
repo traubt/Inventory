@@ -378,6 +378,7 @@ $("#changePassword").on("click", function (event) {
     const renewPassword = $("#renewPassword").val().trim();
     const oldPassword = "{{user.password}}"; // Server-side variable for current password (hashed)
 
+
     // Validation: Check if fields are empty
     if (!currPassword) {
         alert("Current Password field cannot be empty.");
@@ -411,8 +412,8 @@ $("#changePassword").on("click", function (event) {
 
     // AJAX request to call the Flask route
     $.ajax({
-        url: `/update_password/${newPassword}`, // Call the update_password route with the new password
-        type: "POST",
+        url: `/api/update_password/${newPassword}`, // Call the update_password route with the new password
+        type: "PUT",
         success: function (response) {
             if (response.status === "success") {
                 alert("Password updated successfully.");
