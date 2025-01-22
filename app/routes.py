@@ -2,8 +2,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import pymysql
 import json
 import os
-import datetime
-from app.models import  TocMessages, TocNotification, TOC_SHOPS
 from sqlalchemy.exc import SQLAlchemyError
 from .models import *
 from . import db
