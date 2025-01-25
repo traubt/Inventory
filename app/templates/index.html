@@ -572,6 +572,12 @@
     shops = JSON.parse('{{ shops | tojson }}');
     console.log(shops);  // This will log the list of shops as a JavaScript array
 
+    // Disable shop drop down for shops - shops can't change to another shop
+    console.log("User role: {{user.role}}");
+    if("{{user.role}}" == "Agent"){
+      $('#shopDropdown').prop('disabled', true);
+    }
+
     let fetchInterval;
 
     //Initialize the current date as 'To' date

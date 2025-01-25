@@ -1625,7 +1625,6 @@ def count_new_orders():
 def get_top_items_route():
     top_items = get_top_items()
     return jsonify({'top_items': top_items})
-    return jsonify({'top_items': top_items})
 
 @main.route('/sales_summary', methods=['GET'])
 def sales_summary():
@@ -1640,7 +1639,8 @@ def sales_data():
 
 @main.route('/sales_three_months', methods=['GET'])
 def sales_three_months():
-    data = get_sales_by_shop_last_three_months()
+    user_shop = json.loads(session.get('user'))['shop']
+    data = get_sales_by_shop_last_three_months(user_shop)
     print(data)
     return jsonify(data)
 
