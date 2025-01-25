@@ -775,42 +775,66 @@ def get_receive_stock_order(shop,order_id):
 
     return result
 
-def get_sales_by_shop_last_three_months():
+def get_sales_by_shop_last_three_months(user_shop):
     # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # Query to retrieve the stock order form
-    query = '''
+    if user_shop == 'Head Office':
+        query = '''
+                SELECT 
+                    ts.store_name,
+                    DATE_FORMAT(tlsi.time_of_sale, '%Y-%m') AS sale_month,
+                    ROUND(SUM(tlsi.net_amt)) AS total_sales
+                FROM 
+                    toc_ls_sales_item tlsi
+                JOIN 
+                    toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
+                JOIN toc_shops s on ts.store_customer = s.customer
+                WHERE 
+                    tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                    AND s.actv_ind = 1
+                GROUP BY 
+                    ts.store_name, sale_month
+                UNION ALL
+                SELECT 
+                    'Online' AS store_name,
+                    DATE_FORMAT(order_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
+                    ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
+                FROM 
+                    toc_wc_sales_order
+                WHERE 
+                    order_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                    AND status NOT IN ('wc-cancelled','wc-pending')
+                GROUP BY 
+                    store_name, sale_month;
+                '''
+        # Execute the query
+        cursor.execute(query)
+
+    else:
+        query = '''
             SELECT 
                 ts.store_name,
-                DATE_FORMAT(tlsi.time_of_sale, '%Y-%m') AS sale_month,
+                DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m') AS sale_month,
                 ROUND(SUM(tlsi.net_amt)) AS total_sales
             FROM 
                 toc_ls_sales_item tlsi
             JOIN 
                 toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
-            JOIN toc_shops s on ts.store_customer = s.customer
+            JOIN toc_shops s ON ts.store_customer = s.customer
             WHERE 
-                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
-                and s.actv_ind = 1
+                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%%Y-%%m-01')
+                AND s.actv_ind = 1
+                AND TRIM(LOWER(ts.store_name)) = TRIM(LOWER(%s))
             GROUP BY 
-                ts.store_name, sale_month
-    union all
-            SELECT 
-                'Online' AS store_name,
-                DATE_FORMAT(order_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
-                ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
-            FROM 
-                toc_wc_sales_order
-                WHERE 
-                order_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
-                 and status not in ('wc-cancelled','wc-pending')
-            group by store_name,sale_month;
-            '''
+                ts.store_name, sale_month;
 
-    # Execute the query
-    cursor.execute(query)
+                '''
+        # Execute the query
+        cursor.execute(query, (user_shop,))
+
     result = cursor.fetchall()
 
     # Fetch column names
@@ -823,6 +847,7 @@ def get_sales_by_shop_last_three_months():
     conn.close()
 
     return result_as_dicts
+
 
 
 def get_top_agents (shop_name, timeframe):
