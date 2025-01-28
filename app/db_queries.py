@@ -829,8 +829,9 @@ def get_sales_by_shop_last_three_months(user_shop):
                 AND s.actv_ind = 1
                 AND TRIM(LOWER(ts.store_name)) = TRIM(LOWER(%s))
             GROUP BY 
-                ts.store_name, sale_month;
-
+                ts.store_name, sale_month
+            ORDER BY 
+                sale_month asc;
                 '''
         # Execute the query
         cursor.execute(query, (user_shop,))
@@ -1012,16 +1013,16 @@ def get_sales_data(shop_name, from_date, to_date):
         else:
             query = '''
                 SELECT
-                    DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
-                    ROUND(SUM(ti.net_amt), 2) AS total_net_amount  ,
+                    DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d') AS date,  
+                    ROUND(SUM(tlsi.net_amt), 2) AS total_net_amount  ,
                     count(ts.sales_id) as count_orders,
-                    round(SUM(ti.net_amt)/count(ts.sales_id)) as average
+                    round(SUM(tlsi.net_amt)/count(ts.sales_id)) as average
                 FROM
-                    toc_ls_sales ts
-                JOIN
-                    toc_ls_sales_item ti ON ts.sales_id = ti.sales_id
-                JOIN
-                    toc_product p ON ti.item_sku = p.item_sku
+                    toc_ls_sales_item tlsi
+				JOIN 
+					toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
+				JOIN 
+				    toc_shops s ON ts.store_customer = s.customer
                 WHERE
                     ts.store_name = %s
                     AND ts.time_of_sale >= %s AND ts.time_of_sale < %s
