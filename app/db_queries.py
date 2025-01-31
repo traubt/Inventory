@@ -602,75 +602,75 @@ def get_replenish_order_form(shop,threshold, replenish):
     cursor = conn.cursor()
 
     # Query to retrieve the stock order form
-    query = '''
-WITH sales_data AS (
-    SELECT 
-        d.item_sku,
-        d.item_name,
-        b.store_customer,
-        c.blName AS shop_name,
-        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
-        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
-        COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read  -- Added new column
-    FROM 
-        toc_product d
-    LEFT JOIN 
-        toc_ls_sales_item a
-        ON d.item_sku = a.item_sku
-    LEFT JOIN 
-        toc_ls_sales b 
-        ON a.sales_id = b.sales_id
-    LEFT JOIN 
-        toc_shops c
-        ON b.store_customer = c.customer
-    LEFT JOIN
-        toc_stock st
-        ON d.item_sku = st.sku AND b.store_customer = st.shop_id  -- Joining toc_stock for stock_qty_date
-    WHERE 
-        d.acct_group <> 'Specials'
-        AND c.blName = %s  -- Ensures we only get sales related to this shop
-        and d.item_sku <> '9568' -- Refund item
-    GROUP BY 
-        d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date  -- Group by stock_qty_date
-)
-SELECT 
-    s.item_sku,
-    s.item_name,
-    s.store_customer,
-    s.shop_name,
-    s.threshold_sold_qty,
-    s.replenish_qty,
-    s.sales_since_stock_read,  -- Include the new column in the final SELECT
-    st.final_stock_qty AS last_stock_update,
-    st.stock_qty_date AS last_stock_update_date,
-    st.final_stock_qty 
-        - s.sales_since_stock_read 
-        + COALESCE((
-            SELECT SUM(tro.received_qty) 
-            FROM toc_replenish_order tro
-            WHERE tro.shop_id = s.store_customer 
-              AND tro.sku = s.item_sku
-              AND tro.received_date > st.stock_qty_date
-        ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
-    CASE 
-        WHEN st.final_stock_qty 
-            - s.sales_since_stock_read 
-            + COALESCE((
-                SELECT SUM(tro.received_qty) 
-                FROM toc_replenish_order tro
-                WHERE tro.shop_id = s.store_customer 
-                  AND tro.sku = s.item_sku
-                  AND tro.received_date > st.stock_qty_date
-            ), 0) > s.threshold_sold_qty THEN 0
-        ELSE s.replenish_qty
-    END AS replenish_order  -- Add the replenish_order column
-FROM 
-    sales_data s
-LEFT JOIN 
-    toc_stock st
-ON 
-    s.item_sku = st.sku AND s.store_customer = st.shop_id
-ORDER BY  s.sales_since_stock_read DESC;
+    query = '''    
+            WITH sales_data AS (
+            SELECT 
+                st.sku AS item_sku,
+                d.item_name,
+                st.shop_id AS store_customer,
+                c.blName AS shop_name,
+                IFNULL(COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END), 0) AS threshold_sold_qty,
+                IFNULL(COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END), 0) AS replenish_qty,
+                IFNULL(COUNT(CASE WHEN a.time_of_sale > IFNULL(st.stock_qty_date, '1900-01-01') THEN a.sales_id END), 0) AS sales_since_stock_read
+            FROM 
+                toc_stock st
+            LEFT JOIN 
+                toc_product d 
+                ON st.sku = d.item_sku 
+                AND d.acct_group <> 'Specials' 
+                AND d.item_sku <> '9568' -- Exclude refund item
+            LEFT JOIN 
+                toc_ls_sales_item a 
+                ON st.sku = a.item_sku
+            LEFT JOIN 
+                toc_ls_sales b 
+                ON a.sales_id = b.sales_id AND st.shop_id = b.store_customer
+            LEFT JOIN 
+                toc_shops c 
+                ON st.shop_id = c.customer
+            WHERE 
+                c.blName = %s
+            GROUP BY 
+                st.sku, d.item_name, st.shop_id, c.blName
+            )
+            SELECT 
+                s.item_sku,
+                s.item_name,
+                s.store_customer,
+                s.shop_name,
+                s.threshold_sold_qty,
+                s.replenish_qty,
+                s.sales_since_stock_read,  -- Include the new column in the final SELECT
+                st.final_stock_qty AS last_stock_update,
+                st.stock_qty_date AS last_stock_update_date,
+                st.final_stock_qty 
+                    - s.sales_since_stock_read 
+                    + COALESCE((
+                        SELECT SUM(tro.received_qty) 
+                        FROM toc_replenish_order tro
+                        WHERE tro.shop_id = s.store_customer 
+                          AND tro.sku = s.item_sku
+                          AND tro.received_date > st.stock_qty_date
+                    ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
+                CASE 
+                    WHEN st.final_stock_qty 
+                        - s.sales_since_stock_read 
+                        + COALESCE((
+                            SELECT SUM(tro.received_qty) 
+                            FROM toc_replenish_order tro
+                            WHERE tro.shop_id = s.store_customer 
+                              AND tro.sku = s.item_sku
+                              AND tro.received_date > st.stock_qty_date
+                        ), 0) > s.threshold_sold_qty THEN 0
+                    ELSE s.replenish_qty
+                END AS replenish_order  -- Add the replenish_order column
+            FROM 
+                sales_data s
+            LEFT JOIN 
+                toc_stock st
+            ON 
+                s.item_sku = st.sku AND s.store_customer = st.shop_id
+            ORDER BY  s.sales_since_stock_read DESC;
             '''
 
     # Execute the query with the parameter
