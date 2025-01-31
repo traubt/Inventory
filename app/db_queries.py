@@ -603,35 +603,63 @@ def get_replenish_order_form(shop,threshold, replenish):
 
     # Query to retrieve the stock order form
     query = '''
-WITH sales_data AS (
-    SELECT 
-        d.item_sku,
-        d.item_name,
-        b.store_customer,
-        c.blName AS shop_name,
-        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
-        COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
-        COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read  -- Added new column
-    FROM 
-        toc_product d
-    LEFT JOIN 
-        toc_ls_sales_item a
-        ON d.item_sku = a.item_sku
-    LEFT JOIN 
-        toc_ls_sales b 
-        ON a.sales_id = b.sales_id
-    LEFT JOIN 
-        toc_shops c
-        ON b.store_customer = c.customer
-    LEFT JOIN
-        toc_stock st
-        ON d.item_sku = st.sku AND b.store_customer = st.shop_id  -- Joining toc_stock for stock_qty_date
-    WHERE 
-        d.acct_group <> 'Specials'
-        AND c.blName = %s  -- Ensures we only get sales related to this shop
-        and d.item_sku <> '9568' -- Refund item
-    GROUP BY 
-        d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date  -- Group by stock_qty_date
+   WITH sales_data AS (
+   SELECT 
+    d.item_sku,
+    d.item_name,
+    b.store_customer,
+    c.blName AS shop_name,
+    COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
+    COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
+    COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
+FROM 
+    toc_product d
+ JOIN 
+    toc_ls_sales_item a
+    ON d.item_sku = a.item_sku
+ JOIN 
+    toc_ls_sales b 
+    ON a.sales_id = b.sales_id
+ JOIN 
+    toc_shops c
+    ON b.store_customer = c.customer
+ JOIN
+    toc_stock st
+    ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+WHERE 
+    d.acct_group <> 'Specials'
+    AND c.blName = %s
+    AND d.item_sku <> '9568'  -- Refund item
+GROUP BY 
+    d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+UNION ALL
+SELECT 
+    st.sku AS item_sku,
+    d.item_name,
+    st.shop_id AS store_customer,
+    c.blName AS shop_name,
+    0 AS threshold_sold_qty,
+    0 AS replenish_qty,
+    0 AS sales_since_stock_read
+FROM 
+    toc_stock st
+ JOIN 
+    toc_product d 
+    ON st.sku = d.item_sku 
+    AND d.acct_group <> 'Specials' 
+    AND d.item_sku <> '9568'  -- Exclude refund item
+ JOIN 
+    toc_shops c 
+    ON st.shop_id = c.customer
+WHERE 
+    c.blName = %s
+    AND NOT EXISTS (
+        SELECT 1
+        FROM toc_ls_sales_item a
+        JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+        WHERE a.item_sku = st.sku 
+        AND b.store_customer = st.shop_id
+    )
 )
 SELECT 
     s.item_sku,
@@ -674,7 +702,7 @@ ORDER BY  s.sales_since_stock_read DESC;
             '''
 
     # Execute the query with the parameter
-    cursor.execute(query, (threshold, replenish,shop))
+    cursor.execute(query, (threshold, replenish,shop,shop))
     result = cursor.fetchall()
 
     cursor.close()
