@@ -1500,8 +1500,8 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales a
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
-                    JOIN 
-                        toc_product d ON b.item_sku = d.item_sku 
+           --         JOIN 
+           --             toc_product d ON b.item_sku = d.item_sku 
            --         LEFT JOIN 
            --             toc_ls_payments c ON b.sales_id = c.sales_id
                     WHERE 
@@ -1782,20 +1782,20 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     if group_by == 'none':
         query += """
             creation_date,
-            shop_id,
-            sku,
-            stock_qty_date,
-            product_name,
-            stock_count,
-            count_by,
-            last_stock_qty,
-            calc_stock_qty,
-            variance,
-            stock_recount,
             shop_name,
-            rejects_qty,
+        --    shop_id,
+            sku,
+        --    stock_qty_date,
+            product_name,
+        --    stock_count,
+            count_by,
+        --    last_stock_qty,
+            round(calc_stock_qty,2) as calc_qty,
+            round(variance,2) as variance,
+        --    stock_recount,           
+            rejects_qty as damaged,
             final_stock_qty,
-            replenish_id,
+            replenish_id as order_id,
             comments
         """
     elif group_by == 'day':
@@ -1849,7 +1849,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
 
     # Add ORDER BY clause
     if group_by != 'none':
-        query += " ORDER BY shop_name ASC"
+        query += " ORDER BY creation_date DESC"
         if group_by in ['day', 'month']:
             query += ", stock_qty_date ASC"
 
