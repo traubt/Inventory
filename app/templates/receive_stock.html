@@ -492,6 +492,10 @@ $("#saveOrder").on("click", function () {
         return;
     }
 
+    // confirm saving to database:
+
+    if (!confirm("Are you sure you want to commit stock count to the database?")) return;
+
     // Show spinner and text
     const spinnerWrapper = $(`
         <div class="spinner-wrapper">

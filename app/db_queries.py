@@ -2127,6 +2127,32 @@ def get_stock_value_per_shop():
 
     return result_as_dicts
 
+def get_transactions(from_date,to_date):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query)
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
 
 
 
