@@ -237,10 +237,10 @@ $(document).ready(function () {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
-    const lastYear = new Date(today);
-    lastYear.setFullYear(today.getFullYear() - 1);
+    const lastMonth = new Date(today);
+    lastMonth.setMonth(today.getMonth() - 1);
 
-    $('#fromDate').datepicker('update', formatDate(lastYear));
+    $('#fromDate').datepicker('update', formatDate(lastMonth));
     $('#toDate').datepicker('update', formatDate(tomorrow));
 
     // Helper function to format date as yyyy-mm-dd

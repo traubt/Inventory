@@ -291,7 +291,7 @@ $(document).ready(function () {
                                 title: `${reportType}_${new Date().toISOString().slice(0, 10)}`
                             }
                         ],
-                        order: [[1, 'asc']], // Sort by second column (if applicable)
+                        order: [[0, 'desc']], // Sort by second column (if applicable)
                         pageLength: 50, // Show 50 rows by default
                         lengthMenu: [
                             [50, 100, 150, 200],
@@ -309,11 +309,7 @@ $(document).ready(function () {
         });
     });
 
-
-
-
 });
-
 
     $('input[name="salesReport"]').on('click', function() {
       const selectedReport = $(this).val();

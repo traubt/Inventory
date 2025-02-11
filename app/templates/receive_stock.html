@@ -239,7 +239,9 @@ function loadStockData(rows) {
                 data: null,
                 className: 'editable',
                 render: function (data, type, row) {
-                    const currentStockCount = row.replenish_qty;
+                // 9-2-25: change the default receive qty to 0
+                    //const currentStockCount = row.replenish_qty;
+                    const currentStockCount = 0;
                     return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
                 }
             },

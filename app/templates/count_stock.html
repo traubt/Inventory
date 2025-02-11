@@ -85,7 +85,11 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center">
-              <h5 class="card-title mb-0">Stock Count</h5>
+<div class="d-flex align-items-center">
+  <h5 class="card-title mb-0 me-2">Stock Counted By:</h5>
+  <input type="text" id='countBy' class="form-control w-auto" placeholder="Enter name">
+</div>
+
               <div class="d-flex gap-2">
                 <label for="orderName" class="form-label mb-0">Count ID:</label>
                 <input type="text" id="orderName" class="form-control" >
@@ -141,6 +145,12 @@
     $("#saveOrder").prop("disabled", true);
 
     $("#newOrder").on("click", function (event) {
+        // check count by is populated
+          if ($("#countBy").val() == '') {
+            alert('Please fill in the "Stock Counted By" field.');
+            return 0;
+          }
+
         // Set the order name based on shop customer and current date
         $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}C`);
 
@@ -449,6 +459,12 @@ function loadStockData(rows) {
 
 $("#saveOrder").on("click", function () {
 
+    // check count by is populated
+      if ($("#countBy").val() == '') {
+        alert('Please fill in the "Stock Counted By" field.');
+        return 0;
+      }
+
     // Check if the filter is on
     if ($("#ProductOrderTemplate_filter input").val().length > 0) {
         dialog("Filter Is On", "Can't submit count stock while filter is on. Please close the table filter before submit");
@@ -514,7 +530,9 @@ $("#saveOrder").on("click", function () {
     $("body").append(spinnerWrapper);
 
     // AJAX request to send data to Flask route
-    const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
+    // 11-2-25 change the counted by to name of the person
+    //const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
+    const user_name = $("#countBy").val();
     const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized
     const date = getCurrentDate(); // Get current date in YYYYMMDD format
     const shop_name = {{shop.name | tojson}};
