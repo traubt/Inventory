@@ -844,6 +844,7 @@ def get_receive_stock_form():
                 "replenish_user": row[4],
                 "item_name": row[5],
                 "replenish_qty": row[6],
+                "received_qty" : row[8]
             }
             for row in data
         ]
@@ -1459,6 +1460,59 @@ def update_count_receive_stock():
         db.session.rollback()
         print("Database error:", e)
         return jsonify({"status": "error", "message": "Failed to update stock data", "error": str(e)}), 500
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+    finally:
+        db.session.close()
+
+@main.route('/save_count_receive_stock', methods=['POST'])
+def save_count_receive_stock():
+    try:
+        # Get JSON data from the request
+        data = request.get_json()
+
+        # Extract relevant information
+        table = data.get('table', [])
+        shop = data.get('shop', '')
+        shop_name = data.get('shop_name', '')
+        user_name = data.get('user_name', '')
+        date = data.get('date', '')
+        replenish_order_id = data.get('replenish_order_id', '')
+
+        # Process each row and update the database
+        for row in table:
+            sku = row.get('sku', '')
+            product_name = row.get('product_name', '')
+            stock_sent = row.get('sent_qty', 0)
+            stock_count = row.get('received_qty', 0)
+            variance = row.get('variance', 0)
+            # variance_rsn = row.get('variance_reason', 'NA')
+            # stock_rejected = row.get('rejected_qty', 0)
+            comments = row.get('comments', '')
+
+            # Check if the record exists in TocStock
+            existing_record = TocReplenishOrder.query.filter_by(
+                order_id=replenish_order_id,
+                sku=sku
+            ).first()
+
+            if existing_record:
+                existing_record.received_qty = stock_count
+                existing_record.received_comment = comments
+            else:
+                raise Exception("Shop SKU combination does not exist")
+
+        # Commit changes to the database
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Stock saved successfully"})
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print("Database error:", e)
+        return jsonify({"status": "error", "message": "Failed to save stock data", "error": str(e)}), 500
 
     except Exception as e:
         print("Error:", e)
