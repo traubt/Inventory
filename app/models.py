@@ -35,7 +35,7 @@ class TOC_SHOPS(db.Model):
     customer = db.Column(db.String(10))
     mt_shop_name = db.Column(db.String(50))
     actv_ind = db.Column(db.Integer)
-    tier = db.Column(db.Integer)
+    tier =  db.Column(db.String(2))
 
 class TocMessages(db.Model):
     __tablename__ = 'toc_messages'
