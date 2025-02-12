@@ -2135,11 +2135,40 @@ def get_transactions(from_date,to_date):
 
     # Query to retrieve the stock order form
     query = '''
-
+                SELECT DISTINCT 
+                    a.sales_id, 
+                    a.store_name, 
+                    DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d %%H:%%i') AS time_of_sale, 
+                    MONTH(a.time_of_sale) AS monnth, 
+                    a.quantity AS sales_quantity, 
+                    a.owner_name, 
+                    b.salesline_id, 
+                    b.item_name,
+                    b.item_sku, 
+                    b.quantity AS item_quantity, 
+                    b.tot_amt, 
+                    b.net_amt, 
+                    b.tax_amt, 
+                    b.discount_amt, 
+                    b.stat_group, 
+                    b.staff_name, 
+                    d.acct_group, 
+                    d.retail_price, 
+                    d.cost_price, 
+                    d.wh_price, 
+                    d.cann_cost_price, 
+                    c.email
+                FROM toc_ls_sales a
+                JOIN toc_ls_sales_item b ON a.sales_id = b.sales_id
+                JOIN toc_product d ON b.item_sku = d.item_sku 
+                LEFT JOIN toc_ls_payments c ON b.sales_id = c.sales_id
+                WHERE a.time_of_sale > %s 
+                  AND a.time_of_sale < %s
+                ORDER BY a.time_of_sale ASC;
             '''
 
     # Execute the query with the parameter
-    cursor.execute(query)
+    cursor.execute(query, (from_date, to_date))
     result = cursor.fetchall()
 
     # Fetch column names
