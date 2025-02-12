@@ -1609,6 +1609,8 @@ def get_business_report():
             data = get_stock_value_per_shop()
         elif report_type == "Transactions Report":
             data = get_transactions(from_date, to_date)
+        elif report_type == "Online Transactions Report":
+            data = get_online_transactions(from_date, to_date)
         else:
             data = get_sales_report(report_type, from_date, to_date, group_by)
 

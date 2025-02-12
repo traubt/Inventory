@@ -1533,6 +1533,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     SELECT 
                         a.store_name,
                         b.staff_name,
+                        s.tier,
                 '''
 
         # Conditionally add DATE_FORMAT based on group_by
@@ -1557,6 +1558,8 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales a
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
+                    JOIN
+                        toc_shops s on a.store_name = s.blName
                     WHERE 
                         a.time_of_sale >= %s AND a.time_of_sale <= %s                        
                 '''
@@ -1564,15 +1567,15 @@ def get_sales_report(report_type, from_date, to_date, group_by):
         # Add dynamic GROUP BY clause based on 'group_by' parameter
         if group_by == 'none':
             query += ''' 
-                        GROUP BY a.store_name, b.staff_name
+                        GROUP BY a.store_name, b.staff_name, s.tier
                     '''
         elif group_by == 'day':
             query += ''' 
-                        GROUP BY a.store_name, b.staff_name, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d')  -- Group by Day
+                        GROUP BY a.store_name, b.staff_name,s.tier, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d')  -- Group by Day
                     '''
         elif group_by == 'month':
             query += ''' 
-                        GROUP BY a.store_name, b.staff_name, DATE_FORMAT(a.time_of_sale, '%%b/%%Y')  -- Group by Month
+                        GROUP BY a.store_name, b.staff_name, s.tier DATE_FORMAT(a.time_of_sale, '%%b/%%Y')  -- Group by Month
                     '''
 
         # Add ORDER BY clause
@@ -2165,6 +2168,43 @@ def get_transactions(from_date,to_date):
                 WHERE a.time_of_sale > %s 
                   AND a.time_of_sale < %s
                 ORDER BY a.time_of_sale ASC;
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
+def get_online_transactions(from_date,to_date):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+                select 
+                a.order_id, b.sales_id, 
+                 DATE_FORMAT(a.order_date, '%%Y-%%m-%%d %%H:%%i') AS time_of_sale,
+                 a.total_amount,
+                 a.discount_amount, a.customer_id, a.customer_name,
+                  a.customer_email, a.customer_phone, a.status, b.sales_id, b.product_name,
+                   b.sku, b.quantity, b.total_amount as charge_amount
+                from toc_wc_sales_order a
+                JOIN toc_wc_sales_items b on a.order_id = b.order_id
+                WHERE a.order_date > %s 
+                  AND a.order_date < %s
+                ORDER BY 3 desc;
             '''
 
     # Execute the query with the parameter
