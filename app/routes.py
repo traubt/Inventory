@@ -1646,7 +1646,13 @@ def get_variance_report():
         print(f"To Date: {to_date}")
 
         # Fetch the data from the function
-        data = get_db_variance_report(report_type,from_date,to_date,group_by)
+        # Fetch the data from the function
+        if report_type == "Detailed Shop Stock Report":
+            data = get_stock_value()
+        elif report_type == "Consolidated Shop Stock Report":
+            data = get_stock_value_per_shop()
+        else:
+            data = get_db_variance_report(report_type,from_date,to_date,group_by)
 
         # Check if no data is returned
         if not data:
