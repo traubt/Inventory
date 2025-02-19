@@ -1641,7 +1641,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     ORDER BY total_net_amt DESC;
                 '''
 
-    elif report_type == "Product Category Sales Report":
+    elif report_type == "Brand Sales Report":
         # Start the query with columns specific to "Product Category Sales Report"
         query = '''
                     SELECT 
@@ -1652,6 +1652,63 @@ def get_sales_report(report_type, from_date, to_date, group_by):
         if group_by == 'none':
             query += '''
                         SUM(b.quantity) AS total_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+        elif group_by == 'day':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d') AS Date,  -- Format as YYYY-MM-DD
+                        SUM(b.quantity) AS total_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+        elif group_by == 'month':
+            query += '''
+                        DATE_FORMAT(a.time_of_sale, '%%b/%%Y') AS month,  -- Format as Mon/Year (e.g., Oct/2024)
+                        SUM(b.quantity) AS total_quantity,
+                        ROUND(SUM(b.net_amt)) AS total_net_amt
+                    '''
+
+        # Add the FROM and JOIN clauses
+        query += '''
+                    FROM 
+                        toc_ls_sales a
+                    JOIN 
+                        toc_ls_sales_item b ON a.sales_id = b.sales_id
+                    JOIN
+                        toc_product d ON b.item_sku = d.item_sku
+                    WHERE 
+                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                '''
+
+        # Add dynamic GROUP BY clause based on 'group_by' parameter
+        if group_by == 'none':
+            query += ''' 
+                        GROUP BY d.stat_group
+                    '''
+        elif group_by == 'day':
+            query += ''' 
+                        GROUP BY d.stat_group, DATE_FORMAT(a.time_of_sale, '%%Y-%%m-%%d')  -- Group by Day
+                    '''
+        elif group_by == 'month':
+            query += ''' 
+                        GROUP BY d.stat_group, DATE_FORMAT(a.time_of_sale, '%%b/%%Y')  -- Group by Month
+                    '''
+
+        # Add ORDER BY clause
+        query += '''
+                    ORDER BY total_net_amt DESC;
+                '''
+
+    elif report_type == "Product Category Sales Report":
+        # Start the query with columns specific to "Product Category Sales Report"
+        query = '''
+                    SELECT 
+                        d.acct_group as Category,
+                '''
+
+        # Conditionally add DATE_FORMAT based on group_by
+        if group_by == 'none':
+            query += '''
+                        round(SUM(b.quantity)) AS total_quantity,
                         ROUND(SUM(b.net_amt)) AS total_net_amt
                     '''
         elif group_by == 'day':
@@ -2221,6 +2278,8 @@ def get_online_transactions(from_date,to_date):
     conn.close()
 
     return result_as_dicts
+
+
 
 
 
