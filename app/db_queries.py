@@ -1145,11 +1145,11 @@ def get_product_sales_data(shop_name, from_date, to_date):
                     SELECT
                         p.item_name,  
                         round(sum(ti.quantity),2) AS count,
-                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
-                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
-                        ROUND(
-                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
-                        ) AS gross_profit_percentage
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount
+                    --    ROUND(SUM(p.cost_price), 2) AS total_cost_price
+                    --    ROUND(
+                    --        (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                    --    ) AS gross_profit_percentage
                     FROM
                         toc_ls_sales ts
                     JOIN
@@ -1421,11 +1421,11 @@ def get_top_brand(shop_name, from_date, to_date):
                     SELECT
                         p.acct_group as category,  
                         count(p.acct_group) AS count,
-                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount,
-                        ROUND(SUM(p.cost_price), 2) AS total_cost_price,
-                        ROUND(
-                            (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
-                        ) AS gross_profit_percentage
+                        ROUND(SUM(ti.net_amt), 2) AS total_net_amount
+                   --     ROUND(SUM(p.cost_price), 2) AS total_cost_price,
+                   --     ROUND(
+                   --         (SUM(ti.net_amt) - SUM(p.cost_price)) / SUM(ti.net_amt) * 100, 2
+                   --     ) AS gross_profit_percentage
                     FROM
                         toc_ls_sales ts
                     JOIN
@@ -1645,7 +1645,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
         # Start the query with columns specific to "Product Category Sales Report"
         query = '''
                     SELECT 
-                        d.stat_group,
+                        d.stat_group as Brand,
                 '''
 
         # Conditionally add DATE_FORMAT based on group_by
@@ -1793,11 +1793,11 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
         --    stock_count,
             count_by,
         --    last_stock_qty,
-            round(calc_stock_qty,2) as calc_qty,
+            round(calc_stock_qty,2) as Sent_Qty,
             round(variance,2) as variance,
         --    stock_recount,           
             rejects_qty as damaged,
-            final_stock_qty,
+            final_stock_qty as Stock_Received,
             replenish_id as order_id,
             comments
         """
