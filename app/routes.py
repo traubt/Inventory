@@ -1612,6 +1612,8 @@ def get_business_report():
             data = get_transactions(from_date, to_date)
         elif report_type == "Online Transactions Report":
             data = get_online_transactions(from_date, to_date)
+        elif report_type == "Product Category Per Staff":
+            data = get_product_category_per_staff(from_date, to_date)
         else:
             data = get_sales_report(report_type, from_date, to_date, group_by)
 
