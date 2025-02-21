@@ -1865,77 +1865,79 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     # Add fields for `group_by == 'none'`
     if group_by == 'none':
         query += """
-            creation_date,
-            shop_name,
+            a.creation_date,
+            a.shop_name,
         --    shop_id,
-            sku,
+            a.sku,
         --    stock_qty_date,
-            product_name,
+            a.product_name,
         --    stock_count,
-            count_by,
+            a.count_by,
         --    last_stock_qty,
-            round(calc_stock_qty,2) as Sent_Qty,
-            round(variance,2) as variance,
+            round(a.calc_stock_qty,2) as Sent_Qty,
+            round(a.variance,2) as variance,
+            round(a.variance * b.cost_price) as variance_amount,
         --    stock_recount,           
-            rejects_qty as damaged,
-            final_stock_qty as Stock_Received,
-            replenish_id as order_id,
-            comments
+            a.rejects_qty as damaged,
+            a.final_stock_qty as Stock_Received,
+            a.replenish_id as order_id,
+            a.comments
         """
     elif group_by == 'day':
         query += """
-            shop_name,
-            DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS Date,
+            a.shop_name,
+            DATE_FORMAT(a.stock_qty_date, '%%Y-%%m-%%d') AS Date,
             COUNT(*) AS total_records,
-            ROUND(SUM(ABS(variance)), 2) AS total_variance
+            ROUND(SUM(ABS(a.variance)), 2) AS total_variance
         """
     elif group_by == 'month':
         query += """
-            shop_name,
-            DATE_FORMAT(stock_qty_date, '%%b/%%Y') AS Month,
+            a.shop_name,
+            DATE_FORMAT(a.stock_qty_date, '%%b/%%Y') AS Month,
             COUNT(*) AS total_records,
-            ROUND(SUM(ABS(variance)), 2) AS total_variance
+            ROUND(SUM(ABS(a.variance)), 2) AS total_variance
         """
     elif group_by == 'user':
         query += """
-            count_by AS user,
+            a.count_by AS user,
             COUNT(*) AS total_records,
-            ROUND(SUM(ABS(variance)), 2) AS total_variance
+            ROUND(SUM(ABS(a.variance)), 2) AS total_variance
         """
     elif group_by == 'shop':
         query += """
-            shop_name,
+            a.shop_name,
             COUNT(*) AS total_records,
-            ROUND(SUM(ABS(variance)), 2) AS total_variance
+            ROUND(SUM(ABS(a.variance)), 2) AS total_variance
         """
 
     # Add FROM clause
     query += """
-        FROM toc_stock_variance
-        WHERE stock_qty_date >= %s AND stock_qty_date <= %s
+        FROM toc_stock_variance a
+        JOIN toc_product b on a.sku = b.item_sku
+        WHERE a.stock_qty_date >= %s AND a.stock_qty_date <= %s
     """
 
     # Filter by report type
     if report_type == "Stock Count Variance":
-        query += " AND replenish_id LIKE '%%C'"
+        query += " AND a.replenish_id LIKE '%%C'"
     elif report_type == "Stock Receive Variance":
-        query += " AND replenish_id LIKE '%%R'"
+        query += " AND a.replenish_id LIKE '%%R'"
 
     # Add dynamic GROUP BY clause if not `none`
     if group_by == 'day':
-        query += " GROUP BY shop_name, DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d')"
+        query += " GROUP BY a.shop_name, DATE_FORMAT(a.stock_qty_date, '%%Y-%%m-%%d')"
     elif group_by == 'month':
-        query += " GROUP BY shop_name, DATE_FORMAT(stock_qty_date, '%%b/%%Y')"
+        query += " GROUP BY a.shop_name, DATE_FORMAT(a.stock_qty_date, '%%b/%%Y')"
     elif group_by == 'user':
-        query += " GROUP BY count_by"
+        query += " GROUP BY a.count_by"
     elif group_by == 'shop':
-        query += " GROUP BY shop_name"
+        query += " GROUP BY a.shop_name"
 
     # Add ORDER BY clause
     if group_by != 'none':
-        query += " ORDER BY creation_date DESC"
+        query += " ORDER BY a.creation_date DESC"
         if group_by in ['day', 'month']:
-            query += ", stock_qty_date ASC"
+            query += ", a.stock_qty_date ASC"
 
     # Execute the query with the given parameters
     cursor.execute(query, (from_date, to_date))
