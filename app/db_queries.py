@@ -1003,8 +1003,8 @@ def get_sales_data(shop_name, from_date, to_date):
                 SELECT
                     DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
                     ROUND(SUM(ti.net_amt), 2) AS total_net_amount  ,
-                    count(ts.sales_id) as count_orders,
-                    round(SUM(ti.net_amt)/count(ts.sales_id)) as average
+                    count(distinct ts.sales_id) as count_orders,
+                    round(SUM(ti.net_amt)/count( distinct ts.sales_id)) as average
                 FROM
                     toc_ls_sales ts
                 JOIN
@@ -1043,8 +1043,8 @@ def get_sales_data(shop_name, from_date, to_date):
                 SELECT
                     DATE_FORMAT(tlsi.time_of_sale, '%%Y-%%m-%%d') AS date,  
                     ROUND(SUM(tlsi.net_amt), 2) AS total_net_amount  ,
-                    count(ts.sales_id) as count_orders,
-                    round(SUM(tlsi.net_amt)/count(ts.sales_id)) as average
+                    count(distinct ts.sales_id) as count_orders,
+                    round(SUM(tlsi.net_amt)/count(distinct ts.sales_id)) as average
                 FROM
                     toc_ls_sales_item tlsi
 				JOIN 
@@ -1522,8 +1522,19 @@ def get_sales_report(report_type, from_date, to_date, group_by):
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
         if group_by == 'none':
-            query += ''' 
-                        GROUP BY a.store_name
+            query += f''' 
+                         GROUP BY a.store_name
+                         
+                         union all
+                        
+                        select "Online",count(distinct sales_id) as no_sales, 
+                        round(sum(total_amount/1.15)) as net_amount, 
+                        round(sum(b.cost_price)) as cost_price , 
+                        round( (sum(total_amount/1.15) - sum(b.cost_price))/sum(total_amount/1.15) * 100 ) as gross_profit
+                        from toc_wc_sales_items a                       
+                        LEFT JOIN toc_product b on a.sku = b.item_sku
+                        where a.creation_date > '{from_date}';
+                                         
                     '''
         elif group_by == 'day':
             query += ''' 
@@ -1535,9 +1546,9 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     '''
 
         # Add ORDER BY clause
-        query += '''
-                    ORDER BY 3 desc;
-                '''
+        # query += '''
+        #             ORDER BY 3 desc;
+        #         '''
 
     elif report_type == "Sales Report Per Staff":
         # Start the query with columns specific to "Sales Report Per Staff"
