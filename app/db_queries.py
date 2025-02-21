@@ -1632,7 +1632,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales a
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
-                    LEFT JOIN
+                    JOIN
                         toc_product d ON b.item_sku = d.item_sku
                     WHERE 
                         a.time_of_sale >= %s AND a.time_of_sale <= %s
@@ -1693,7 +1693,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales a
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
-                    left JOIN
+                    JOIN
                         toc_product d ON b.item_sku = d.item_sku
                     WHERE 
                         a.time_of_sale >= %s AND a.time_of_sale <= %s
@@ -1754,7 +1754,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         toc_ls_sales a
                     JOIN 
                         toc_ls_sales_item b ON a.sales_id = b.sales_id
-                    LEFT JOIN
+                    JOIN
                         toc_product d ON b.item_sku = d.item_sku
                     WHERE 
                         a.time_of_sale >= %s AND a.time_of_sale <= %s
