@@ -75,8 +75,6 @@ def login():
 
 @main.route('/index')
 def index():
-    # Send email when the page loads
-    print("Trying to send email to myself")
 
     user_data = session.get('user')
     roles = TocRole.query.all()
@@ -120,7 +118,7 @@ def login_post():
 
     #Save to the session shop data
     shop = TOC_SHOPS.query.filter_by(blName=user.shop).first()
-    print(f"shop: {shop.store}")
+    # print(f"shop: {shop.store}")
     shop_data = {
         'name' : shop.blName,
         'code' : shop.store,
@@ -1099,13 +1097,13 @@ def save_order():
         date = data.get('date', '')
 
         # Print the received data for debugging
-        print("order_id:", order_id)
-        print("Shop:", shop)
-        print("User Name:", user_name)
-        print("Save Date:", date)
-        print("Table Data:")
-        for row in table:
-            print(row)
+        # print("order_id:", order_id)
+        # print("Shop:", shop)
+        # print("User Name:", user_name)
+        # print("Save Date:", date)
+        # print("Table Data:")
+        # for row in table:
+        #     print(row)
 
         # Check for order_id and delete existing records
         if order_id:
@@ -1160,13 +1158,13 @@ def save_replenish():
         status = "New"
 
         # Print the received data for debugging
-        print("order_id:", order_id)
-        print("Shop:", shop)
-        print("User Name:", user_name)
-        print("Save Date:", date)
-        print("Table Data:")
-        for row in table:
-            print(row)
+        # print("order_id:", order_id)
+        # print("Shop:", shop)
+        # print("User Name:", user_name)
+        # print("Save Date:", date)
+        # print("Table Data:")
+        # for row in table:
+        #     print(row)
 
         # Check for order_id and delete existing records
         if order_id:
@@ -1299,10 +1297,10 @@ def update_count_stock():
         replenish_order_id = data.get('replenish_order_id', '')
 
         # Print the received data for debugging purposes
-        print("Shop:", shop)
-        print("User Name:", user_name)
-        print("Update Date:", date)
-        print("Table Data:", table)
+        # print("Shop:", shop)
+        # print("User Name:", user_name)
+        # print("Update Date:", date)
+        # print("Table Data:", table)
 
         # Process each row and update the database
         for row in table:
@@ -1752,7 +1750,7 @@ def sales_data():
 def sales_three_months():
     user_shop = json.loads(session.get('user'))['shop']
     data = get_sales_by_shop_last_three_months(user_shop)
-    print(data)
+    # print(data)
     return jsonify(data)
 
 @main.route('/sales', methods=['GET'])
