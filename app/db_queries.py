@@ -335,8 +335,8 @@ def get_recent_product_sales(timeframe, shop_name):
 def get_hourly_sales(shop_name, timeframe):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"shop_name: {shop_name}")
-    print(f"time_frame: {timeframe}")
+    # print(f"shop_name: {shop_name}")
+    # print(f"time_frame: {timeframe}")
 
     if shop_name == "Head Office":
         if timeframe == "hourly":
@@ -882,8 +882,8 @@ def get_sales_by_shop_last_three_months(user_shop):
 def get_top_agents (shop_name, timeframe):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"shop_name: {shop_name}")
-    print(f"time_frame: {timeframe}")
+    # print(f"shop_name: {shop_name}")
+    # print(f"time_frame: {timeframe}")
 
     if shop_name == "Head Office":
         if timeframe == "daily":
@@ -990,10 +990,10 @@ def get_top_agents (shop_name, timeframe):
 def get_sales_data(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"query input sales")
-    print(f"Shop: {shop_name}")
-    print(f"from date: {from_date}")
-    print(f"to date: {to_date}")
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
 
     try:
 
@@ -1082,10 +1082,10 @@ def get_sales_data(shop_name, from_date, to_date):
 def get_product_sales_data(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"query input sales")
-    print(f"Shop: {shop_name}")
-    print(f"from date: {from_date}")
-    print(f"to date: {to_date}")
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
 
     try:
 
@@ -1188,10 +1188,10 @@ def get_product_sales_data(shop_name, from_date, to_date):
 def get_top_sellers(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"query input sales")
-    print(f"Shop: {shop_name}")
-    print(f"from date: {from_date}")
-    print(f"to date: {to_date}")
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
 
     try:
 
@@ -1262,10 +1262,10 @@ def get_top_sellers(shop_name, from_date, to_date):
 def get_top_specials(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"query input sales")
-    print(f"Shop: {shop_name}")
-    print(f"from date: {from_date}")
-    print(f"to date: {to_date}")
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
 
     try:
 
@@ -1358,10 +1358,10 @@ def get_top_specials(shop_name, from_date, to_date):
 def get_top_brand(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
-    print(f"query input sales")
-    print(f"Shop: {shop_name}")
-    print(f"from date: {from_date}")
-    print(f"to date: {to_date}")
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
 
     try:
 

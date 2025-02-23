@@ -35,7 +35,8 @@
   <script src="static/assets/js/functions.js"></script>
 
 <!--    Datatables-->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
+<!--    <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">-->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
@@ -52,6 +53,16 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" rel="stylesheet">
     <!-- Bootstrap Datepicker CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.2.2/css/fixedHeader.dataTables.min.css">
+
+    <style>
+        /* Set a max height and allow vertical scrolling */
+        .dataTables_wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
 
 
 
@@ -336,6 +347,7 @@ $(document).ready(function () {
                             }
                         ],
                         //order: [[1, 'asc']], // Sort by second column (if applicable)
+                        fixedHeader: true,
                         pageLength: 50, // Show 50 rows by default
                         lengthMenu: [
                             [50, 100, 150, 200],
