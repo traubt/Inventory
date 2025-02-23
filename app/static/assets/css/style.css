@@ -1470,6 +1470,21 @@ table.dataTable thead {
     z-index: 10;
 }
 
+@media (max-width: 1366px) { /* For iPad Pro and smaller screens */
+    #leftSide, #rightSide {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    #leftSide {
+        order: 1;
+    }
+    #rightSide {
+        order: 2;
+    }
+}
+
 
 
 
