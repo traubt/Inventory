@@ -1487,6 +1487,15 @@ table.dataTable thead {
 
 
 
+    @media (min-width: 1000px) {
+    .datepicker {
+        max-width: 150px; /* Adjust as needed */
+    }
+}
+
+
+
+
 
 
 
