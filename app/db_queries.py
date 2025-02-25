@@ -2064,8 +2064,8 @@ def get_stock_value_per_shop():
         )
         SELECT
             shop_name,
-            SUM(total_cost_price) AS sum_total_cost_price,
-            SUM(total_retail_price) AS sum_total_retail_price
+            SUM(total_cost_price) AS total_cost_price,
+            SUM(total_retail_price) AS total_retail_price
         FROM stock_data
         GROUP BY shop_name;
             '''
