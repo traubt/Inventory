@@ -1976,7 +1976,7 @@ def get_stock_value():
                   COUNT(*) AS count_items
               FROM toc_stock st
               JOIN toc_ls_sales_item ti ON st.sku = ti.item_sku
-              JOIN toc_ls_sales ts ON ti.sales_id = ts.sales_id
+              JOIN toc_ls_sales ts ON ti.sales_id = ts.sales_id and st.shop_id = ts.store_customer
               WHERE ts.time_of_sale > st.stock_qty_date
               GROUP BY st.sku, st.shop_id, st.stock_qty_date
             )
@@ -2037,7 +2037,7 @@ def get_stock_value_per_shop():
             JOIN toc_ls_sales_item ti 
               ON st.sku = ti.item_sku
             JOIN toc_ls_sales ts 
-              ON ti.sales_id = ts.sales_id
+              ON ti.sales_id = ts.sales_id and st.shop_id = ts.store_customer
             WHERE ts.time_of_sale > st.stock_qty_date
             GROUP BY st.sku, st.shop_id, st.stock_qty_date
         ),
