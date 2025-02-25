@@ -1968,31 +1968,40 @@ def get_stock_value():
 
     # Query to retrieve the stock order form
     query = '''
+            WITH sales_counts AS (
+              SELECT
+                  st.sku,
+                  st.shop_id,
+                  st.stock_qty_date,
+                  COUNT(*) AS count_items
+              FROM toc_stock st
+              JOIN toc_ls_sales_item ti ON st.sku = ti.item_sku
+              JOIN toc_ls_sales ts ON ti.sales_id = ts.sales_id
+              WHERE ts.time_of_sale > st.stock_qty_date
+              GROUP BY st.sku, st.shop_id, st.stock_qty_date
+            )
             SELECT
                 d.item_sku,
                 d.item_name,
-                c.blName AS shop_name,
-                COUNT(*) AS sales_since_stock_read,
+                st.shop_name,
+                st.shop_id,
                 st.stock_qty_date,
                 st.final_stock_qty,
-                (st.final_stock_qty - COUNT(*)) AS current_stock,
-                ((st.final_stock_qty - COUNT(*)) * d.cost_price) AS cost_price,
-                ((st.final_stock_qty - COUNT(*)) * d.retail_price) AS retail_price
+                COALESCE(sc.count_items, 0) AS sold_items,
+                st.final_stock_qty - COALESCE(sc.count_items, 0) AS current_stock,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
-            JOIN toc_shops c 
-              ON st.shop_id = c.customer
-            LEFT JOIN toc_ls_sales_item a 
-              ON d.item_sku = a.item_sku
-            LEFT JOIN toc_ls_sales b 
-              ON a.sales_id = b.sales_id
+            LEFT JOIN sales_counts sc 
+              ON st.sku = sc.sku 
+              AND st.shop_id = sc.shop_id
+              AND st.stock_qty_date = sc.stock_qty_date
             WHERE d.acct_group <> 'Specials'
-              AND d.item_sku <> '9568'           -- Exclude refund item
-              AND a.time_of_sale > st.stock_qty_date
-            GROUP BY 
-                d.item_sku, d.item_name, b.store_customer, c.blName,
-                st.stock_qty_date, st.final_stock_qty, d.cost_price, d.retail_price;
+              AND d.item_sku <> '9568'  
+            --  and st.shop_name = 'CC - Menlyn'
+              AND st.final_stock_qty > 0;
             '''
 
     # Execute the query with the parameter
@@ -2018,37 +2027,46 @@ def get_stock_value_per_shop():
 
     # Query to retrieve the stock order form
     query = '''
-             SELECT 
-            shop_name,
-            SUM(cost_price) AS total_cost_price,
-            SUM(retail_price) AS total_retail_price
-        FROM (
+          WITH sales_counts AS (
             SELECT
-                d.item_sku,
-                d.item_name,
-                c.blName AS shop_name,
-                COUNT(*) AS sales_since_stock_read,
+                st.sku,
+                st.shop_id,
+                st.stock_qty_date,
+                COUNT(*) AS count_items
+            FROM toc_stock st
+            JOIN toc_ls_sales_item ti 
+              ON st.sku = ti.item_sku
+            JOIN toc_ls_sales ts 
+              ON ti.sales_id = ts.sales_id
+            WHERE ts.time_of_sale > st.stock_qty_date
+            GROUP BY st.sku, st.shop_id, st.stock_qty_date
+        ),
+        stock_data AS (
+            SELECT
+                st.shop_name,
+                st.shop_id,
                 st.stock_qty_date,
                 st.final_stock_qty,
-                (st.final_stock_qty - COUNT(*)) AS current_stock,
-                ((st.final_stock_qty - COUNT(*)) * d.cost_price) AS cost_price,
-                ((st.final_stock_qty - COUNT(*)) * d.retail_price) AS retail_price
+                COALESCE(sc.count_items, 0) AS count_items,
+                (st.final_stock_qty - COALESCE(sc.count_items, 0)) AS current_stock,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
-            JOIN toc_shops c 
-              ON st.shop_id = c.customer
-            LEFT JOIN toc_ls_sales_item a 
-              ON d.item_sku = a.item_sku
-            LEFT JOIN toc_ls_sales b 
-              ON a.sales_id = b.sales_id
+            LEFT JOIN sales_counts sc 
+              ON st.sku = sc.sku 
+              AND st.shop_id = sc.shop_id
+              AND st.stock_qty_date = sc.stock_qty_date
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'           -- Exclude refund item
-              AND a.time_of_sale > st.stock_qty_date
-            GROUP BY 
-                d.item_sku, d.item_name, b.store_customer, c.blName,
-                st.stock_qty_date, st.final_stock_qty, d.cost_price, d.retail_price
-        ) AS sub
+              AND st.final_stock_qty > 0
+        )
+        SELECT
+            shop_name,
+            SUM(total_cost_price) AS sum_total_cost_price,
+            SUM(total_retail_price) AS sum_total_retail_price
+        FROM stock_data
         GROUP BY shop_name;
             '''
 
