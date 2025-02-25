@@ -1878,19 +1878,14 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
         query += """
             a.creation_date,
             a.shop_name,
-        --    shop_id,
             a.sku,
-        --    stock_qty_date,
             a.product_name,
-        --    stock_count,
             a.count_by,
-        --    last_stock_qty,
-            round(a.calc_stock_qty,2) as Sent-Calc_Qty,
+            round(a.calc_stock_qty,2) as Sent_Calc_Qty,
             round(a.variance,2) as variance,
-            round(a.variance * b.cost_price) as variance_amount,
-        --    stock_recount,           
+            round(a.variance * b.cost_price) as variance_amount,         
             a.rejects_qty as damaged,
-            a.final_stock_qty as Received-Counted_Qty,
+            a.final_stock_qty as Received_Counted_Qty,
             a.replenish_id as order_id,
             a.comments
         """
