@@ -1983,16 +1983,15 @@ def get_stock_value():
                 (st.final_stock_qty - COUNT(*)) AS current_stock,
                 ((st.final_stock_qty - COUNT(*)) * d.cost_price) AS cost_price,
                 ((st.final_stock_qty - COUNT(*)) * d.retail_price) AS retail_price
-            FROM toc_ls_sales_item a
-            JOIN toc_ls_sales b 
-              ON a.sales_id = b.sales_id
+            FROM toc_stock st
             JOIN toc_product d 
-              ON a.item_sku = d.item_sku
+              ON st.sku = d.item_sku
             JOIN toc_shops c 
-              ON b.store_customer = c.customer
-            JOIN toc_stock st 
-              ON d.item_sku = st.sku 
-             AND b.store_customer = st.shop_id
+              ON st.shop_id = c.customer
+            LEFT JOIN toc_ls_sales_item a 
+              ON d.item_sku = a.item_sku
+            LEFT JOIN toc_ls_sales b 
+              ON a.sales_id = b.sales_id
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'           -- Exclude refund item
               AND a.time_of_sale > st.stock_qty_date
@@ -2030,28 +2029,30 @@ def get_stock_value_per_shop():
             SUM(retail_price) AS total_retail_price
         FROM (
             SELECT
+                d.item_sku,
+                d.item_name,
                 c.blName AS shop_name,
-                round(((st.final_stock_qty - COUNT(*)) * d.cost_price)) AS cost_price,
-                round(((st.final_stock_qty - COUNT(*)) * d.retail_price)) AS retail_price
-            FROM toc_ls_sales_item a
-            JOIN toc_ls_sales b 
-              ON a.sales_id = b.sales_id
+                COUNT(*) AS sales_since_stock_read,
+                st.stock_qty_date,
+                st.final_stock_qty,
+                (st.final_stock_qty - COUNT(*)) AS current_stock,
+                ((st.final_stock_qty - COUNT(*)) * d.cost_price) AS cost_price,
+                ((st.final_stock_qty - COUNT(*)) * d.retail_price) AS retail_price
+            FROM toc_stock st
             JOIN toc_product d 
-              ON a.item_sku = d.item_sku
+              ON st.sku = d.item_sku
             JOIN toc_shops c 
-              ON b.store_customer = c.customer
-            JOIN toc_stock st 
-              ON d.item_sku = st.sku 
-             AND b.store_customer = st.shop_id
+              ON st.shop_id = c.customer
+            LEFT JOIN toc_ls_sales_item a 
+              ON d.item_sku = a.item_sku
+            LEFT JOIN toc_ls_sales b 
+              ON a.sales_id = b.sales_id
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'           -- Exclude refund item
               AND a.time_of_sale > st.stock_qty_date
             GROUP BY 
-                 c.blName,
-                 st.stock_qty_date,
-                 st.final_stock_qty,
-                 d.cost_price,
-                 d.retail_price
+                d.item_sku, d.item_name, b.store_customer, c.blName,
+                st.stock_qty_date, st.final_stock_qty, d.cost_price, d.retail_price
         ) AS sub
         GROUP BY shop_name;
             '''
