@@ -1973,110 +1973,32 @@ def get_stock_value():
 
     # Query to retrieve the stock order form
     query = '''
-               WITH sales_data AS (
-               SELECT 
+            SELECT
                 d.item_sku,
                 d.item_name,
-                b.store_customer,
                 c.blName AS shop_name,
-             --   COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 11 DAY THEN a.sales_id END) AS threshold_sold_qty,
-             --   COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 22 DAY THEN a.sales_id END) AS replenish_qty,
-                COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
-            FROM 
-                toc_product d
-             JOIN 
-                toc_ls_sales_item a
-                ON d.item_sku = a.item_sku
-             JOIN 
-                toc_ls_sales b 
-                ON a.sales_id = b.sales_id
-             JOIN 
-                toc_shops c
-                ON b.store_customer = c.customer
-             JOIN
-                toc_stock st
-                ON d.item_sku = st.sku AND b.store_customer = st.shop_id
-            WHERE 
-                d.acct_group <> 'Specials'
-             --   AND c.blName = 'CC - Rosebank'
-                AND d.item_sku <> '9568'  -- Refund item
+                COUNT(*) AS sales_since_stock_read,
+                st.stock_qty_date,
+                st.final_stock_qty,
+                (st.final_stock_qty - COUNT(*)) AS current_stock,
+                ((st.final_stock_qty - COUNT(*)) * d.cost_price) AS cost_price,
+                ((st.final_stock_qty - COUNT(*)) * d.retail_price) AS retail_price
+            FROM toc_ls_sales_item a
+            JOIN toc_ls_sales b 
+              ON a.sales_id = b.sales_id
+            JOIN toc_product d 
+              ON a.item_sku = d.item_sku
+            JOIN toc_shops c 
+              ON b.store_customer = c.customer
+            JOIN toc_stock st 
+              ON d.item_sku = st.sku 
+             AND b.store_customer = st.shop_id
+            WHERE d.acct_group <> 'Specials'
+              AND d.item_sku <> '9568'           -- Exclude refund item
+              AND a.time_of_sale > st.stock_qty_date
             GROUP BY 
-                d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
-            UNION ALL
-            SELECT 
-                st.sku AS item_sku,
-                d.item_name,
-                st.shop_id AS store_customer,
-                c.blName AS shop_name,
-            --    0 AS threshold_sold_qty,
-            --    0 AS replenish_qty,
-                0 AS sales_since_stock_read
-            FROM 
-                toc_stock st
-             JOIN 
-                toc_product d 
-                ON st.sku = d.item_sku 
-                AND d.acct_group <> 'Specials' 
-                AND d.item_sku <> '9568'  -- Exclude refund item
-             JOIN 
-                toc_shops c 
-                ON st.shop_id = c.customer
-            WHERE 
-            --    c.blName = 'CC - Rosebank'
-                 NOT EXISTS (
-                    SELECT 1
-                    FROM toc_ls_sales_item a
-                    JOIN toc_ls_sales b ON a.sales_id = b.sales_id
-                    WHERE a.item_sku = st.sku 
-                    AND b.store_customer = st.shop_id
-                )
-            )
-            SELECT 
-                s.item_sku,
-                s.item_name,
-            --    s.store_customer,
-                s.shop_name,
-            --    s.threshold_sold_qty,
-            --    s.replenish_qty,
-            --    s.sales_since_stock_read,  -- Include the new column in the final SELECT
-            --    st.final_stock_qty AS last_stock_update,
-             --   st.stock_qty_date AS last_stock_update_date,
-                st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0) AS current_stock_qty ,
-                    p.cost_price *     st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0) AS total_cost_value ,
-                    p.retail_price *     st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0) AS total_retail_value 
-            FROM 
-                sales_data s
-            LEFT JOIN 
-                toc_stock st
-            ON 
-                s.item_sku = st.sku AND s.store_customer = st.shop_id
-            LEFT JOIN 
-                toc_product p on p.item_sku = s.item_sku
-            ORDER BY  s.sales_since_stock_read DESC;
+                d.item_sku, d.item_name, b.store_customer, c.blName,
+                st.stock_qty_date, st.final_stock_qty, d.cost_price, d.retail_price;
             '''
 
     # Execute the query with the parameter
@@ -2102,111 +2024,36 @@ def get_stock_value_per_shop():
 
     # Query to retrieve the stock order form
     query = '''
-               WITH sales_data AS (
-               SELECT 
-                d.item_sku,
-                d.item_name,
-                b.store_customer,
+             SELECT 
+            shop_name,
+            SUM(cost_price) AS total_cost_price,
+            SUM(retail_price) AS total_retail_price
+        FROM (
+            SELECT
                 c.blName AS shop_name,
-             --   COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 11 DAY THEN a.sales_id END) AS threshold_sold_qty,
-             --   COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 22 DAY THEN a.sales_id END) AS replenish_qty,
-                COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
-            FROM 
-                toc_product d
-             JOIN 
-                toc_ls_sales_item a
-                ON d.item_sku = a.item_sku
-             JOIN 
-                toc_ls_sales b 
-                ON a.sales_id = b.sales_id
-             JOIN 
-                toc_shops c
-                ON b.store_customer = c.customer
-             JOIN
-                toc_stock st
-                ON d.item_sku = st.sku AND b.store_customer = st.shop_id
-            WHERE 
-                d.acct_group <> 'Specials'
-             --   AND c.blName = 'CC - Rosebank'
-                AND d.item_sku <> '9568'  -- Refund item
+                round(((st.final_stock_qty - COUNT(*)) * d.cost_price)) AS cost_price,
+                round(((st.final_stock_qty - COUNT(*)) * d.retail_price)) AS retail_price
+            FROM toc_ls_sales_item a
+            JOIN toc_ls_sales b 
+              ON a.sales_id = b.sales_id
+            JOIN toc_product d 
+              ON a.item_sku = d.item_sku
+            JOIN toc_shops c 
+              ON b.store_customer = c.customer
+            JOIN toc_stock st 
+              ON d.item_sku = st.sku 
+             AND b.store_customer = st.shop_id
+            WHERE d.acct_group <> 'Specials'
+              AND d.item_sku <> '9568'           -- Exclude refund item
+              AND a.time_of_sale > st.stock_qty_date
             GROUP BY 
-                d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
-            UNION ALL
-            SELECT 
-                st.sku AS item_sku,
-                d.item_name,
-                st.shop_id AS store_customer,
-                c.blName AS shop_name,
-            --    0 AS threshold_sold_qty,
-            --    0 AS replenish_qty,
-                0 AS sales_since_stock_read
-            FROM 
-                toc_stock st
-             JOIN 
-                toc_product d 
-                ON st.sku = d.item_sku 
-                AND d.acct_group <> 'Specials' 
-                AND d.item_sku <> '9568'  -- Exclude refund item
-             JOIN 
-                toc_shops c 
-                ON st.shop_id = c.customer
-            WHERE 
-            --    c.blName = 'CC - Rosebank'
-                 NOT EXISTS (
-                    SELECT 1
-                    FROM toc_ls_sales_item a
-                    JOIN toc_ls_sales b ON a.sales_id = b.sales_id
-                    WHERE a.item_sku = st.sku 
-                    AND b.store_customer = st.shop_id
-                )
-            )
-            SELECT 
-            --    s.item_sku,
-            --    s.item_name,
-            --    s.store_customer,
-                s.shop_name,
-            --    s.threshold_sold_qty,
-            --    s.replenish_qty,
-            --    s.sales_since_stock_read,  -- Include the new column in the final SELECT
-            --    st.final_stock_qty AS last_stock_update,
-             --   st.stock_qty_date AS last_stock_update_date,
---                 st.final_stock_qty 
---                     - s.sales_since_stock_read 
---                     + COALESCE((
---                         SELECT SUM(tro.received_qty) 
---                         FROM toc_replenish_order tro
---                         WHERE tro.shop_id = s.store_customer 
---                           AND tro.sku = s.item_sku
---                           AND tro.received_date > st.stock_qty_date
---                     ), 0) AS current_stock_qty ,
-                  round(sum(  p.cost_price *     st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0))) AS total_cost_value ,
-                   round(sum( p.retail_price *     st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0))) AS total_retail_value 
-            FROM 
-                sales_data s
-            LEFT JOIN 
-                toc_stock st
-            ON 
-                s.item_sku = st.sku AND s.store_customer = st.shop_id
-            LEFT JOIN 
-                toc_product p on p.item_sku = s.item_sku
-            group by  s.shop_name   
-            ORDER BY  s.sales_since_stock_read DESC;
+                 c.blName,
+                 st.stock_qty_date,
+                 st.final_stock_qty,
+                 d.cost_price,
+                 d.retail_price
+        ) AS sub
+        GROUP BY shop_name;
             '''
 
     # Execute the query with the parameter
