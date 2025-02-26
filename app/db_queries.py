@@ -2210,6 +2210,32 @@ def get_product_category_per_staff(from_date,to_date):
 
     return result_as_dicts
 
+def get_user_activities():
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+               select * from toc_user_activity order by 2 desc limit 300; 
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query)
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to a list of dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return columns, result_as_dicts  # Now returning two values
+
+
 
 
 

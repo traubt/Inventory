@@ -200,6 +200,26 @@ def admin_logs():
         users=users
     )
 
+@main.route('/user_activity')
+def user_activity():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    users = User.query.all()
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'user_activity.html',
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        users=users
+    )
+
 @main.route('/change_shop', methods=['POST'])
 def change_shop():
     selected_shop_name = request.form.get('shop')  # Get the shop name from the request
@@ -1919,6 +1939,18 @@ def get_last_update():
     except Exception as e:
         # Handle any errors
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@main.route('/get_user_activity', methods=['GET'])
+def get_user_activity():
+
+    # Simulated function to get columns and rows
+    column_names, data = get_user_activities()  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
