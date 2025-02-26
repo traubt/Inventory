@@ -439,6 +439,20 @@ def create_product():
 
 
 
+# @main.route('/api/products/<string:item_sku>', methods=['DELETE'])
+# def delete_product(item_sku):
+#     product = TocProduct.query.get(item_sku)
+#     if not product:
+#         return jsonify({"error": "Product not found"}), 404
+#
+#     try:
+#         db.session.delete(product)
+#         db.session.commit()
+#         return jsonify({"message": "Product deleted successfully"}), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({"error": str(e)}), 500
+
 @main.route('/api/products/<string:item_sku>', methods=['DELETE'])
 def delete_product(item_sku):
     product = TocProduct.query.get(item_sku)
@@ -446,13 +460,49 @@ def delete_product(item_sku):
         return jsonify({"error": "Product not found"}), 404
 
     try:
+        # Delete related stock records first
+        TocStock.query.filter_by(sku=item_sku).delete()
+
+        # Delete product
         db.session.delete(product)
+
+        # Commit changes
         db.session.commit()
-        return jsonify({"message": "Product deleted successfully"}), 200
+
+        return jsonify({"message": "Product and related stock records deleted successfully"}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+
+# @main.route('/api/products/<string:item_sku>', methods=['PUT'])
+# def update_product(item_sku):
+#     data = request.get_json()
+#
+#     try:
+#         # Find the product by item_sku
+#         product = TocProduct.query.get(item_sku)
+#         if not product:
+#             return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
+#
+#         # Update fields
+#         product.item_name = data.get('item_name', product.item_name)
+#         product.stat_group = data.get('stat_group', product.stat_group)
+#         product.acct_group = data.get('acct_group', product.acct_group)
+#         product.retail_price = data.get('retail_price', product.retail_price)
+#         product.cost_price = data.get('cost_price', product.cost_price)
+#         product.wh_price = data.get('wh_price', product.wh_price)
+#         product.cann_cost_price = data.get('cann_cost_price', product.cann_cost_price)
+#         product.product_url = data.get('product_url', product.product_url)
+#         product.image_url = data.get('image_url', product.image_url)
+#         product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
+#
+#         # Commit changes
+#         db.session.commit()
+#         return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify({"error": str(e)}), 500
 
 @main.route('/api/products/<string:item_sku>', methods=['PUT'])
 def update_product(item_sku):
@@ -464,7 +514,7 @@ def update_product(item_sku):
         if not product:
             return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
 
-        # Update fields
+        # Update fields in toc_product
         product.item_name = data.get('item_name', product.item_name)
         product.stat_group = data.get('stat_group', product.stat_group)
         product.acct_group = data.get('acct_group', product.acct_group)
@@ -476,12 +526,17 @@ def update_product(item_sku):
         product.image_url = data.get('image_url', product.image_url)
         product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
 
+        # Update toc_stock where sku = item_sku
+        TocStock.query.filter_by(sku=item_sku).update({"product_name": product.item_name})
+
         # Commit changes
         db.session.commit()
+
         return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
 
 
 #######################################################################################################
