@@ -156,9 +156,9 @@
                 $("#loadOrder").prop("disabled",true);
                 $("#saveOrder").prop("disabled", false);
                 $("#resetQty").prop("disabled", false);
-                $("#submitOrder").prop("disabled", false);
-                $("#cancelOrder").prop("disabled", false);
-                $("#closeOrder").prop("disabled", false);
+               // $("#submitOrder").prop("disabled", false);
+               // $("#cancelOrder").prop("disabled", false);
+              //  $("#closeOrder").prop("disabled", false);
                 $("#newOrder").prop("disabled", true);
                 loadStockData(data);
             })
@@ -304,6 +304,9 @@ function loadStockData(rows) {
                     console.log("Data submitted successfully:", response);
                     dialog("Save Order","Order was saved successfully");
                     _saved = true;
+                $("#submitOrder").prop("disabled", false);
+                $("#cancelOrder").prop("disabled", false);
+                $("#closeOrder").prop("disabled", false);
                 },
                 error: function(error) {
                     console.error("Error submitting data:", error);
@@ -314,17 +317,17 @@ function loadStockData(rows) {
     });
 
 
-
     $("#submitOrder").on("click", async function(event) {
 
         // Check if the order is saved (assuming _saved is updated during saveOrder execution)
         if (_saved) {
             const now = new Date();
+            const order_id = $("#orderName").val();
             const data = {
                 not_date: now,
                 not_address: "Head Office",
                 not_subject: "NEW ORDER",
-                not_body: `New order arrived from {{user.shop}}`,
+                not_body: `New order ${order_id} arrived from {{user.shop}}`,
                 not_status: "unread"
             };
 
