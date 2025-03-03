@@ -570,7 +570,8 @@ function savePickingSlip(orderId, shopName) {
                     tracking_code : tracking_code,
                     sold_qty : sold_qty,
                     replenish_qty : replenish_qty,
-                    status : "Saved"
+                    status : "Saved",
+                    type : "hq"
                 }),
                 success: function(response) {
                     console.log("Data submitted successfully:", response);

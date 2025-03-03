@@ -97,11 +97,11 @@
                 </select>
 
                 <!-- Additional Inputs -->
-                <label for="thresholdQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Sold Qty (days):</label>
-                <input type="number" id="thresholdQty" class="form-control" style="max-width: 150px;" min="1">
+                <label for="thresholdQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;visibility: hidden;">Sold Qty (days):</label>
+                <input type="number" id="thresholdQty" class="form-control" style="max-width: 150px;visibility: hidden;" min="1" value="0">
 
-                <label for="replenishQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Replenish Qty (Days):</label>
-                <input type="number" id="replenishQty" class="form-control" style="max-width: 150px;" min="1">
+                <label for="replenishQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;visibility: hidden;">Replenish Qty (Days):</label>
+                <input type="number" id="replenishQty" class="form-control" style="max-width: 150px;visibility: hidden;" min="1" value="0">
               </div>
 
               <!-- Order Input Floating to the Right -->
@@ -359,9 +359,9 @@ function loadOrderTemplate(data, orderId, shopName) {
         columns: [
             { title: "SKU", data: "sku" },
             { title: "Product Name", data: "product_name" },
-            { title: "Current Stock Count", data: "current_stock" },
-            { title: "Qty Sold in Period", data: "threshold_qty" },
-            { title: "Calculated Replenish", data: "replenish_qty" },
+            { title: "Current Stock Count", data: "current_stock" , visible: false },
+            { title: "Qty Sold in Period", data: "threshold_qty" , visible: false },
+            { title: "Calculated Replenish", data: "replenish_qty", visible: false },
             {
                 title: "Replenish Order",
                 data: "replenish_order",
@@ -569,7 +569,8 @@ function savePickingSlip(orderId, shopName) {
                     tracking_code : tracking_code,
                     sold_qty : sold_qty,
                     replenish_qty : replenish_qty,
-                    status : "Saved"
+                    status : "Saved",
+                    type: "inter"
                 }),
                 success: function(response) {
                     console.log("Data submitted successfully:", response);
