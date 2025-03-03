@@ -718,6 +718,19 @@ def replenish_stock():
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('replenishment.html', user=user, shop=shop, shops=list_of_shops , roles=roles_list)
 
+@main.route('/inter_replenish_stock')
+def inter_replenish_stock():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != shop["code"]).all()
+    list_of_shops = [shop.blName for shop in shops]
+    roles = TocRole.query.all()
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('inter_replenishment.html', user=user, shop=shop, shops=list_of_shops , roles=roles_list)
+
 
 
 @main.route('/register', methods=['POST'])
@@ -1219,6 +1232,8 @@ def save_order():
 @main.route('/save_replenish', methods=['POST'])
 def save_replenish():
     try:
+        user_data = json.loads(session.get('user'))
+
         data = request.get_json()
 
         # Extract table data and parameters
@@ -1231,15 +1246,6 @@ def save_replenish():
         sold_qty = data.get('sold_qty', '')
         replenish_qty = data.get('replenish_qty', '')
         status = "New"
-
-        # Print the received data for debugging
-        # print("order_id:", order_id)
-        # print("Shop:", shop)
-        # print("User Name:", user_name)
-        # print("Save Date:", date)
-        # print("Table Data:")
-        # for row in table:
-        #     print(row)
 
         # Check for order_id and delete existing records
         if order_id:
@@ -1265,18 +1271,22 @@ def save_replenish():
             )
             db.session.add(new_record)
 
-        #Add tracking code
+        #2/3/25 Add internal transfer - source shop
+        shop_name = user_data["shop"]
+        # Get the store code
+        from_shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
 
         new_record = TOCReplenishCtrl(
             order_id = order_id,
             shop_id = shop,
-            order_open_date=date,
+            order_open_date=datetime.now(),
             user=user_name,
             order_status = status,
             order_status_date = datetime.now(),
             tracking_code = tracking_code,
             sold_qty=sold_qty,
             replenish_qty=replenish_qty,
+            sent_from = from_shop.store
         )
         db.session.add(new_record)
 
@@ -1332,9 +1342,17 @@ def submit_replenish():
 
 @main.route('/fetch_recent_orders', methods=['GET'])
 def fetch_recent_orders():
+    user_data = json.loads(session.get('user'))
+    # 2/3/25 Add internal transfer - source shop
+    shop_name = user_data["shop"]
+    # Get the store code
+    user_shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
+    shop_code = user_shop.store
+
     # Fetch the 20 most recent orders sorted by `order_open_date` in descending order
     recent_orders = (
         db.session.query(TOCReplenishCtrl)
+        .filter(TOCReplenishCtrl.sent_from == shop_code)  # 2/3/2025 Internal transfer Add filter condition
         .order_by(TOCReplenishCtrl.order_open_date.desc())
         .limit(20)
         .all()

@@ -10,12 +10,15 @@ function dialog(dialog_title, dialog_body) {
 }
 
     // Get the current date in yyyy-mm-dd format
+    // 2/3/25 - add hours minutes
 function getCurrentDate() {
     const today = new Date();
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Add leading zero if needed
     const day = today.getDate().toString().padStart(2, '0'); // Add leading zero if needed
-    return `${year}${month}${day}`;
+    const hours = today.getHours().toString().padStart(2, '0'); // Add leading zero
+    const minutes = today.getMinutes().toString().padStart(2, '0'); // Add leading zero
+    return `${year}${month}${day}${hours}${minutes}`;
 }
 
 function allOrderQtyZero() {

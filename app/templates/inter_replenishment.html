@@ -76,7 +76,7 @@
         <ol class="breadcrumb">
           <li class="breadcrumb-item"><a href="#">Home</a></li>
           <li class="breadcrumb-item">Pages</li>
-          <li class="breadcrumb-item active">Replenish Shop</li>
+          <li class="breadcrumb-item active">Inter Transfer</li>
         </ol>
       </nav>
     </div><!-- End Page Title -->
@@ -253,8 +253,7 @@
                 return 0;
             }
 
-
-             if ($("#orderName").val().trim() === "") {
+            if ($("#orderName").val().trim() === "") {
                   $("#orderName").val(`${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}R`);
             };
 
