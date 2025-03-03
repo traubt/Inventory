@@ -1245,6 +1245,7 @@ def save_replenish():
         tracking_code = data.get('tracking_code', '')
         sold_qty = data.get('sold_qty', '')
         replenish_qty = data.get('replenish_qty', '')
+        type = data.get('type', '')
         status = "New"
 
         # Check for order_id and delete existing records
@@ -1257,7 +1258,13 @@ def save_replenish():
 
         # Insert new records into the table
         for row in table:
-            sku, item_name, current_stock_qty, qty_sold_period, calc_replenish, replenish_order,  comments = row
+            if type == 'hq':
+                sku, item_name, current_stock_qty, qty_sold_period, calc_replenish, replenish_order,  comments = row
+            else:
+                sku, item_name, replenish_order, comments = row  # Unpack only the required values
+                current_stock_qty = "0"
+                qty_sold_period = "0"
+                calc_replenish = "0"
 
             new_record = TocReplenishOrder(
                 shop_id=shop,
@@ -1303,6 +1310,8 @@ def save_replenish():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+
 
 @main.route('/submit_replenish', methods=['POST'])
 def submit_replenish():
