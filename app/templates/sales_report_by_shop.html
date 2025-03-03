@@ -279,95 +279,206 @@ $(document).ready(function () {
         return `${year}-${month}-${day}`;
     }
 
-    $("#runReport").on("click", function () {
-        const reportType = $("input[name='salesReport']:checked").val(); // Get selected report
-        const groupBy = $("#groupBy").val(); // Get group by value
-        const fromDate = $("#fromDate").val(); // Get from date
-        const toDate = $("#toDate").val(); // Get to date
+<!--    $("#runReport").on("click", function () {-->
+<!--        const reportType = $("input[name='salesReport']:checked").val(); // Get selected report-->
+<!--        const groupBy = $("#groupBy").val(); // Get group by value-->
+<!--        const fromDate = $("#fromDate").val(); // Get from date-->
+<!--        const toDate = $("#toDate").val(); // Get to date-->
 
-        // Ensure all required fields are filled
-        if (!reportType || !fromDate || !toDate) {
-            alert("Please select a report type and specify the date range.");
-            return;
-        }
+<!--        // Ensure all required fields are filled-->
+<!--        if (!reportType || !fromDate || !toDate) {-->
+<!--            alert("Please select a report type and specify the date range.");-->
+<!--            return;-->
+<!--        }-->
 
-        // add spinner while fetching data
-        const spinnerWrapper = $(`
-            <div class="spinner-wrapper">
-                <div class="spinner"></div>
-                <p class="spinner-text">Please wait while fetching data from the server...</p>
-            </div>
-        `);
-        $("body").append(spinnerWrapper);
+<!--        // add spinner while fetching data-->
+<!--        const spinnerWrapper = $(`-->
+<!--            <div class="spinner-wrapper">-->
+<!--                <div class="spinner"></div>-->
+<!--                <p class="spinner-text">Please wait while fetching data from the server...</p>-->
+<!--            </div>-->
+<!--        `);-->
+<!--        $("body").append(spinnerWrapper);-->
 
-        // Make AJAX request with parameters
-        $.ajax({
-            url: "/get_business_report",
-            method: "GET",
-            data: {
-                reportType: reportType,
-                groupBy: groupBy,
-                fromDate: fromDate,
-                toDate: toDate
-            },
-            success: function (response) {
-                if (response.columns && response.data) {
-                    // Step 1: Clear and destroy the existing DataTable (if any)
-                    if ($.fn.DataTable.isDataTable('#sales_report')) {
-                        $('#sales_report').DataTable().clear().destroy();
-                    }
+<!--        // Make AJAX request with parameters-->
+<!--        $.ajax({-->
+<!--            url: "/get_business_report",-->
+<!--            method: "GET",-->
+<!--            data: {-->
+<!--                reportType: reportType,-->
+<!--                groupBy: groupBy,-->
+<!--                fromDate: fromDate,-->
+<!--                toDate: toDate-->
+<!--            },-->
+<!--            success: function (response) {-->
+<!--                if (response.columns && response.data) {-->
+<!--                    // Step 1: Clear and destroy the existing DataTable (if any)-->
+<!--                    if ($.fn.DataTable.isDataTable('#sales_report')) {-->
+<!--                        $('#sales_report').DataTable().clear().destroy();-->
+<!--                    }-->
 
-                    // Step 2: Dynamically rebuild the table headers
-                    const table = $('#sales_report');
-                    table.empty(); // Remove all existing content
+<!--                    // Step 2: Dynamically rebuild the table headers-->
+<!--                    const table = $('#sales_report');-->
+<!--                    table.empty(); // Remove all existing content-->
 
-                    // Create thead and tbody structure
-                    const thead = $('<thead></thead>');
-                    const headerRow = $('<tr></tr>');
-                    response.columns.forEach(col => {
-                        headerRow.append(`<th>${col.title}</th>`);
-                    });
-                    thead.append(headerRow);
-                    table.append(thead);
-                    table.append('<tbody></tbody>'); // Ensure tbody exists
+<!--                    // Create thead and tbody structure-->
+<!--                    const thead = $('<thead></thead>');-->
+<!--                    const headerRow = $('<tr></tr>');-->
+<!--                    response.columns.forEach(col => {-->
+<!--                        headerRow.append(`<th>${col.title}</th>`);-->
+<!--                    });-->
+<!--                    thead.append(headerRow);-->
+<!--                    table.append(thead);-->
+<!--                    table.append('<tbody></tbody>'); // Ensure tbody exists-->
 
-                    // Step 3: Initialize DataTable with new columns and data
-                    table.DataTable({
-                        data: response.data,
-                        columns: response.columns.map(col => ({
-                            title: col.title,
-                            data: col.title
-                        })),
-                        dom: 'Bfrtip', // Export buttons
-                        buttons: [
-                            {
-                                extend: 'excel',
-                                text: 'Download To Excel',
-                                title: `${reportType}_${new Date().toISOString().slice(0, 10)}`
-                            }
-                        ],
-                        //order: [[1, 'asc']], // Sort by second column (if applicable)
-                        fixedHeader: true,
-                        pageLength: 50, // Show 50 rows by default
-                        lengthMenu: [
-                            [50, 100, 150, 200],
-                            [50, 100, 150, 200]
-                        ]
-                    });
-                } else {
-                    alert("No data available for the selected parameters.");
+<!--                    // Step 3: Initialize DataTable with new columns and data-->
+<!--                    table.DataTable({-->
+<!--                        data: response.data,-->
+<!--                        columns: response.columns.map(col => ({-->
+<!--                            title: col.title,-->
+<!--                            data: col.title-->
+<!--                        })),-->
+<!--                        dom: 'Bfrtip', // Export buttons-->
+<!--                        buttons: [-->
+<!--                            {-->
+<!--                                extend: 'excel',-->
+<!--                                text: 'Download To Excel',-->
+<!--                                title: `${reportType}_${new Date().toISOString().slice(0, 10)}`-->
+<!--                            }-->
+<!--                        ],-->
+<!--                        //order: [[1, 'asc']], // Sort by second column (if applicable)-->
+<!--                        fixedHeader: true,-->
+<!--                        pageLength: 50, // Show 50 rows by default-->
+<!--                        lengthMenu: [-->
+<!--                            [50, 100, 150, 200],-->
+<!--                            [50, 100, 150, 200]-->
+<!--                        ]-->
+<!--                    });-->
+<!--                } else {-->
+<!--                    alert("No data available for the selected parameters.");-->
+<!--                }-->
+<!--            },-->
+<!--            error: function (xhr, status, error) {-->
+<!--                console.error("Error fetching data: ", error);-->
+<!--                alert("An error occurred while fetching the sales report.");-->
+<!--            },-->
+<!--            complete: function () {-->
+<!--            // Hide spinner after request completes-->
+<!--            spinnerWrapper.remove();-->
+<!--            }-->
+<!--        });-->
+<!--    });-->
+
+$("#runReport").on("click", function () {
+    const reportType = $("input[name='salesReport']:checked").val(); // Get selected report
+    const groupBy = $("#groupBy").val(); // Get group by value
+    const fromDate = $("#fromDate").val(); // Get from date
+    const toDate = $("#toDate").val(); // Get to date
+
+    // Ensure all required fields are filled
+    if (!reportType || !fromDate || !toDate) {
+        alert("Please select a report type and specify the date range.");
+        return;
+    }
+
+    // Add spinner while fetching data
+    const spinnerWrapper = $(`
+        <div class="spinner-wrapper">
+            <div class="spinner"></div>
+            <p class="spinner-text">Please wait while fetching data from the server...</p>
+        </div>
+    `);
+    $("body").append(spinnerWrapper);
+
+    // Make AJAX request with parameters
+    $.ajax({
+        url: "/get_business_report",
+        method: "GET",
+        data: {
+            reportType: reportType,
+            groupBy: groupBy,
+            fromDate: fromDate,
+            toDate: toDate
+        },
+        success: function (response) {
+            if (response.columns && response.data) {
+                // Step 1: Clear and destroy the existing DataTable (if any)
+                if ($.fn.DataTable.isDataTable("#sales_report")) {
+                    $("#sales_report").DataTable().clear().destroy();
                 }
-            },
-            error: function (xhr, status, error) {
-                console.error("Error fetching data: ", error);
-                alert("An error occurred while fetching the sales report.");
-            },
-            complete: function () {
+
+                // Step 2: Dynamically rebuild the table headers
+                const table = $("#sales_report");
+                table.empty(); // Remove all existing content
+
+                // Create thead and tbody structure
+                const thead = $("<thead></thead>");
+                const filterRow = $("<tr></tr>"); // Row for search boxes
+                const headerRow = $("<tr></tr>"); // Column headers
+
+                response.columns.forEach(col => {
+                    headerRow.append(`<th>${col.title}</th>`);
+                    filterRow.append(`<th><input type="text" placeholder="🔍 Search ${col.title}" data-column="${col.title}" /></th>`);
+                });
+
+                thead.append(filterRow); // Add filter row first
+                thead.append(headerRow); // Add header row below it
+                table.append(thead);
+                table.append("<tbody></tbody>"); // Ensure tbody exists
+
+                // Step 3: Initialize DataTable with new columns and data
+                let dataTable = table.DataTable({
+                    data: response.data,
+                    columns: response.columns.map(col => ({
+                        title: col.title,
+                        data: col.title
+                    })),
+                    dom: "Bfrtip",
+                    buttons: [
+                        {
+                            extend: "excel",
+                            text: "Download To Excel",
+                            title: `${reportType}_${new Date().toISOString().slice(0, 10)}`
+                        }
+                    ],
+                    fixedHeader: true,
+                    pageLength: 50,
+                    lengthMenu: [
+                        [50, 100, 150, 200],
+                        [50, 100, 150, 200]
+                    ],
+                    initComplete: function () {
+                        let api = this.api();
+
+                        api.columns().every(function () {
+                            let column = this;
+                            let columnIndex = column.index(); // Get the column index correctly
+
+                            // Now bind the search input for each column
+                            $('input[data-column="'+column.header().textContent+'"]').on("keyup change", function () {
+                                let searchTerm = this.value.trim();
+                                if (column.search() !== searchTerm) {
+                                    column.search(searchTerm, false, true).draw();
+                                }
+                            });
+                        });
+                    }
+                });
+            } else {
+                alert("No data available for the selected parameters.");
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error("Error fetching data: ", error);
+            alert("An error occurred while fetching the sales report.");
+        },
+        complete: function () {
             // Hide spinner after request completes
             spinnerWrapper.remove();
-            }
-        });
+        }
     });
+});
+
 
 
 
