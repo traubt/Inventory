@@ -133,6 +133,7 @@ class TOCReplenishCtrl(db.Model):
     tracking_code = db.Column(db.String(45), nullable=True)
     sold_qty = db.Column(db.Integer, nullable=True)
     replenish_qty = db.Column(db.Integer, nullable=True)
+    sent_from = db.Column(db.String(45), nullable=True)
 
 class TocStock(db.Model):
     __tablename__ = 'toc_stock'
