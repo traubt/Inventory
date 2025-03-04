@@ -1203,7 +1203,7 @@ def save_order():
 
             new_record = TocStockOrder(
                 shop_id=shop,
-                order_open_date=datetime.strptime(date, '%Y%m%d'),
+                order_open_date=datetime.strptime(date, '%Y%m%d%H%M'),
                 sku=sku,
                 order_id=order_id,
                 user=user_name,
@@ -1447,7 +1447,7 @@ def update_count_stock():
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    stock_qty_date=datetime.strptime(date, '%Y%m%d'),
+                    stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,
@@ -1526,7 +1526,7 @@ def update_count_receive_stock():
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    stock_qty_date=datetime.strptime(date, '%Y%m%d'),
+                    stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,
