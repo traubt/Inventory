@@ -556,35 +556,42 @@ function loadOrderTemplate(data, orderId, shopName) {
 function savePickingSlip(orderId, shopName) {
     const table = $('#ProductOrderTemplate').DataTable();
     const data = [];
-    const headers = [];
 
+    // Get the current date in YYYY-MM-DD format
+    const currentDate = new Date().toISOString().split('T')[0];
 
-    // Extract table headers
-    table.columns().every(function () {
-        headers.push(this.header().textContent.trim());
-    });
-    data.push(headers);
+    // Header row with Date and Shop
+    data.push([`Order ID: ${orderId}`,`Date: ${currentDate}`, `Shop: ${shopName}`, "", ""]);
 
-    // Extract table data, but filter rows where Replenish Order > 0
+    // Define column indices (1-based index in table)
+    const skuIndex = 0;          // SKU column
+    const productNameIndex = 1;  // Product Name column
+    const replenishOrderIndex = 5; // Replenish Order column (input field)
+    const commentIndex = 6;      // Comment column (input field)
+
+    // Push CSV column headers
+    data.push(["SKU", "PRODUCT_NAME", "REPLENISH_ORDER", "COMMENT"]);
+
+    // Extract table data, filtering rows where Replenish Order > 0
     table.rows().every(function () {
-        const rowData = [];
         const row = $(this.node());
-        const replenishOrderInput = row.find('td:nth-child(6) input'); // Replenish Order column (input field)
+        const replenishOrderInput = row.find(`td:eq(${replenishOrderIndex}) input`);
 
         // Only include row if Replenish Order is greater than 0
         const replenishOrder = parseFloat(replenishOrderInput.val()) || 0;
         if (replenishOrder > 0) {
-            // Extract values from each cell
-            row.find('td').each(function () {
-                const input = $(this).find('input');
-                rowData.push(input.length ? input.val() : $(this).text().trim());
-            });
+            const rowData = [
+                row.find(`td:eq(${skuIndex})`).text().trim(),  // SKU
+                row.find(`td:eq(${productNameIndex})`).text().trim(), // Product Name
+                replenishOrder, // Replenish Order (input value)
+                row.find(`td:eq(${commentIndex}) input`).val() || "" // Comment (input value)
+            ];
             data.push(rowData);
         }
     });
 
     // Check if there is data to save
-    if (data.length <= 1) {
+    if (data.length <= 2) {  // Only header row and title row exist
         alert("No records with replenish orders greater than 0 to save.");
         return;
     }
@@ -592,7 +599,7 @@ function savePickingSlip(orderId, shopName) {
     // Create CSV content
     const csvContent = data.map(row => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `${orderId}_${shop["name"]}_${shopName}.csv`;
+    const fileName = `${orderId}_${shopName}.csv`;
 
     // Trigger download
     const link = document.createElement('a');
@@ -602,6 +609,7 @@ function savePickingSlip(orderId, shopName) {
     link.click();
     document.body.removeChild(link);
 }
+
 
 
 
