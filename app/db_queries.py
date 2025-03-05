@@ -1876,17 +1876,18 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     # Add fields for `group_by == 'none'`
     if group_by == 'none':
         query += """
+            a.replenish_id as order_id,
             a.creation_date,
             a.shop_name,
             a.sku,
             a.product_name,
             a.count_by,
             round(a.calc_stock_qty,2) as Sent_Calc_Qty,
+            a.final_stock_qty as Received_Counted_Qty,
+            a.rejects_qty as damaged,
             round(a.variance,2) as variance,
             round(a.variance * b.cost_price) as variance_amount,         
-            a.rejects_qty as damaged,
-            a.final_stock_qty as Received_Counted_Qty,
-            a.replenish_id as order_id,
+            a.rejects_qty as damaged,                        
             a.comments
         """
     elif group_by == 'day':
