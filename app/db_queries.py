@@ -2235,6 +2235,37 @@ def get_user_activities():
 
     return columns, result_as_dicts  # Now returning two values
 
+def get_replenishment_data(order_id):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+            select a.order_id,s2.blName as From_Shop, s1.blName as To_Shop, a.order_open_date as Open_Date, a.user as Replenisher, a.order_status as Status ,
+             o.sku, o.item_name, o.replenish_qty, o.comments,o.received_date , o.received_qty, o.variance, o.received_comment
+            from toc_replenish_ctrl a
+            JOIN toc_shops s1 on a.shop_id = s1.customer
+            JOin toc_shops s2 on a.sent_from = s2.store
+            JOIN toc_replenish_order o on a.order_id = o.order_id
+            where a.order_id = %s ;
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query,(order_id))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to a list of dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return columns, result_as_dicts  # Now returning two values
+
 
 
 
