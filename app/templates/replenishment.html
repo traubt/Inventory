@@ -96,6 +96,8 @@
                   <option value="" disabled selected>Select a shop</option>
                 </select>
 
+                  <button class="btn btn-primary" id="viewHistory" >View History</button>
+
                 <!-- Additional Inputs -->
                 <label for="thresholdQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Sold Qty (days):</label>
                 <input type="number" id="thresholdQty" class="form-control" style="max-width: 150px;" min="1">
@@ -127,7 +129,7 @@
 
               <!--Handle the csv file -->
 
-                <table id="ProductOrderTemplate" border="1">
+                <table id="ProductOrderTemplate" border="1" class="mt-4 table table-bordered table-striped w-100" >
                     <thead>
                     </thead>
                     <tbody></tbody>
@@ -203,6 +205,7 @@
     var _shops = [];
     var _products = [];
     var _open_orders = []
+    var _history_mode = false;
 
  $(document).ready(async function() {
     var roles = {{ roles | tojson }};
@@ -226,6 +229,10 @@
     shops.forEach(shop => {
         $selectBox.append(new Option(shop, shop));
     });
+
+ // get user shop
+    var shop = {{ shop | tojson }};
+    console.log("Shop Parameter:", shop);
 
 
 
@@ -281,9 +288,10 @@
 
 
 // Event handler for the "loadOrder" button
-$("#loadOrder").on("click", function () {
+$("#loadOrder" ).on("click", function () {
     $("#newOrder").prop("disabled", true);
     // Fetch the recent orders via AJAX
+
     $.ajax({
         url: "/fetch_recent_orders",
         method: "GET",
@@ -329,11 +337,65 @@ $("#loadOrder").on("click", function () {
     });
 });
 
+// Event handler for the "loadOrder" button
+$("#viewHistory").on("click", function () {
+    $("#newOrder").prop("disabled", true);
+    // Fetch the recent orders via AJAX
+
+       // Get the value of #replenishShop. If not selected the default Head Office
+    const replenishShop = $("#replenishShop").val();
+    _history_mode = true;
+
+    $.ajax({
+        url: "/fetch_history_orders",
+        method: "GET",
+        data: { replenishShop: replenishShop },
+        success: function (response) {
+            if (!Array.isArray(response) || response.length === 0) {
+                alert("No recent orders found.");
+                return;
+            }
+
+            // Populate the table with the fetched orders
+            const tableBody = $("#orderHistoryTable tbody");
+            tableBody.empty(); // Clear existing rows
+
+            response.forEach(order => {
+                const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing
+                const row = `
+                    <tr>
+                        <td>
+                         <input type="radio" name="selectedOrder" value="${order.order_id}">
+                        </td>
+                        <td>${order.order_id || "N/A"}</td>
+                        <td>${order.shop_id || "N/A"}</td>
+                        <td>${shopName}</td>
+                        <td>${order.order_open_date || ""}</td>
+                        <td>${order.user || ""}</td>
+                        <td>${order.order_status || ""}</td>
+                        <td>${order.order_status_date || ""}</td>
+                        <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>
+                        <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>
+                    </tr>
+                `;
+                tableBody.append(row);
+            });
+
+            // Show the modal
+            $("#orderHistoryModal").modal("show");
+        },
+        error: function (xhr, status, error) {
+            console.error("Failed to fetch recent orders:", error);
+            alert("An error occurred while fetching recent orders. Please try again.");
+        }
+    });
+});
+
 // Event listener for the Confirm Selection button
 $("#confirmOrderSelection").on("click", function () {
     // Get the selected radio button
     const selectedOrder = $("input[name='selectedOrder']:checked").val();
-    if (selectedOrder) {
+    if (selectedOrder && !_history_mode) {
         const row = $("input[name='selectedOrder']:checked").closest("tr");
         const shopCode = row.find("td:nth-child(3)").text().trim(); // Shop Code column
         const shopName = row.find("td:nth-child(4)").text().trim(); // Shop Name column
@@ -343,7 +405,75 @@ $("#confirmOrderSelection").on("click", function () {
         // Call the loadExistingOrder function with the selected details
         loadExistingOrder(shopName, selectedOrder, soldQty, replenishQty);
         $("#orderHistoryModal").modal("hide");
-    } else {
+    } else if (selectedOrder && _history_mode) {
+
+        alert ("Display history table ");
+            // Make AJAX request with parameters
+$.ajax({
+    url: "/get_replenish_data",
+    method: "GET",
+    data: { order_id: selectedOrder },
+    success: function (response) {
+        $("#orderHistoryModal").modal("hide");
+
+        if (response.columns && response.data) {
+            // Destroy existing DataTable (if any)
+            if ($.fn.DataTable.isDataTable("#ProductOrderTemplate")) {
+                $("#ProductOrderTemplate").DataTable().clear().destroy();
+            }
+
+            const table = $("#ProductOrderTemplate");
+            table.empty(); // Remove existing content
+
+            // Create thead and tbody structure
+            const thead = $("<thead></thead>");
+            const headerRow = $("<tr></tr>");
+
+            response.columns.forEach(col => {
+                headerRow.append(`<th>${col}</th>`); // Append column names as headers
+            });
+
+            thead.append(headerRow);
+            table.append(thead);
+            table.append("<tbody></tbody>"); // Ensure tbody exists
+
+            // Fix: Ensure correct mapping of columns
+            let dataTable = table.DataTable({
+                data: response.data,
+                columns: response.columns.map(col => ({
+                    title: col,   // Display name in the table
+                    data: col     // Match the key from JSON object
+                })),
+                dom: "Bfrtip",
+                buttons: [
+                    {
+                        extend: "excel",
+                        text: "Download To Excel",
+                        title: `replenishment_order_${selectedOrder}`
+                    }
+                ],
+                fixedHeader: true,
+                pageLength: 50,
+                lengthMenu: [
+                    [50, 100, 150, 200],
+                    [50, 100, 150, 200]
+                ]
+            });
+        } else {
+            alert("No data available for the selected order.");
+        }
+    },
+    error: function (xhr, status, error) {
+        console.error("Error fetching data: ", error);
+        alert("An error occurred while fetching the sales report.");
+    }
+});
+
+
+
+
+    }
+    else {
         alert("Please select a saved order to continue.");
     }
 });
@@ -428,6 +558,7 @@ function savePickingSlip(orderId, shopName) {
     const data = [];
     const headers = [];
 
+
     // Extract table headers
     table.columns().every(function () {
         headers.push(this.header().textContent.trim());
@@ -461,7 +592,7 @@ function savePickingSlip(orderId, shopName) {
     // Create CSV content
     const csvContent = data.map(row => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `${orderId}_${shopName}.csv`;
+    const fileName = `${orderId}_${shop["name"]}_${shopName}.csv`;
 
     // Trigger download
     const link = document.createElement('a');

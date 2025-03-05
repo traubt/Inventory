@@ -1384,6 +1384,46 @@ def fetch_recent_orders():
 
     return jsonify(result)
 
+@main.route('/fetch_history_orders', methods=['GET'])
+def fetch_history_orders():
+    user_data = json.loads(session.get('user'))
+
+    # Get the shop_name from the request parameters (if provided)
+    shop_name = request.args.get("replenishShop")  # Default to Head Office shop if not provided
+
+    # Get the store code
+    if shop_name == '':
+        shop_code = '001'
+    else:
+        user_shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
+        shop_code = user_shop.store
+
+    # Fetch the 20 most recent orders sorted by `order_open_date` in descending order
+    recent_orders = (
+        db.session.query(TOCReplenishCtrl)
+        .filter(TOCReplenishCtrl.sent_from == shop_code)  # 2/3/2025 Internal transfer Add filter condition
+        .order_by(TOCReplenishCtrl.order_open_date.desc())
+        .limit(20)
+        .all()
+    )
+
+    # Convert records to JSON
+    result = [
+        {
+            "order_id": order.order_id,
+            "shop_id": order.shop_id,
+            "order_open_date": order.order_open_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_open_date else None,
+            "user": order.user,
+            "order_status": order.order_status,
+            "order_status_date": order.order_status_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_status_date else None,
+            "sold_qty" : order.sold_qty,
+            "replenish_qty" :order.replenish_qty
+        }
+        for order in recent_orders
+    ]
+
+    return jsonify(result)
+
 @main.route('/update_count_stock', methods=['POST'])
 def update_count_stock():
     try:
@@ -1760,7 +1800,7 @@ def get_variance_report():
             # Run SQL query (return raw date)
             query = """
             SELECT shop_name, 
-                   stock_qty_date AS raw_date,  -- Fetch actual date
+                   DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') as raw_date,  -- Fetch actual date
                    ROUND(SUM(a.variance * b.cost_price)) AS total_variance
             FROM toc_stock_variance a
             JOIN toc_product b ON a.sku = b.item_sku
@@ -2032,6 +2072,19 @@ def get_user_activity():
     return jsonify({
         "columns": column_names,  # List of column names
         "rows": data  # List of row data
+    })
+
+@main.route('/get_replenish_data', methods=['GET'])
+def get_replenish_data():
+
+    order_id = request.args.get('order_id')
+
+    # Simulated function to get columns and rows
+    column_names, data = get_replenishment_data(order_id)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "data": data  # List of row data
     })
 
 if __name__ == '__main__':
