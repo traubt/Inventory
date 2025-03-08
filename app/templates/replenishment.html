@@ -109,7 +109,7 @@
               <!-- Order Input Floating to the Right -->
               <div class="d-flex align-items-center gap-2">
                 <label for="orderName" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Replenish ID:</label>
-                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" readonly>
+                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" disabled>
               </div>
             </div>
 
@@ -123,7 +123,7 @@
               <button class="btn btn-danger" id="resetQty"  disabled>Reset Order Qty</button>
               <div class="d-flex align-items-center gap-2 ms-auto">
                 <label for="trackingCode" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Tracking Code:</label>
-                <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;">
+                <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;" disabled>
               </div>
             </div>
 
@@ -235,12 +235,13 @@
     console.log("Shop Parameter:", shop);
 
 
-
     console.log("shop : {{shop.customer}}");
     $("#saveOrder").prop("disabled", true);
 
     $("#newOrder").on("click",async function(event) {
-        // Set the order name based on shop customer and current date
+        // Set tracking code
+        $("#trackingCode").val(`TRK${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}`);
+
 
 
         // Get the selected shop value from the select box
@@ -248,7 +249,7 @@
 
         // Check input values
             if ($("#replenishShop").val() === null || $("#replenishShop").val() === "") {
-                dialog("Select Shop","Please select shop from the drop down list");
+                dialog("Select Shop","Please select shop from the drop-down list");
                 return 0;
             }
             if ($("#thresholdQty").val() === null || $("#thresholdQty").val() === "") {
@@ -730,7 +731,7 @@ $("#submitOrder").on("click", async function(event) {
     const address_to = $("#replenishShop").val();
     const order_id = $("#orderName").val();
     const shop_code = getShopCodeByBlName($('#replenishShop').val());
-    const user_name = {{user.username | tojson}};   // Assuming you get the user name somehow, e.g., from a logged-in user session
+    const user_name = {{user.username | tojson}};   // Assuming you get the username somehow, e.g., from a logged-in user session
     const tracking_code = $("#trackingCode").val(); // You can set the tracking code here, based on your application logic
 
     // Check if the order is saved (assuming _saved is updated during saveOrder execution)
@@ -937,7 +938,7 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
             </div>
           </div>
 
-        </div>
+<!--        </div>-->
 
 <!--        <div class="col-lg-6">-->
 
@@ -949,7 +950,7 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
 <!--          </div>-->
 
 <!--        </div>-->
-      </div>
+<!--      </div>-->
     </section>
   </main><!-- End #main -->
 

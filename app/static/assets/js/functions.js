@@ -13,7 +13,7 @@ function dialog(dialog_title, dialog_body) {
     // 2/3/25 - add hours minutes
 function getCurrentDate() {
     const today = new Date();
-    const year = today.getFullYear();
+    const year = today.getFullYear().toString().slice(-2);
     const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Add leading zero if needed
     const day = today.getDate().toString().padStart(2, '0'); // Add leading zero if needed
     const hours = today.getHours().toString().padStart(2, '0'); // Add leading zero

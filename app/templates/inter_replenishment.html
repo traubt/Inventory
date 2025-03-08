@@ -107,7 +107,7 @@
               <!-- Order Input Floating to the Right -->
               <div class="d-flex align-items-center gap-2">
                 <label for="orderName" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Replenish ID:</label>
-                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" readonly>
+                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" disabled>
               </div>
             </div>
 
@@ -120,8 +120,8 @@
               <button class="btn btn-danger" id="cancelOrder"  disabled>Cancel Order</button>
               <button class="btn btn-danger" id="resetQty"  disabled>Reset Order Qty</button>
               <div class="d-flex align-items-center gap-2 ms-auto">
-                <label for="trackingCode" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Tracking Code:</label>
-                <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;">
+                <label for="trackingCode" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Tracking Code:</label>
+                <input type="text" id="trackingCode" class="form-control" style="max-width: 200px;" disabled>
               </div>
             </div>
 
@@ -254,8 +254,11 @@
             }
 
             if ($("#orderName").val().trim() === "") {
-                  $("#orderName").val(`${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}R`);
+                  $("#orderName").val(`{{shop.customer}}${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}-I`);
             };
+
+        // Set tracking code
+        $("#trackingCode").val(`TRK${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}`);
 
         // Check if there is already an open "New" order
         fetch('/get_product_replenish_form', {
