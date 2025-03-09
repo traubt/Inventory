@@ -1792,6 +1792,8 @@ def get_variance_report():
         # Fetch the data from the function
         if report_type == "Detailed Shop Stock Report":
             data = get_stock_value()
+        elif report_type == "Back Order Report":
+            data = get_back_order()
         elif report_type == "Consolidated Shop Stock Report":
             data = get_stock_value_per_shop()
         elif report_type == "Consolidated Variance Report":
