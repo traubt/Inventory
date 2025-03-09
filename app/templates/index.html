@@ -570,7 +570,7 @@
 
     // Disable shop drop down for shops - shops can't change to another shop
     console.log("User role: {{user.role}}");
-    if("{{user.role}}" == "Agent"){
+    if("{{user.role}}" == "Agent" || "{{user.role}}" == "Stock Controller"){
       $('#shopDropdown').prop('disabled', true);
     }
 
