@@ -1482,6 +1482,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         count(*) AS total_sales_quantity,
                         ROUND(SUM(b.net_amt)) AS total_sales_amount,
                         ROUND(SUM(d.cost_price)) AS total_cost_price,
+                        ROUND(SUM(b.net_amt)) -  ROUND(SUM(d.cost_price)) AS gross_profit,
                         ROUND(
                             (SUM(b.net_amt) - SUM(d.cost_price)) / SUM(b.net_amt) * 100, 2
                         ) AS gross_profit_percentage                        
@@ -1532,6 +1533,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                             COUNT(DISTINCT wo.order_id) AS no_sales, 
                             ROUND(SUM(wo.total_amount / 1.15), 2) AS net_amount,  -- Matches Query A
                             ROUND(SUM(order_cost.total_cost), 2) AS cost_price, 
+                            ROUND(SUM(wo.total_amount / 1.15), 2) - ROUND(SUM(order_cost.total_cost), 2) as gross_profit,
                             ROUND((SUM(wo.total_amount / 1.15) - SUM(order_cost.total_cost)) / SUM(wo.total_amount / 1.15) * 100, 2) AS gross_profit
                         FROM 
                             toc_wc_sales_order wo
