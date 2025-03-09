@@ -1526,15 +1526,32 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                          GROUP BY a.store_name
                          
                          union all
+                         
+                         SELECT 
+                            "Online" AS source,
+                            COUNT(DISTINCT wo.order_id) AS no_sales, 
+                            ROUND(SUM(wo.total_amount / 1.15), 2) AS net_amount,  -- Matches Query A
+                            ROUND(SUM(order_cost.total_cost), 2) AS cost_price, 
+                            ROUND((SUM(wo.total_amount / 1.15) - SUM(order_cost.total_cost)) / SUM(wo.total_amount / 1.15) * 100, 2) AS gross_profit
+                        FROM 
+                            toc_wc_sales_order wo
+                        LEFT JOIN (
+                            -- Aggregate cost per order to avoid duplication
+                            SELECT 
+                                a.order_id, 
+                                SUM(b.cost_price) AS total_cost
+                            FROM 
+                                toc_wc_sales_items a
+                            LEFT JOIN 
+                                toc_product b ON a.sku = b.item_sku
+                            GROUP BY 
+                                a.order_id
+                        ) order_cost ON wo.order_id = order_cost.order_id
+                        WHERE 
+                            wo.order_date > '{from_date}'
+                            AND wo.status NOT IN ('wc-cancelled', 'wc-pending');
                         
-                        select "Online",count(distinct sales_id) as no_sales, 
-                        round(sum(total_amount/1.15)) as net_amount, 
-                        round(sum(b.cost_price)) as cost_price , 
-                        round( (sum(total_amount/1.15) - sum(b.cost_price))/sum(total_amount/1.15) * 100 ) as gross_profit
-                        from toc_wc_sales_items a                       
-                        LEFT JOIN toc_product b on a.sku = b.item_sku
-                        where a.creation_date > '{from_date}';
-                                         
+                                        
                     '''
         elif group_by == 'day':
             query += ''' 

@@ -45,7 +45,8 @@ async function sales_three_months() {
             },
             xAxis: {
                 type: 'value',
-                name: 'Total Sales'
+                name: 'Total Sales',
+                min: 0
             },
             yAxis: {
                 type: 'category',
