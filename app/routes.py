@@ -1487,7 +1487,7 @@ def update_count_stock():
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
+                    stock_qty_date=datetime.now().strftime('%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,
@@ -1566,7 +1566,7 @@ def update_count_receive_stock():
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
+                    stock_qty_date = datetime.now().strftime('%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,

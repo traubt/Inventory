@@ -2334,7 +2334,7 @@ def get_product_category_per_staff(from_date,to_date):
 
     # Query to retrieve the stock order form
     query = '''
-            select a.staff_name, b.store_name, s.tier, p.acct_group as category, round(sum(p.cost_price)) as total, count(*) as count
+            select a.staff_name, b.store_name, s.tier, p.acct_group as category, round(sum(a.net_amt)) as total, count(*) as count
             from toc_ls_sales_item a 
             JOIN toc_ls_sales b on a.sales_id = b.sales_id
             JOIN toc_product p on a.item_sku = p.item_sku
