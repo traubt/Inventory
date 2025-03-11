@@ -1470,6 +1470,8 @@ def update_count_stock():
                 existing_record.stock_count = float(stock_count)
                 existing_record.variance = float(variance)
                 # existing_record.variance_rsn = variance_rsn
+                # 11/3 Reset stock movement
+                existing_record.stock_transfer = 0
                 existing_record.rejects_qty = float(stock_rejected)
                 existing_record.comments = comments
                 existing_record.count_by = user_name
@@ -1544,7 +1546,38 @@ def update_count_receive_stock():
             # stock_rejected = row.get('rejected_qty', 0)
             comments = row.get('comments', '')
 
-            # Check if the record exists in TocStock
+            # 11/3 Update toc_stock.stock_transfer
+            # 1. Update the stock movement of the receiving shop
+            stock_record = TocStock.query.filter_by(
+                shop_id=shop,
+                sku=sku
+            ).first()
+
+            if stock_record:
+                stock_record.stock_transfer = stock_record.stock_transfer + stock_count
+            else:
+                raise Exception("Shop SKU combination does not exist in toc_stock for the receiving shop")
+
+            # 2. Update origin (replenish) shop stock
+            toc_stock_record = (
+                db.session.query(TocStock)
+                .join(TOC_SHOPS, TocStock.shop_id == TOC_SHOPS.customer)
+                .join(TOCReplenishCtrl, TOC_SHOPS.store == TOCReplenishCtrl.sent_from)
+                .filter(
+                    TOCReplenishCtrl.order_id == replenish_order_id,
+                    TocStock.sku == sku
+                )
+                .first()  # Fetch only one record
+            )
+
+            # 3. Deduct stock from the sending shop stock
+            if stock_record:
+                toc_stock_record.stock_transfer = toc_stock_record.stock_transfer - stock_count
+            else:
+                raise Exception("Shop SKU combination does not exist in toc_stock for the replenish shop")
+
+
+            #4. Update the replenish and replenish control tables
             existing_record = TocReplenishOrder.query.filter_by(
                 order_id=replenish_order_id,
                 sku=sku
@@ -1559,7 +1592,7 @@ def update_count_receive_stock():
                 existing_record.received_by = user_name
                 existing_record.received_comment = comments
             else:
-                raise Exception("Shop SKU combination does not exist")
+                raise Exception("Shop SKU combination does not exist in toc_replenish_order")
 
             # Insert into TOCStockVariance if Variance > 0
             if variance != 0:
