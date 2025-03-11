@@ -1801,14 +1801,17 @@ def get_variance_report():
 
             # Run SQL query (return raw date)
             query = """
-            SELECT shop_name, 
-                   DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') as raw_date,  -- Fetch actual date
-                   ROUND(SUM(a.variance * b.cost_price)) AS total_variance
-            FROM toc_stock_variance a
-            JOIN toc_product b ON a.sku = b.item_sku
-            WHERE stock_qty_date > %s
-            and replenish_id like '%%C'
-            GROUP BY shop_name, stock_qty_date;
+          
+            SELECT 
+    shop_name, 
+    DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS raw_date,  -- Fetch actual date in yyyy-mm-dd format
+    ROUND(SUM(a.variance * b.cost_price)) AS total_variance
+FROM toc_stock_variance a
+JOIN toc_product b ON a.sku = b.item_sku
+WHERE stock_qty_date > %s
+AND replenish_id LIKE '%%C'
+GROUP BY shop_name, raw_date;
+            
             """
 
             # Read query into DataFrame, parse raw_date as a datetime column
