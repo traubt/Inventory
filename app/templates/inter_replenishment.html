@@ -366,7 +366,7 @@ function loadOrderTemplate(data, orderId, shopName) {
             { title: "Qty Sold in Period", data: "threshold_qty" , visible: false },
             { title: "Calculated Replenish", data: "replenish_qty", visible: false },
             {
-                title: "Replenish Order",
+                title: "Send Quantity",
                 data: "replenish_order",
                 className: 'editable',
                 render: function(data, type, row) {
@@ -376,9 +376,9 @@ function loadOrderTemplate(data, orderId, shopName) {
                         const currentStockCount = row.current_stock || 0;
                         const calculatedReplenish = row.replenish_qty || 0;
 
-                        if (qtySoldInPeriod > currentStockCount) {
-                            replenishOrder = calculatedReplenish - currentStockCount;
-                        }
+<!--                        if (qtySoldInPeriod > currentStockCount) {-->
+<!--                            replenishOrder = calculatedReplenish - currentStockCount;-->
+<!--                        }-->
 
                         return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
                     }
