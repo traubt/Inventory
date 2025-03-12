@@ -1519,7 +1519,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
            --         LEFT JOIN 
            --             toc_ls_payments c ON b.sales_id = c.sales_id
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
@@ -1534,8 +1534,8 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                             COUNT(DISTINCT wo.order_id) AS no_sales, 
                             ROUND(SUM(wo.total_amount / 1.15), 2) AS net_amount,  -- Matches Query A
                             ROUND(SUM(order_cost.total_cost), 2) AS cost_price, 
-                            ROUND(SUM(wo.total_amount / 1.15), 2) - ROUND(SUM(order_cost.total_cost), 2) as gross_profit,
-                            ROUND((SUM(wo.total_amount / 1.15) - SUM(order_cost.total_cost)) / SUM(wo.total_amount / 1.15) * 100, 2) AS gross_profit
+                            round(ROUND(SUM(wo.total_amount / 1.15), 2) - ROUND(SUM(order_cost.total_cost), 2)) as gross_profit,
+                             ROUND((SUM(wo.total_amount / 1.15) - SUM(order_cost.total_cost)) / SUM(wo.total_amount / 1.15) * 100, 2) as gross_prof_pct
                         FROM 
                             toc_wc_sales_order wo
                         LEFT JOIN (
@@ -1552,6 +1552,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                         ) order_cost ON wo.order_id = order_cost.order_id
                         WHERE 
                             wo.order_date > '{from_date}'
+                            and wo.order_date  <= DATE_ADD('{to_date}', INTERVAL 1 DAY)
                             AND wo.status NOT IN ('wc-cancelled', 'wc-pending');
                         
                                         
@@ -1604,7 +1605,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_shops s on a.store_name = s.blName
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s                        
+                        a.time_of_sale >= %s AND a.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)                 
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
@@ -1666,7 +1667,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_product d ON b.item_sku = d.item_sku
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
@@ -1727,7 +1728,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_product d ON b.item_sku = d.item_sku
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
@@ -1788,7 +1789,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_product p ON ti.item_sku = p.item_sku
                     WHERE 
-                        ts.time_of_sale >= %s AND ts.time_of_sale <= %s
+                        ts.time_of_sale >= %s AND ts.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
@@ -1845,7 +1846,7 @@ def get_sales_report(report_type, from_date, to_date, group_by):
                     JOIN
                         toc_canna_member m ON p.email = m.email
                     WHERE 
-                        a.time_of_sale >= %s AND a.time_of_sale <= %s
+                        a.time_of_sale >= %s AND a.time_of_sale <= DATE_ADD(%s, INTERVAL 1 DAY)
                 '''
 
         # Add dynamic GROUP BY clause based on 'group_by' parameter
