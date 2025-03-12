@@ -672,24 +672,24 @@ SELECT
     st.final_stock_qty AS last_stock_update,
     st.stock_qty_date AS last_stock_update_date,
     st.final_stock_qty 
-        - s.sales_since_stock_read 
-        + COALESCE((
-            SELECT SUM(tro.received_qty) 
-            FROM toc_replenish_order tro
-            WHERE tro.shop_id = s.store_customer 
-              AND tro.sku = s.item_sku
-              AND tro.received_date > st.stock_qty_date
-        ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
+        - s.sales_since_stock_read + st.stock_transfer AS current_stock_qty,
+  --      + COALESCE((
+  --          SELECT SUM(tro.received_qty) 
+  --          FROM toc_replenish_order tro
+  --          WHERE tro.shop_id = s.store_customer 
+   --           AND tro.sku = s.item_sku
+   --           AND tro.received_date > st.stock_qty_date
+   --     ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
     CASE 
         WHEN st.final_stock_qty 
-            - s.sales_since_stock_read 
-            + COALESCE((
-                SELECT SUM(tro.received_qty) 
-                FROM toc_replenish_order tro
-                WHERE tro.shop_id = s.store_customer 
-                  AND tro.sku = s.item_sku
-                  AND tro.received_date > st.stock_qty_date
-            ), 0) > s.threshold_sold_qty THEN 0
+            - s.sales_since_stock_read + st.stock_transfer > s.threshold_sold_qty THEN 0
+    --        + COALESCE((
+    --            SELECT SUM(tro.received_qty) 
+    --            FROM toc_replenish_order tro
+    --            WHERE tro.shop_id = s.store_customer 
+    --              AND tro.sku = s.item_sku
+    --              AND tro.received_date > st.stock_qty_date
+    --        ), 0) > s.threshold_sold_qty THEN 0
         ELSE s.replenish_qty
     END AS replenish_order  -- Add the replenish_order column
 FROM 
@@ -755,13 +755,14 @@ SELECT DISTINCT
     st.stock_qty_date AS last_stock_count_date, -- Last stock count date (stock_qty_date from toc_stock)
     COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
     st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity, -- Current quantity (last stock count - sold quantity)
-    COALESCE((
-        SELECT SUM(tro.received_qty) 
-        FROM toc_replenish_order tro
-        WHERE tro.shop_id = st.shop_id 
-          AND tro.sku = st.sku
-          AND tro.received_date > st.stock_qty_date
-    ), 0) AS received_stock -- Received stock
+    st.stock_transfer AS received_stock 
+--    COALESCE((
+--        SELECT SUM(tro.received_qty) 
+--        FROM toc_replenish_order tro
+--        WHERE tro.shop_id = st.shop_id 
+--          AND tro.sku = st.sku
+--          AND tro.received_date > st.stock_qty_date
+--    ), 0) AS received_stock -- Received stock
 FROM 
     toc_stock st
 LEFT JOIN 
