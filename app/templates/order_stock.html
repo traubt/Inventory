@@ -233,6 +233,13 @@ function loadStockData(rows) {
             dialog("Nothing to save","No changes made to the order");
             return 0;
         }
+
+        // Check if the filter is on
+            if ($("#ProductOrderTemplate_filter input").val().length > 0) {
+                dialog("Filter Is On", "Can't save order stock while search filter is on. Please close the search filter before saving the order");
+                return;
+            }
+
         const tableData = [];
         const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
             $("#ProductOrderTemplate thead th:contains('Order Qty')")
