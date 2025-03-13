@@ -1894,7 +1894,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
         SELECT 
     """
 
-    # Add fields for `group_by == 'none'`
+    # Add fields for `group_by == 'none'` change
     if group_by == 'none':
         query += """
             a.replenish_id as order_id,
