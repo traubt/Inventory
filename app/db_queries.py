@@ -1949,7 +1949,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     if report_type == "Stock Count Variance":
         query += " AND a.replenish_id LIKE '%%C'"
     elif report_type == "Stock Receive Variance":
-        query += " AND a.replenish_id LIKE '%%R'"
+        query += " AND a.replenish_id LIKE '%%R' OR a.replenish_id LIKE '%%I'"
 
     # Add dynamic GROUP BY clause if not `none`
     if group_by == 'day':
@@ -2008,11 +2008,12 @@ def get_stock_value():
                 st.shop_name,
                 st.shop_id,
                 st.stock_qty_date,
-                st.final_stock_qty,
+                st.final_stock_qty as gross_stock_qty,
+                st.stock_transfer as stock_movement,
                 COALESCE(sc.count_items, 0) AS sold_items,
-                st.final_stock_qty - COALESCE(sc.count_items, 0) AS current_stock,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
+                st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) AS current_stock,
+                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
@@ -2068,11 +2069,12 @@ def get_stock_value_per_shop():
                 st.shop_name,
                 st.shop_id,
                 st.stock_qty_date,
-                st.final_stock_qty,
+                st.final_stock_qty as gross_stock_qty,
+                st.stock_transfer,
                 COALESCE(sc.count_items, 0) AS count_items,
-                (st.final_stock_qty - COALESCE(sc.count_items, 0)) AS current_stock,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
+                (st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) AS current_stock,
+                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty +st.stock_transfer - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
@@ -2186,18 +2188,20 @@ def get_back_order():
                         WHERE tro.shop_id = s.store_customer 
                           AND tro.sku = s.item_sku
                           AND tro.received_date > st.stock_qty_date
-                    ), 0) AS current_stock_qty,  -- Updated current_stock_qty calculation
+                    ), 0) AS gross_stock_qty,  -- Updated current_stock_qty calculation
+                    st.stock_transfer as stock_movement,
                     s.replenish_qty AS 4_weeks_sales,
                 ( 
-                    st.final_stock_qty 
+                    st.final_stock_qty + st.stock_transfer
                     - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0) - s.replenish_qty
+               --     + COALESCE((
+               --         SELECT SUM(tro.received_qty) 
+               --         FROM toc_replenish_order tro
+               --         WHERE tro.shop_id = s.store_customer 
+               --           AND tro.sku = s.item_sku
+               --           AND tro.received_date > st.stock_qty_date
+               --     ), 0) 
+                    - s.replenish_qty
                 ) AS order_back -- Added column for stock difference
             FROM 
                 sales_data s
@@ -2208,14 +2212,14 @@ def get_back_order():
             WHERE 
                 ( 
                     st.final_stock_qty 
-                    - s.sales_since_stock_read 
-                    + COALESCE((
-                        SELECT SUM(tro.received_qty) 
-                        FROM toc_replenish_order tro
-                        WHERE tro.shop_id = s.store_customer 
-                          AND tro.sku = s.item_sku
-                          AND tro.received_date > st.stock_qty_date
-                    ), 0)
+                    - s.sales_since_stock_read + st.stock_transfer
+            --        + COALESCE((
+            --            SELECT SUM(tro.received_qty) 
+            --            FROM toc_replenish_order tro
+            --            WHERE tro.shop_id = s.store_customer 
+            --              AND tro.sku = s.item_sku
+            --              AND tro.received_date > st.stock_qty_date
+            --        ), 0)
                 ) > s.replenish_qty -- Filter records where current_stock_qty > 3_weeks_sales
             ORDER BY  
                 3 DESC, 6 desc;
