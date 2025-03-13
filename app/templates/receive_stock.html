@@ -447,7 +447,7 @@ function loadStockData(rows) {
 $("#saveOrder").on("click", function () {
 
     if ($("#ProductOrderTemplate_filter input").val().length > 0) {
-        dialog("Filter Is On", "Can't submit count stock while filter is on. Please close the table filter before submit");
+        dialog("Filter Is On", "Can't save order while filter is on. Please clear the table filter before saving");
         return;
     }
 
@@ -542,7 +542,7 @@ $("#saveOrder").on("click", function () {
 $("#saveForm").on("click", function () {
 
     if ($("#ProductOrderTemplate_filter input").val().length > 0) {
-        dialog("Filter Is On", "Can't save form while filter is on. Please close the table filter before submit");
+        dialog("Filter Is On", "Can't save form while filter is on. Please clear the table filter before submit");
         return;
     }
 
