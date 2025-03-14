@@ -309,8 +309,8 @@
                 await fetch('/api/get_logs')
                     .then(response => response.json())
                     .then(data => {
-                        // Check the first 10 logs for "error" in the comment
-                        for (let i = 0; i < Math.min(10, data.length); i++) {
+                        // Check the first 3 logs for "error" in the comment
+                        for (let i = 0; i < Math.min(3, data.length); i++) {
                             const log = data[i];
                             const comment = log.comment;
                             if (comment && comment.toLowerCase().includes("error") &&
