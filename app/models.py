@@ -208,3 +208,28 @@ class TocSalesLog(db.Model):
     num_of_sales = db.Column(db.Integer, nullable=True)
     source = db.Column(db.String(2), nullable=True)
     comment = db.Column(db.String(200), nullable=True)
+
+class TOCWeeks(db.Model):
+    __tablename__ = 'toc_weeks'
+
+    week = db.Column(db.String(10), primary_key=True)
+    from_date = db.Column(db.Date, nullable=False)
+    to_date = db.Column(db.Date, nullable=False)
+
+class TOCCasuals(db.Model):
+    __tablename__ = 'toc_casuals'
+
+    shop_id = db.Column(db.String(45), primary_key=True)
+    date = db.Column(db.Date, primary_key=True)
+    casuals = db.Column(db.String(200), nullable=True)
+    confirmed_by = db.Column(db.String(45), nullable=True)
+    confirmation_date = db.Column(db.DateTime, nullable=True)
+
+class TOCCasualsCtrl(db.Model):
+    __tablename__ = 'toc_casuals_ctrl'
+
+    shop_id = db.Column(db.String(45), primary_key=True)
+    week = db.Column(db.String(45), primary_key=True)
+    status = db.Column(db.String(45), nullable=True)
+    status_date = db.Column(db.DateTime,  nullable=True)
+    confirmed_by = db.Column(db.String(45), nullable=True)

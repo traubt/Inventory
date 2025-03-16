@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .models import *
 from . import db
 from .db_queries import *
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from flask import Flask, request, jsonify
 from sqlalchemy import distinct, or_, text, desc
 from flask import session, jsonify
@@ -2152,6 +2152,78 @@ def verify_order():
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+@main.route('/casual_timesheet')
+def casual_timesheet():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    products = TocProduct.query.all()
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'casual_timesheet.html',
+        user=user,
+        shop = shop,
+        shops=list_of_shops,
+        roles=roles_list,
+        products=products
+    )
+
+
+@main.route("/get_weeks", methods=["GET"])
+def get_weeks():
+    # Get today's date and determine the current week
+    today = date.today()
+
+    # Get the current week's record
+    current_week = db.session.query(TOCWeeks).filter(TOCWeeks.from_date <= today, TOCWeeks.to_date >= today).first()
+
+    if not current_week:
+        return jsonify({"error": "Current week not found in toc_weeks"}), 404
+
+    # Get the last 10 weeks including the current week, ordered in descending order
+    weeks = (
+        db.session.query(TOCWeeks)
+        .filter(TOCWeeks.from_date <= current_week.from_date)
+        .order_by(TOCWeeks.from_date.desc())
+        .limit(11)  # Current week + last 10 weeks
+        .all()
+    )
+
+    # Convert the results to JSON format
+    data = [
+        {
+            "week": week.week,
+            "from_date": week.from_date.strftime("%d-%b-%Y"),
+            "to_date": week.to_date.strftime("%d-%b-%Y"),
+        }
+        for week in weeks
+    ]
+
+    return jsonify(data)
+
+@main.route("/get_week_dates/<selected_week>", methods=["GET"])
+def get_week_dates(selected_week):
+    # Fetch the week data from the toc_weeks table
+    week_data = TOCWeeks.query.filter_by(week=selected_week).first()
+
+    if week_data is None:
+        return jsonify({"error": "Week not found in the database"}), 404
+
+    from_date = week_data.from_date
+    to_date = week_data.to_date
+
+    # Generate a list of dates from from_date to to_date (inclusive)
+    dates = [(from_date + timedelta(days=i)).strftime("%d-%b-%Y") for i in range((to_date - from_date).days + 1)]
+
+    return jsonify(dates)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
