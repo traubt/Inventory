@@ -96,6 +96,24 @@
         </ul>
       </li><!-- End Forms Nav -->
 
+            <li class="nav-item">
+        <a class="nav-link collapsed" data-bs-target="#casual-nav" data-bs-toggle="collapse" >
+          <i class="bi bi-calendar-check"></i><span>Timesheet</span><i class="bi bi-chevron-down ms-auto"></i>
+        </a>
+        <ul id="casual-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
+          <li id="casualTimesheet">
+            <a href="{{ url_for('main.casual_timesheet') }}">
+              <i class="bi bi-circle"></i><span>Timesheet</span>
+            </a>
+          </li>
+          <li id="CasualHistory">
+            <a href="{{ url_for('main.casual_timesheet') }}">
+              <i class="bi bi-circle"></i><span>History</span>
+            </a>
+          </li>
+        </ul>
+      </li><!-- End Forms Nav -->
+
 
 
 

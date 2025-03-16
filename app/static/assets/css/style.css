@@ -1493,6 +1493,25 @@ table.dataTable thead {
     }
 }
 
+#week{
+    width: 310px !important;
+}
+
+/* Add border around casual fields */
+#Timesheet td input {
+    border: 1px solid #ccc;  /* Light gray border */
+    padding: 5px;
+    width: 100%; /* Ensure the input takes the full width of the cell */
+}
+
+/* Optional: Add focus styles */
+#Timesheet td input:focus {
+    border-color: #007bff; /* Change border color to blue when focused */
+    outline: none; /* Remove the default outline */
+}
+
+
+
 
 
 
