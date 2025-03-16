@@ -1555,8 +1555,9 @@ def update_count_receive_stock():
 
             if stock_record:
                 stock_record.stock_transfer = stock_record.stock_transfer + stock_count
+                stock_record.stock_qty_date = date
             else:
-                raise Exception("Shop SKU combination does not exist in toc_stock for the receiving shop")
+                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the receiving shop")
 
             # 2. Update origin (replenish) shop stock
             toc_stock_record = (
@@ -1573,8 +1574,9 @@ def update_count_receive_stock():
             # 3. Deduct stock from the sending shop stock
             if stock_record:
                 toc_stock_record.stock_transfer = toc_stock_record.stock_transfer - stock_count
+                toc_stock_record.stock_qty_date = date
             else:
-                raise Exception("Shop SKU combination does not exist in toc_stock for the replenish shop")
+                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the replenish shop")
 
 
             #4. Update the replenish and replenish control tables
@@ -1592,7 +1594,7 @@ def update_count_receive_stock():
                 existing_record.received_by = user_name
                 existing_record.received_comment = comments
             else:
-                raise Exception("Shop SKU combination does not exist in toc_replenish_order")
+                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_replenish_order")
 
             # Insert into TOCStockVariance if Variance > 0
             if variance != 0:

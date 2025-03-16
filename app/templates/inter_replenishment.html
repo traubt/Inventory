@@ -366,7 +366,7 @@ function loadOrderTemplate(data, orderId, shopName) {
             { title: "Qty Sold in Period", data: "threshold_qty" , visible: false },
             { title: "Calculated Replenish", data: "replenish_qty", visible: false },
             {
-                title: "Replenish Order",
+                title: "Send Quantity",
                 data: "replenish_order",
                 className: 'editable',
                 render: function(data, type, row) {
@@ -376,9 +376,9 @@ function loadOrderTemplate(data, orderId, shopName) {
                         const currentStockCount = row.current_stock || 0;
                         const calculatedReplenish = row.replenish_qty || 0;
 
-                        if (qtySoldInPeriod > currentStockCount) {
-                            replenishOrder = calculatedReplenish - currentStockCount;
-                        }
+                     //   if (qtySoldInPeriod > currentStockCount) {
+                     //       replenishOrder = calculatedReplenish - currentStockCount;
+                     //   }
 
                         return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
                     }
@@ -456,7 +456,7 @@ function savePickingSlip(orderId, shopName) {
 
     // Check if there is data to save
     if (data.length <= 1) {
-        alert("No records with replenish orders greater than 0 to save.");
+        alert("No records with Send Qty greater than 0 to save.");
         return;
     }
 
@@ -508,7 +508,7 @@ function savePickingSlip(orderId, shopName) {
         }
         const tableData = [];
         const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
-            $("#ProductOrderTemplate thead th:contains('Replenish Order')")
+            $("#ProductOrderTemplate thead th:contains('Send Quantity')")
         ); // Find the index of the "Order Qty" column
         let allQtyZero = true; // Track if all "Order Qty" are zero
         let isValid = true; // Flag to check if all "Order Qty" are valid numbers
