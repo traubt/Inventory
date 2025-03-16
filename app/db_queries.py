@@ -2024,7 +2024,7 @@ def get_stock_value():
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'  
             --  and st.shop_name = 'CC - Menlyn'
-              AND st.final_stock_qty > 0;
+              AND st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) > 0;
             '''
 
     # Execute the query with the parameter
@@ -2084,7 +2084,7 @@ def get_stock_value_per_shop():
               AND st.stock_qty_date = sc.stock_qty_date
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'           -- Exclude refund item
-              AND st.final_stock_qty > 0
+              AND st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) > 0
         )
         SELECT
             shop_name,

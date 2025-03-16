@@ -527,6 +527,12 @@ $("#saveOrder").on("click", function () {
         success: function (response) {
             console.log("Data submitted successfully:", response);
             dialog("Save Stock Data", "Stock data was saved successfully.");
+            // Disable save order button
+            $("#saveOrder").prop("disabled", true);
+            $("#saveForm").prop("disabled", true);
+            $("#resetQty").prop("disabled", true);
+            $("#cancelOrder").prop("disabled", true);
+            $("#submitOrder").prop("disabled", true);
         },
         error: function (error) {
             console.error("Error submitting data:", error);
