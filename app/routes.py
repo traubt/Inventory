@@ -2127,6 +2127,32 @@ def get_replenish_data():
         "data": data  # List of row data
     })
 
+@main.route('/verify_order', methods=['POST'])
+def verify_order():
+    data = request.get_json()
+    order_id = data.get('order_id')
+
+    if not order_id:
+        return jsonify({"success": False, "message": "Order ID is required"}), 400
+
+    # Fetch the order from the database
+    order = TOCReplenishCtrl.query.filter_by(order_id=order_id).first()
+
+    if not order:
+        return jsonify({"success": False, "message": "Order not found"}), 404
+
+    try:
+        # Update order status
+        order.order_status = "Verified"
+        order.order_status_date = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Order verified successfully"})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
 

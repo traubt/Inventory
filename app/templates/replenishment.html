@@ -179,6 +179,7 @@
                                 <th>Order Status Date</th>
                                 <th>Sold Qty</th>
                                 <th>Replenish Qty</th>
+                                <th>Verify Order</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -339,11 +340,61 @@ $("#loadOrder" ).on("click", function () {
 });
 
 // Event handler for the "loadOrder" button
+<!--$("#viewHistory").on("click", function () {-->
+<!--    $("#newOrder").prop("disabled", true);-->
+<!--    // Fetch the recent orders via AJAX-->
+
+<!--       // Get the value of #replenishShop. If not selected the default Head Office-->
+<!--    const replenishShop = $("#replenishShop").val();-->
+<!--    _history_mode = true;-->
+
+<!--    $.ajax({-->
+<!--        url: "/fetch_history_orders",-->
+<!--        method: "GET",-->
+<!--        data: { replenishShop: replenishShop },-->
+<!--        success: function (response) {-->
+<!--            if (!Array.isArray(response) || response.length === 0) {-->
+<!--                alert("No recent orders found.");-->
+<!--                return;-->
+<!--            }-->
+
+<!--            // Populate the table with the fetched orders-->
+<!--            const tableBody = $("#orderHistoryTable tbody");-->
+<!--            tableBody.empty(); // Clear existing rows-->
+
+<!--            response.forEach(order => {-->
+<!--                const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing-->
+<!--                const row = `-->
+<!--                    <tr>-->
+<!--                        <td>-->
+<!--                         <input type="radio" name="selectedOrder" value="${order.order_id}">-->
+<!--                        </td>-->
+<!--                        <td>${order.order_id || "N/A"}</td>-->
+<!--                        <td>${order.shop_id || "N/A"}</td>-->
+<!--                        <td>${shopName}</td>-->
+<!--                        <td>${order.order_open_date || ""}</td>-->
+<!--                        <td>${order.user || ""}</td>-->
+<!--                        <td>${order.order_status || ""}</td>-->
+<!--                        <td>${order.order_status_date || ""}</td>-->
+<!--                        <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>-->
+<!--                        <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>-->
+<!--                    </tr>-->
+<!--                `;-->
+<!--                tableBody.append(row);-->
+<!--            });-->
+
+<!--            // Show the modal-->
+<!--            $("#orderHistoryModal").modal("show");-->
+<!--        },-->
+<!--        error: function (xhr, status, error) {-->
+<!--            console.error("Failed to fetch recent orders:", error);-->
+<!--            alert("An error occurred while fetching recent orders. Please try again.");-->
+<!--        }-->
+<!--    });-->
+<!--});-->
+
 $("#viewHistory").on("click", function () {
     $("#newOrder").prop("disabled", true);
-    // Fetch the recent orders via AJAX
-
-       // Get the value of #replenishShop. If not selected the default Head Office
     const replenishShop = $("#replenishShop").val();
     _history_mode = true;
 
@@ -363,11 +414,11 @@ $("#viewHistory").on("click", function () {
 
             response.forEach(order => {
                 const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing
+                const isCompleted = order.order_status === "Completed"; // Check if status is 'Completed'
+
                 const row = `
                     <tr>
-                        <td>
-                         <input type="radio" name="selectedOrder" value="${order.order_id}">
-                        </td>
+                        <td><input type="radio" name="selectedOrder" value="${order.order_id}"></td>
                         <td>${order.order_id || "N/A"}</td>
                         <td>${order.shop_id || "N/A"}</td>
                         <td>${shopName}</td>
@@ -377,9 +428,21 @@ $("#viewHistory").on("click", function () {
                         <td>${order.order_status_date || ""}</td>
                         <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>
                         <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>
+                        <td>
+                            <button class="btn btn-success verify-btn" id="verify" data-order-id="${order.order_id}" ${isCompleted ? "" : "disabled"}>
+                                Verify
+                            </button>
+                        </td>
                     </tr>
                 `;
                 tableBody.append(row);
+            });
+
+            // Attach event listener to Verify buttons
+            $(".verify-btn").on("click", function () {
+                const orderId = $(this).data("order-id");
+                alert("Verifying Order ID: " + orderId);
+                // Add your verification logic here
             });
 
             // Show the modal
@@ -391,6 +454,7 @@ $("#viewHistory").on("click", function () {
         }
     });
 });
+
 
 // Event listener for the Confirm Selection button
 $("#confirmOrderSelection").on("click", function () {
@@ -933,6 +997,36 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
         // Call the logUserActivity function with the combined description
         logUserActivity(activityDescription);
     });
+
+    // verify the order
+    $(document).on("click", ".verify-btn", function () {
+        const orderId = $(this).data("order-id");
+        const button = $(this);
+        const row = button.closest("tr");
+        const statusCell = row.find("td:eq(6)"); // Assuming the status column is the 7th column (index 6)
+
+        $.ajax({
+            url: "/verify_order",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ order_id: orderId }),
+            success: function (response) {
+                if (response.success) {
+                    // Update the status in the table
+                    statusCell.text("Verified");
+                    // Disable the button after successful verification
+                    button.prop("disabled", true);
+                } else {
+                    alert("Failed to verify order: " + response.message);
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("Error verifying order:", error);
+                alert("An error occurred while verifying the order. Please try again.");
+            }
+        });
+    });
+
 
 
 

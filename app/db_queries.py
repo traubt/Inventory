@@ -1907,7 +1907,8 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
             a.final_stock_qty as Received_Counted_Qty,
             a.rejects_qty as damaged,
             round(a.variance,2) as variance,
-            round(a.variance * b.cost_price) as variance_amount,         
+            round(a.variance * b.cost_price) as variance_amount,  
+            coalesce(ts.blName,"NA") as sent_from,       
             a.rejects_qty as damaged,                        
             a.comments
         """
@@ -1942,6 +1943,8 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     query += """
         FROM toc_stock_variance a
         JOIN toc_product b on a.sku = b.item_sku
+        LEFT JOIN toc_replenish_ctrl trc on a.replenish_id = trc.order_id
+        LEFT JOIN toc_shops ts on trc.sent_from = ts.store
         WHERE a.stock_qty_date >= %s AND a.stock_qty_date <= %s
     """
 
