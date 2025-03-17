@@ -1735,6 +1735,18 @@ def log_user_activity():
 
 #####################################  Reports Section
 
+@main.route('/timesheet_history')
+def timesheet_history():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('timesheet_history_report.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
+
 @main.route('/sales_report')
 def sales_report():
     user_data = session.get('user')
@@ -1789,6 +1801,8 @@ def get_business_report():
             data = get_online_transactions(from_date, to_date)
         elif report_type == "Product Category Per Staff":
             data = get_product_category_per_staff(from_date, to_date)
+        elif report_type == "Casuals Timesheet History Report":
+            data = get_timesheet_history(from_date, to_date)
         else:
             data = get_sales_report(report_type, from_date, to_date, group_by)
 
@@ -2200,8 +2214,8 @@ def get_weeks():
     data = [
         {
             "week": week.week,
-            "from_date": week.from_date.strftime("%d-%b-%Y"),
-            "to_date": week.to_date.strftime("%d-%b-%Y"),
+            "from_date": week.from_date.strftime("%Y-%m-%d"),
+            "to_date": week.to_date.strftime("%Y-%m-%d"),
         }
         for week in weeks
     ]
@@ -2220,9 +2234,116 @@ def get_week_dates(selected_week):
     to_date = week_data.to_date
 
     # Generate a list of dates from from_date to to_date (inclusive)
-    dates = [(from_date + timedelta(days=i)).strftime("%d-%b-%Y") for i in range((to_date - from_date).days + 1)]
+    dates = [(from_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((to_date - from_date).days + 1)]
 
     return jsonify(dates)
+
+@main.route("/save_timesheet", methods=["POST"])
+def save_timesheet():
+    data = request.json
+    shop_id = data.get("shop_id")
+    week = data.get("week")
+    manager = data.get("manager")
+    timesheet = data.get("timesheet", [])
+
+    print("Received Data:", data)  # Debugging
+
+    for entry in timesheet:
+        try:
+            date = datetime.strptime(entry['date'], "%Y-%m-%d")  # Format: "09-Mar-2025"
+        except ValueError as e:
+            print(f"Date format error: {e}")
+            continue  # Skip invalid dates
+
+        casuals = entry.get("casuals", "")
+
+        # **Check if TOCCasuals entry already exists**
+        existing_entry = TOCCasuals.query.filter_by(shop_id=shop_id, date=date).first()
+
+        if existing_entry:
+            # **Update existing entry**
+            existing_entry.casuals = casuals
+            existing_entry.confirmed_by = manager
+            existing_entry.confirmation_date = datetime.utcnow()
+        else:
+            # **Insert new entry if not found**
+            new_entry = TOCCasuals(
+                shop_id=shop_id,
+                week=week,
+                date=date,
+                casuals=casuals,
+                confirmed_by=manager,
+                confirmation_date=datetime.utcnow()
+            )
+            db.session.add(new_entry)
+
+    # **Check if TOCCasualsCtrl entry exists**
+    existing_ctrl = TOCCasualsCtrl.query.filter_by(shop_id=shop_id, week=week).first()
+
+    if existing_ctrl:
+        # **Update existing status**
+        existing_ctrl.status = "Updated"
+        existing_ctrl.status_date = datetime.utcnow()
+        existing_ctrl.confirmed_by = manager
+    else:
+        # **Insert new control entry**
+        new_ctrl = TOCCasualsCtrl(
+            shop_id=shop_id,
+            week=week,
+            status="Saved",
+            status_date=datetime.utcnow(),
+            confirmed_by=manager
+        )
+        db.session.add(new_ctrl)
+
+    db.session.commit()
+    return jsonify({"message": "Timesheet updated successfully"}), 200
+
+@main.route("/confirm_timesheet", methods=["POST"])
+def confirm_timesheet():
+    data = request.json
+    shop_id = data.get("shop_id")
+    week = data.get("week")
+    manager = data.get("manager")
+
+    # Check if the entry exists in TOCCasualsCtrl
+    existing_ctrl = TOCCasualsCtrl.query.filter_by(shop_id=shop_id, week=week).first()
+
+    if existing_ctrl:
+        # Update status to "Confirmed"
+        existing_ctrl.status = "Confirmed"
+        existing_ctrl.status_date = datetime.utcnow()
+        existing_ctrl.confirmed_by = manager
+        db.session.commit()
+        return jsonify({"message": "Timesheet confirmed successfully"}), 200
+    else:
+        return jsonify({"error": "Timesheet not found"}), 404
+
+
+@main.route("/get_timesheet_status/<shop_id>/<week>")
+def get_timesheet_status(shop_id, week):
+    entry = TOCCasualsCtrl.query.filter_by(shop_id=shop_id, week=week).first()
+
+    if entry:
+        return jsonify({"status": entry.status, "confirmed_by": entry.confirmed_by})
+
+    # If no entry found, return status "Empty"
+    return jsonify({"status": "Empty"}), 200
+
+
+@main.route("/get_week_casuals/<shop_id>/<week>")
+def get_week_casuals(shop_id, week):
+    casuals = TOCCasuals.query.filter_by(shop_id=shop_id, week=week).all()
+
+    if not casuals:
+        return jsonify([])  # Return empty list if no casuals found
+
+    return jsonify([
+        {
+            "date": casual.date.strftime("%Y-%m-%d"),
+            "casuals": casual.casuals
+        } for casual in casuals
+    ])
 
 
 if __name__ == '__main__':

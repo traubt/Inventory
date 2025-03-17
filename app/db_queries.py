@@ -2368,6 +2368,38 @@ def get_product_category_per_staff(from_date,to_date):
 
     return result_as_dicts
 
+def get_timesheet_history(from_date,to_date):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query to retrieve the stock order form
+    query = '''
+            select s.blName as shop_name, c.week, w.from_date, w.to_date, c.status, c.status_date, c.confirmed_by, b.casuals as list_of_casuals, b.date as date_worked
+            from toc_casuals_ctrl c
+            join toc_shops s on c.shop_id = s.customer
+            join toc_casuals b on c.shop_id = b.shop_id and c.week = b.week
+            join toc_weeks w on c.week = w.week
+            WHERE w.from_date > %s  AND w.to_date < %s
+            order by w.to_date desc;
+            '''
+
+    # Execute the query with the parameter
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
 def get_user_activities():
     # Connect to the database
     conn = get_db_connection()
