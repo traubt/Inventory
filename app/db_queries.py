@@ -500,12 +500,12 @@ def distribute_product_to_shops(sku):
         INSERT INTO toc_stock (
             shop_id, sku, stock_qty_date, product_name, shop_name, final_stock_qty,
             stock_count, count_by, last_stock_qty, calc_stock_qty, variance, variance_rsn,
-            stock_recount, rejects_qty, replenish_id, comments
+             rejects_qty, replenish_id, comments, pastel_date
         )
         SELECT 
             toc_shops.customer AS shop_id,
             toc_product.item_sku AS sku,
-            NOW() AS stock_qty_date,
+            '2000-01-01' AS stock_qty_date,
             toc_product.item_name AS product_name,
             toc_shops.blName AS shop_name,
             0 AS final_stock_qty,
@@ -515,10 +515,10 @@ def distribute_product_to_shops(sku):
             0 AS calc_stock_qty,
             0 AS variance,
             'NA' AS variance_rsn,
-            0 AS stock_recount,
             0 AS rejects_qty,
             'NA' AS replenish_id,  -- Replacing transfer_id with replenish_id
-            'NA' AS comments
+            'NA' AS comments,
+            '2020-02-02' as pastel_date           
         FROM 
             toc_shops
         CROSS JOIN 
