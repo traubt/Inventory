@@ -220,6 +220,7 @@ class TOCCasuals(db.Model):
     __tablename__ = 'toc_casuals'
 
     shop_id = db.Column(db.String(45), primary_key=True)
+    week = db.Column(db.String(45), primary_key=True)
     date = db.Column(db.Date, primary_key=True)
     casuals = db.Column(db.String(200), nullable=True)
     confirmed_by = db.Column(db.String(45), nullable=True)

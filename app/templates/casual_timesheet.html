@@ -109,10 +109,10 @@
             <div id="tblCtrl" class="d-flex gap-1 mt-3">
               <button class="btn btn-primary" id="newOrder" >Load Timesheet</button>
               <button class="btn btn-primary" id="saveOrder"  disabled>Save Timesheet</button>
-              <button class="btn btn-primary" id="submitOrder"  disabled>Confirm Timesheet</button>
+              <button class="btn btn-primary" id="confirmTS"  disabled>Confirm Timesheet</button>
               <button class="btn btn-primary" id="closeOrder"  disabled>Close Timesheet</button>
 <!--              <button class="btn btn-danger" id="cancelOrder"  disabled>Cancel Order</button>-->
-              <button class="btn btn-danger" id="resetQty"  disabled>Reset Timesheet</button>
+<!--              <button class="btn btn-danger" id="resetQty"  disabled>Reset Timesheet</button>-->
             <div class="d-flex align-items-center gap-2 ms-auto">
                 <label for="tsStatus" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Timesheet Status:</label>
                 <input type="text" id="tsStatus" class="form-control" style="max-width: 200px;" disabled>
@@ -242,571 +242,223 @@
     $("#saveOrder").prop("disabled", true);
 
 $("#newOrder").on("click", async function(event) {
-    // Get the selected week
     const selectedWeek = $("#week").val();
-
-    // Check if no week is selected
     if (!selectedWeek) {
         alert("Please select a week from the list");
-        return 0;  // Stop further execution
-    }
-
-    // Fetch the dates of the selected week
-    const response = await fetch(`/get_week_dates/${selectedWeek}`);
-    const dates = await response.json(); // This will be an array of dates
-
-    // Prepare the data for the DataTable
-    const data = dates.map(date => ({
-        date: date,        // The first column should be 'date'
-        casual1: '',
-        casual2: '',
-        casual3: '',
-        casual4: ''
-    }));
-
-    // Destroy the table if already open
-    if ($.fn.DataTable.isDataTable('#Timesheet')) {
-        $('#Timesheet').DataTable().destroy();
-    }
-
-    // Initialize the DataTable
-    const table = $('#Timesheet').DataTable({
-        data: data,
-        columns: [
-            { data: 'date' },        // Date column
-            { data: 'casual1' },     // Casual 1 column
-            { data: 'casual2' },     // Casual 2 column
-            { data: 'casual3' },     // Casual 3 column
-            { data: 'casual4' }      // Casual 4 column
-        ],
-        // Ensuring the input fields have borders when the table is loaded
-        createdRow: function(row, data, dataIndex) {
-            // Loop through the columns and create input fields with borders for casual columns
-            $('td', row).each(function(index) {
-                if (index > 0) {  // Skip the first column (Date)
-                    // Create input fields for casual columns and apply the border
-                    $(this).html('<input type="text" value="' + data["casual" + index] + '" style="border: 1px solid #ccc; padding: 5px; width: 100%;">');
-                }
-            });
-        }
-    });
-
-    // Enable inline editing for casual columns
-    $('#Timesheet tbody').on('click', 'td', function () {
-        var cell = table.cell(this);  // Get the clicked cell
-        var currentValue = cell.data();
-
-        // Exclude the date column (index 0), and make other cells editable
-        if ($(this).index() > 0) {  // Skip first column (Date)
-            var input = $('<input>', {
-                type: 'text',
-                value: currentValue,
-                style: 'border: 1px solid #ccc; padding: 5px; width: 100%;' // Add the border to input field
-            });
-            $(this).html(input);  // Replace cell content with input
-
-            // Focus on the input field
-            input.focus();
-
-            // When the input field loses focus, save the value
-            input.on('blur', function () {
-                // Update the cell with the new value
-                cell.data(input.val()).draw();
-            });
-
-            // Allow saving when the Enter key is pressed
-            input.on('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    cell.data(input.val()).draw();  // Save the new value
-                }
-            });
-        }
-    });
-});
-
-
-
-
-
-// Event handler for the "loadOrder" button
-$("#loadOrder").on("click", function () {
-    $("#newOrder").prop("disabled", true);
-    // Fetch the recent orders via AJAX
-    $.ajax({
-        url: "/fetch_recent_orders",
-        method: "GET",
-        success: function (response) {
-            if (!Array.isArray(response) || response.length === 0) {
-                alert("No recent orders found.");
-                return;
-            }
-
-            // Populate the table with the fetched orders
-            const tableBody = $("#orderHistoryTable tbody");
-            tableBody.empty(); // Clear existing rows
-
-            response.forEach(order => {
-                const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing
-                const row = `
-                    <tr>
-                        <td>
-                            <input type="radio" name="selectedOrder" value="${order.order_id}"
-                            ${order.order_status === "Saved" ? "" : "disabled"}>
-                        </td>
-                        <td>${order.order_id || "N/A"}</td>
-                        <td>${order.shop_id || "N/A"}</td>
-                        <td>${shopName}</td>
-                        <td>${order.order_open_date || ""}</td>
-                        <td>${order.user || ""}</td>
-                        <td>${order.order_status || ""}</td>
-                        <td>${order.order_status_date || ""}</td>
-                        <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>
-                        <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>
-                    </tr>
-                `;
-                tableBody.append(row);
-            });
-
-            // Show the modal
-            $("#orderHistoryModal").modal("show");
-        },
-        error: function (xhr, status, error) {
-            console.error("Failed to fetch recent orders:", error);
-            alert("An error occurred while fetching recent orders. Please try again.");
-        }
-    });
-});
-
-// Event listener for the Confirm Selection button
-$("#confirmOrderSelection").on("click", function () {
-    // Get the selected radio button
-    const selectedOrder = $("input[name='selectedOrder']:checked").val();
-    if (selectedOrder) {
-        const row = $("input[name='selectedOrder']:checked").closest("tr");
-        const shopCode = row.find("td:nth-child(3)").text().trim(); // Shop Code column
-        const shopName = row.find("td:nth-child(4)").text().trim(); // Shop Name column
-        const soldQty = row.find("td:nth-child(9)").text().trim(); // Sold Qty column
-        const replenishQty = row.find("td:nth-child(10)").text().trim(); // Replenish Qty column
-
-        // Call the loadExistingOrder function with the selected details
-        loadExistingOrder(shopName, selectedOrder, soldQty, replenishQty);
-        $("#orderHistoryModal").modal("hide");
-    } else {
-        alert("Please select a saved order to continue.");
-    }
-});
-
-function loadOrderTemplate(data, orderId, shopName) {
-    console.log(data);
-
-    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-        $('#ProductOrderTemplate').DataTable().destroy();
-    }
-
-    const table = $('#ProductOrderTemplate').DataTable({
-        data: data,
-        columns: [
-            { title: "SKU", data: "sku" },
-            { title: "Product Name", data: "product_name" },
-            { title: "Current Stock Count", data: "current_stock" , visible: false },
-            { title: "Qty Sold in Period", data: "threshold_qty" , visible: false },
-            { title: "Calculated Replenish", data: "replenish_qty", visible: false },
-            {
-                title: "Send Quantity",
-                data: "replenish_order",
-                className: 'editable',
-                render: function(data, type, row) {
-                    if (type === 'display') {
-                        let replenishOrder = 0;
-                        const qtySoldInPeriod = row.threshold_qty || 0;
-                        const currentStockCount = row.current_stock || 0;
-                        const calculatedReplenish = row.replenish_qty || 0;
-
-                     //   if (qtySoldInPeriod > currentStockCount) {
-                     //       replenishOrder = calculatedReplenish - currentStockCount;
-                     //   }
-
-                        return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
-                    }
-                    return data ?? 0;
-                }
-            },
-            {
-                title: "Comments",
-                data: null,
-                className: 'editable',
-                defaultContent: '',
-                render: function(data, type, row) {
-                    if (type === 'display') {
-                        return `<input type="text" class="comments-edit" value="${row.comments || ''}" />`;
-                    }
-                    return data;
-                }
-            }
-        ],
-        pageLength: 300,
-        order: [[5, 'desc']],
-        autoWidth: false,
-        paging: true,
-        searching: true,
-        responsive: true,
-        dom: 'Bfrtip',
-        buttons: [
-            {
-                text: 'Save Picking Slip',
-                action: function (e, dt, button, config) {
-                    savePickingSlip(orderId, shopName);
-                }
-            }
-        ],
-    });
-
-    $('#ProductOrderTemplate').show();
-
-    $("#saveOrder").prop("disabled", false);
-    $("#resetQty").prop("disabled", false);
-    $("#cancelOrder").prop("disabled", false);
-    $("#closeOrder").prop("disabled", false);
-    $("#submitOrder").prop("disabled", false);
-}
-
-// Function to save picking slip as a CSV file
-function savePickingSlip(orderId, shopName) {
-    const table = $('#ProductOrderTemplate').DataTable();
-    const data = [];
-    const headers = [];
-
-    // Extract table headers
-    table.columns().every(function () {
-        headers.push(this.header().textContent.trim());
-    });
-    data.push(headers);
-
-    // Extract table data, but filter rows where Replenish Order > 0
-    table.rows().every(function () {
-        const rowData = [];
-        const row = $(this.node());
-        const replenishOrderInput = row.find('td:nth-child(6) input'); // Replenish Order column (input field)
-
-        // Only include row if Replenish Order is greater than 0
-        const replenishOrder = parseFloat(replenishOrderInput.val()) || 0;
-        if (replenishOrder > 0) {
-            // Extract values from each cell
-            row.find('td').each(function () {
-                const input = $(this).find('input');
-                rowData.push(input.length ? input.val() : $(this).text().trim());
-            });
-            data.push(rowData);
-        }
-    });
-
-    // Check if there is data to save
-    if (data.length <= 1) {
-        alert("No records with Send Qty greater than 0 to save.");
         return;
     }
 
-    // Create CSV content
-    const csvContent = data.map(row => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `${orderId}_${shopName}.csv`;
+    const shopId = "{{shop.customer}}"; // Replace with actual shop_id logic
 
-    // Trigger download
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-
-
-    // Function to load the existing order data into the table
-    function loadExistingOrder(shop_name, order_id, sold_qty, replenish_qty) {
-        //alert(`Load existing order with Shop Name: ${shop_name}, Order ID: ${order_id}, Sold Qty: ${sold_qty}, Replenish Qty: ${replenish_qty}`);
-            // Set the input fields with the parameters
-            $('#replenishShop').val(shop_name); // Assuming this field accepts the shop name
-            $("#thresholdQty").val(sold_qty);
-            $("#replenishQty").val(replenish_qty);
-            $("#orderName").val(order_id);
-
-            // Trigger the "newOrder" button click
-            $("#newOrder").trigger("click");
+    if ($("#Timesheet").length === 0) {
+        console.error("Table element #Timesheet does not exist in the DOM!");
+        return;
     }
 
+    // Destroy existing DataTable properly
+    if ($.fn.DataTable.isDataTable('#Timesheet')) {
+        $('#Timesheet').DataTable().clear().destroy();
+        $('#Timesheet tbody').empty();  // Ensure tbody is empty before reloading data
+    }
 
-    $("#saveOrder").on("click", function() {
-<!--        if(! _saved){-->
-<!--            dialog("Nothing to save","No changes made to the order");-->
-<!--            return 0;-->
-<!--        }-->
+    try {
+        const ctrlResponse = await fetch(`/get_timesheet_status/${shopId}/${selectedWeek}`);
+        const timesheetCtrl = await ctrlResponse.json();
+        $("#Manager").val(timesheetCtrl['confirmed_by']);
+        $("#tsStatus").val(timesheetCtrl['status']);
 
-        // Check if the filter is on
-        if ($("#ProductOrderTemplate_filter input").val().length > 0) {
-            dialog("Filter Is On", "Can't save the order while search filter is on. Please clear the search filter before saving the order");
+        const casualsResponse = await fetch(`/get_week_casuals/${shopId}/${selectedWeek}`);
+        let casualsData = await casualsResponse.json();
+        console.log("Casuals Data:", casualsData);
+
+        const datesResponse = await fetch(`/get_week_dates/${selectedWeek}`);
+        const allWeekDates = await datesResponse.json();
+
+        let casualsMap = {};
+        casualsData.forEach(entry => {
+            casualsMap[entry.date] = entry.casuals ? entry.casuals.split("|") : [];
+        });
+
+        console.log("Casual Map:", casualsMap);
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        let normalizedWeekDates = allWeekDates.map(date => formatDate(date));
+
+        let data = normalizedWeekDates.map(date => ({
+            date: date,
+            casual1: casualsMap[date]?.[0] || '',
+            casual2: casualsMap[date]?.[1] || '',
+            casual3: casualsMap[date]?.[2] || '',
+            casual4: casualsMap[date]?.[3] || ''
+        }));
+
+        console.log("Data Length:", data.length);
+        if (data.length === 0) {
+            alert("No data available to display!");
             return;
         }
 
-        if ($("#trackingCode").val() === null || $("#trackingCode").val() === "") {
-            dialog("Tracking Code","Please enter tracking code.");
-            return 0;
-        }
-        const tableData = [];
-        const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
-            $("#ProductOrderTemplate thead th:contains('Send Quantity')")
-        ); // Find the index of the "Order Qty" column
-        let allQtyZero = true; // Track if all "Order Qty" are zero
-        let isValid = true; // Flag to check if all "Order Qty" are valid numbers
-
-        $("#ProductOrderTemplate tbody tr").each(function() {
-            const row = [];
-            let orderQtyValue = 0;
-            let productName = '';  // Store product name to show in the error message if needed
-
-            $(this).find("td").each(function(index) {
-                const cellValue = $(this).find("input").length > 0
-                    ? $(this).find("input").val()  // Get input value if present
-                    : $(this).text().trim();       // Otherwise, get text content
-
-                if (index === orderQtyIndex) {
-                    orderQtyValue = parseFloat(cellValue) || 0; // Parse "Order Qty" value
-                    productName = $(this).closest("tr").find("td:nth-child(2)").text().trim(); // Get product name from second column
-
-                    if (orderQtyValue !== 0) {
-                        allQtyZero = false; // If any "Order Qty" is non-zero, set allQtyZero to false
-                    }
-
-                    if (isNaN(orderQtyValue) || orderQtyValue < 0) {
-                        isValid = false; // If "Order Qty" is not a valid number (less than 0 or NaN)
-                        alert(`Please enter valid value to ${productName} field`);
-                        return false;  // Exit the loop early if invalid value is found
-                        _saved = false;
-                    }
-                }
-
-                row.push(cellValue);
-            });
-
-            // Only include the row if "Order Qty" is greater than 0
-            if (orderQtyValue > 0) {
-                tableData.push(row);
-            }
+        const table = $('#Timesheet').DataTable({
+            data: data,
+            columns: [
+                { data: 'date' },
+                { data: 'casual1', render: (data) => `<input type="text" value="${data || ''}" class="casual-input">` },
+                { data: 'casual2', render: (data) => `<input type="text" value="${data || ''}" class="casual-input">` },
+                { data: 'casual3', render: (data) => `<input type="text" value="${data || ''}" class="casual-input">` },
+                { data: 'casual4', render: (data) => `<input type="text" value="${data || ''}" class="casual-input">` }
+            ]
         });
 
-        // If all "Order Qty" values are zero, show an alert and stop the process
-        if (allQtyZero) {
-            dialog("Empty Order","You have not entered any order quantity.");
-            _saved = false;
-            return; // Stop the execution of the order saving
+        $("#Timesheet").css('visibility', 'visible').show();
+        table.columns.adjust().draw();  // Ensure proper table rendering
+
+        $("#tsStatus").val() == 'Confirmed' ? $("#saveOrder").prop("disabled", true) : $("#saveOrder").prop("disabled", false );
+
+        $("#closeOrder").prop("disabled", false);
+
+        if (timesheetCtrl.status === "Empty") {
+            alert("No existing timesheet found. A new one has been created.");
         }
 
-        // If the order quantities are valid, proceed to save the order
-        if (isValid) {
-            const order_id = $("#orderName").val();          // Get the order ID from input
-            const shop =  getShopCodeByBlName($('#replenishShop').val())       // Ensure shop variable is serialized
-            const user_name = {{user.username | tojson}};         // Ensure user_name variable is serialized
-            const date = getCurrentDate();                  // Get current date in YYYYMMDD format
-            const tracking_code = $("#trackingCode").val()
-            const sold_qty = $("#thresholdQty").val()
-            const replenish_qty = $("#replenishQty").val()
-
-            $.ajax({
-                url: "/save_replenish",
-                method: "POST",
-                contentType: "application/json",
-                data: JSON.stringify({
-                    table: tableData,
-                    shop: shop,
-                    user_name: user_name,
-                    order_id: order_id,
-                    date: date,
-                    tracking_code : tracking_code,
-                    sold_qty : sold_qty,
-                    replenish_qty : replenish_qty,
-                    status : "Saved",
-                    type: "inter"
-                }),
-                success: function(response) {
-                    console.log("Data submitted successfully:", response);
-                    dialog("Save Order","Order was saved successfully");
-                    _saved = true;
-                },
-                error: function(error) {
-                    console.error("Error submitting data:", error);
-                    _saved = false;
-                }
-            });
-        }
-    });
-
-
-$("#submitOrder").on("click", async function(event) {
-    const address_to = $("#replenishShop").val();
-    const order_id = $("#orderName").val();
-    const shop_code = getShopCodeByBlName($('#replenishShop').val());
-    const user_name = {{user.username | tojson}};   // Assuming you get the user name somehow, e.g., from a logged-in user session
-    const tracking_code = $("#trackingCode").val(); // You can set the tracking code here, based on your application logic
-
-    // Check if the order is saved (assuming _saved is updated during saveOrder execution)
-    if (_saved) {
-        const data = {
-            order_id: order_id,
-            user_name: user_name,
-            tracking_code: tracking_code
-        };
-
-        try {
-            // Call the submit_replenish route to submit the order
-            const response = await fetch('/submit_replenish', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
-
-            const result = await response.json();
-
-            if (result.status === "success") {
-                // Create a notification
-                const now = new Date();
-                const notificationData = {
-                    not_date: now,
-                    not_address: address_to,
-                    not_subject: "Order From Head Office",
-                    not_body: `New order ${order_id} was created by Head Office`,
-                    not_status: "unread"
-                };
-
-                const notificationResponse = await fetch('/create_notification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(notificationData),
-                });
-
-                const notificationResult = await notificationResponse.json();
-
-                // Show success dialog
-                dialog("Order Submit", `<p>Order submitted successfully.<br>You may close the order now.</p>`);
-            } else {
-                // Handle any errors from the /submit_replenish route
-                dialog("Error", `<p>Error in submitting the order.<br>${result.message}</p>`);
-            }
-
-        } catch (error) {
-            console.error('Error:', error);
-            dialog("Error", `<p>Error in submitting the order <br>${error}</p>`);
-        }
-    } else {
-        dialog("Save Order", "Please save the order before submitting.");
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        alert("Error loading timesheet data.");
     }
 });
 
+
+
+$("#saveOrder").on("click", function() {
+    let manager = $("#Manager").val().trim();
+    let shopId = "{{shop.customer}}"; // Ensure this is set correctly
+    let week = $("#week").val();
+    let data = [];
+
+    if (!manager) {
+        alert("Manager field is required.");
+        return;
+    }
+
+    let validEntry = false;
+
+    $("#Timesheet tbody tr").each(function() {
+        let date = $(this).find("td:eq(0)").text().trim();
+        let casuals = [];
+
+        for (let i = 1; i <= 4; i++) {
+            let casual = $(this).find(`td:eq(${i}) input`).val()?.trim() || $(this).find(`td:eq(${i})`).text().trim();
+            if (casual) {
+                casuals.push(casual);
+                validEntry = true;
+            }
+        }
+
+        if (date && casuals.length > 0) {
+            data.push({ date: date, casuals: casuals.join('|') });
+        }
+    });
+
+    if (!validEntry) {
+        alert("At least one name must be entered.");
+        return;
+    }
+
+    let today = new Date().toISOString().split('T')[0];
+    for (let entry of data) {
+        if (new Date(entry['date']) > new Date(today)) {
+            alert("Future dates are not allowed.");
+            return;
+        }
+    }
+
+    $.ajax({
+        url: "/save_timesheet",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            shop_id: shopId,
+            week: week,
+            manager: manager,
+            timesheet: data
+        }),
+        success: function(response) {
+            alert("Timesheet saved successfully!");
+            $("#tsStatus").val("Saved");
+            $("#confirmTS").prop("disabled", false);
+            $("#closeOrder").prop("disabled", false);
+        },
+        error: function() {
+            alert("Error saving timesheet.");
+        }
+    });
+
+});
+
+
+// jQuery click event for Confirm Timesheet button
+$("#confirmTS").on("click", function() {
+    let shopId = "{{shop.customer}}";
+    let week = $("#week").val().trim();
+    let manager = $("#Manager").val().trim();
+
+    // Validate inputs
+    if (!manager) {
+        alert("Manager field is required.");
+        return;
+    }
+
+    // Send confirmation request to Flask
+    $.ajax({
+        url: "/confirm_timesheet",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            shop_id: shopId,
+            week: week,
+            manager: manager
+        }),
+        success: function(response) {
+            alert("Timesheet confirmed successfully!");
+            $("#tsStatus").val("Confirmed");
+            $("#confirmTS").prop("disabled", true);
+            $("#saveOrder").prop("disabled", true);
+        },
+        error: function() {
+            alert("Error confirming timesheet.");
+        }
+    });
+});
 
 
 
  });
-  //////// EVENTS //////////
-$("#cancelOrder").on("click", function(event) {
-<!--    if (allOrderQtyZero()) {-->
-<!--        dialog("Zero Order Quantity" ,"Can't cancel order where all order qty are zero's");-->
-<!--        return; // Exit the function if all Order Qty values are zero-->
-<!--    }-->
-    if(!_saved){
-        dialog("Order Not Saved","Can't cancel unsaved order.");
-        return;
-    }
-    // Show the confirmation modal
-    $('#cancelModal').modal('show');
-});
 
-    // Handle the confirmation action when the user clicks "Yes, Cancel"
-    $("#confirmCancel").on("click", function() {
-
-    const order_id = $("#orderName").val();
-
-    $.ajax({
-        url: '/delete_replenish_order',
-        type: 'POST',
-        contentType: 'application/json', // Set the content type to JSON
-        data: JSON.stringify({ order_id: order_id }),
-        success: function(response) {
-            console.log(response.message); // Success message from Flask
-            dialog("Delete Order", "Order was deleted successfully");
-        },
-        error: function(error) {
-            console.error("Error deleting the order:", error.responseText);
-            dialog("Delete Order Error", "Order could not be deleted");
-        }
-    });
-
-
-    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-        $('#ProductOrderTemplate').DataTable().clear().destroy(); // Clear and destroy the DataTable instance
-    }
-
-    // Gradually hide the table and clear its content
-    $('#ProductOrderTemplate').fadeOut(1000, function() {
-        $('#ProductOrderTemplate thead').empty();
-        $('#ProductOrderTemplate tbody').empty();
-        $('#ProductOrderTemplate').hide();  // Hide the table completely
-    });
-
-    // Close the modal after the action is confirmed
-    $('#cancelModal').modal('hide');
-
-   // disable buttons
-        $("#saveOrder").prop("disabled", true);
-        $("#resetQty").prop("disabled", true);
-        $("#submitOrder").prop("disabled", true);
-        $("#cancelOrder").prop("disabled", true);
-        $("#closeOrder").prop("disabled", true);
-        $("#newOrder").prop("disabled", false);
-        $("#orderName").val("");
-});
 
 $("#closeOrder").on("click", function(event) {
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
+        if ($.fn.DataTable.isDataTable('#Timesheet')) {
+            $('#Timesheet').DataTable().destroy();
         }
-        $('#ProductOrderTemplate').fadeOut(1000, function() {
-        $('#ProductOrderTemplate thead').empty();
-        $('#ProductOrderTemplate tbody').empty();
-        $('#ProductOrderTemplate').hide();  // Hide the table completely
+        $('#Timesheet').fadeOut(1000, function() {
+        $('#Timesheet thead').empty();
+        $('#Timesheet tbody').empty();
+        $('#Timesheet').hide();  // Hide the table completely
         $("#saveOrder").prop("disabled", true);
-        $("#resetQty").prop("disabled", true);
-        $("#submitOrder").prop("disabled", true);
-        $("#cancelOrder").prop("disabled", true);
         $("#closeOrder").prop("disabled", true);
         $("#newOrder").prop("disabled", false);
-        $("#loadOrder").prop("disabled", false);
-        $("#orderName").val("");
+        $("#confirmTS").prop("disabled", true);
+        $("#Manager").val("");
+        $("#tsStatus").val("");
     });
 });
 
-$("#resetQty").on("click", function() {
-    // Ensure the table is a DataTable instance
-    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-        // Get the DataTable instance
-        const table = $('#ProductOrderTemplate').DataTable();
 
-        // Loop through all rows and update the 'Order Qty' column
-        table.rows().every(function() {
-            const rowData = this.data();
-            rowData.replenish_order = 0; // Assuming 'rejects_qty' corresponds to "Order Qty"
-            this.data(rowData); // Update the row with modified data
-        });
-
-        // Redraw the table to reflect changes
-        table.draw(false);
-        _saved = false;
-    } else {
-        console.error("ProductOrderTemplate is not initialized as a DataTable.");
-    }
-});
 
  // Event listener for the custom tableChanged event
 $(document).on("tableChanged", function() {
