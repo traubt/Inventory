@@ -1808,7 +1808,7 @@ def get_business_report():
 
         # Check if no data is returned
         if not data:
-            return jsonify({"message": "Error fetching sales report"}), 500
+            return jsonify({"message": "Error fetching report"}), 500
 
         # Extract column titles dynamically
         columns = [{"title": key} for key in data[0].keys()] if data else []
