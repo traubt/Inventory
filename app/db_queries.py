@@ -2127,7 +2127,7 @@ def get_back_order():
                 b.store_customer,
                 c.blName AS shop_name,
                 COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 14 DAY THEN a.sales_id END) AS threshold_sold_qty,
-                COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 28 DAY THEN a.sales_id END) AS replenish_qty,
+                COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL 35 DAY THEN a.sales_id END) AS replenish_qty,
                 COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
             FROM 
                 toc_product d
@@ -2193,7 +2193,7 @@ def get_back_order():
                           AND tro.received_date > st.stock_qty_date
                     ), 0) AS gross_stock_qty,  -- Updated current_stock_qty calculation
                     st.stock_transfer as stock_movement,
-                    s.replenish_qty AS 4_weeks_sales,
+                    s.replenish_qty AS 5_weeks_sales,
                 ( 
                     st.final_stock_qty + st.stock_transfer
                     - s.sales_since_stock_read 
@@ -2376,13 +2376,24 @@ def get_timesheet_history(from_date,to_date):
 
     # Query to retrieve the stock order form
     query = '''
-            select s.blName as shop_name, c.week, w.from_date, w.to_date, c.status, c.status_date, c.confirmed_by, b.casuals as list_of_casuals, b.date as date_worked
-            from toc_casuals_ctrl c
-            join toc_shops s on c.shop_id = s.customer
-            join toc_casuals b on c.shop_id = b.shop_id and c.week = b.week
-            join toc_weeks w on c.week = w.week
-            WHERE w.from_date > %s  AND w.to_date < %s
-            order by w.to_date desc;
+            SELECT 
+                s.blName AS shop_name, 
+                c.week, 
+                DATE_FORMAT(w.from_date, '%%Y-%%m-%%d') AS from_date, 
+                DATE_FORMAT(w.to_date, '%%Y-%%m-%%d') AS to_date, 
+                c.status, 
+                DATE_FORMAT(c.status_date, '%%Y-%%m-%%d %%H:%%i') AS status_date, 
+                c.confirmed_by, 
+                b.casuals AS list_of_casuals, 
+                DATE_FORMAT(b.date, '%%Y-%%m-%%d') AS date_worked
+            FROM toc_casuals_ctrl c
+            JOIN toc_shops s ON c.shop_id = s.customer
+            JOIN toc_casuals b ON c.shop_id = b.shop_id AND c.week = b.week
+            JOIN toc_weeks w ON c.week = w.week
+            WHERE w.from_date > %s  
+            AND w.to_date < %s
+            ORDER BY w.to_date DESC;
+
             '''
 
     # Execute the query with the parameter
