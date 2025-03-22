@@ -140,7 +140,7 @@ class TocStock(db.Model):
 
     shop_id = db.Column(db.String(20), primary_key=True, nullable=False)
     sku = db.Column(db.String(45), primary_key=True, nullable=False)
-    stock_qty_date = db.Column(db.DateTime, primary_key=True, nullable=False)
+    stock_qty_date = db.Column(db.DateTime,  nullable=False)
     product_name = db.Column(db.String(100), nullable=True)
     stock_count = db.Column(db.Float, nullable=True)
     count_by = db.Column(db.String(45), nullable=True)
