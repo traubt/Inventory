@@ -13,7 +13,7 @@
         <label for="password">Password</label>
         <input type="password" class="form-control" id="password" name="password" required>
       </div>
-      <button type="submit" class="btn btn-primary">Login</button>
+      <button type="submit" id="submit" class="btn btn-primary">Login</button>
 <!--      <a id="register" href="{{ url_for('main.register') }}" class="btn btn-secondary">Register</a>-->
     </form>
   </div>
@@ -28,6 +28,78 @@
             event.preventDefault(); // Prevent the default action (navigation)
         }
     })
+
+var _ip, _city, _country, _loc, _postal, _region, _timezone, _country_code, _country_calling_code;
+
+$("#submit").on("click", async function (event) {
+    //event.preventDefault(); // Prevent immediate submission
+
+    try {
+        // Fetch IP address
+        let ipResponse = await fetch('https://api.ipify.org?format=json');
+        let ipData = await ipResponse.json();
+        let _ip = ipData.ip;
+
+        // Fetch IP details
+        let geoResponse = await fetch("https://ipapi.co/" + _ip + "/json/");
+        let geoData = await geoResponse.json();
+
+        // Assign data from geo API
+        let _city = geoData.city;
+        let _country = geoData.country_name;
+        let _loc = geoData.latitude + "/" + geoData.longitude;
+        let _postal = geoData.postal;
+        let _region = geoData.region;
+        let _timezone = geoData.timezone;
+        let _country_code = geoData.country_code;
+        let _country_calling_code = geoData.country_calling_code;
+
+        // Log values for debugging
+        console.log(_ip, _city, _country, _postal, _region, _loc, _timezone, _country_code);
+
+        // Send data to Flask backend
+        let response = await fetch("/update_user_login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",  // Ensure session cookies are sent
+            body: JSON.stringify({
+                last_login_date: new Date().toISOString(), // Current timestamp
+                ip: _ip,
+                city: _city,
+                county: _country, // Adjust based on DB structure
+                loc: _loc,
+                postal: _postal,
+                region: _region,
+                timezone: _timezone,
+                country_code: _country_code,
+                country_calling_code: _country_calling_code,
+            }),
+        });
+
+        let result = await response.json();
+        if (result.success) {
+            console.log("Login details updated successfully.");
+
+<!--            // Get the form element properly-->
+<!--            let loginForm = document.querySelector("form");-->
+
+<!--            if (loginForm) {-->
+<!--                loginForm.submit();  // Ensure the form is submitted properly-->
+<!--            } else {-->
+<!--                console.error("Error: Form element not found!");-->
+<!--            }-->
+        } else {
+            alert("Error updating login details.");
+        }
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    }
+});
+
+
+
 
 </script>
 
