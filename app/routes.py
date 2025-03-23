@@ -2345,6 +2345,36 @@ def get_week_casuals(shop_id, week):
         } for casual in casuals
     ])
 
+@main.route("/update_user_login", methods=["POST"])
+def update_user_login():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    user_id = user["id"]
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json()
+
+    try:
+        user.last_login_date = datetime.now(timezone.utc)
+        user.ip = data.get("ip")
+        user.city = data.get("city")
+        user.county = data.get("county")
+        user.loc = data.get("loc")
+        user.postal = data.get("postal")
+        user.region = data.get("region")
+        user.timezone = data.get("timezone")
+        user.country_code = data.get("country_code")
+        user.country_calling_code = data.get("country_calling_code")
+
+        db.session.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)

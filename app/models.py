@@ -13,6 +13,7 @@ class User(db.Model):
     username = db.Column(db.String(45), nullable=True)
     password = db.Column(db.String(45), nullable=True)
     creation_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_login_date = db.Column(db.DateTime, nullable=True)
     first_name = db.Column(db.String(45), nullable=True)
     last_name = db.Column(db.String(45), nullable=True)
     email = db.Column(db.String(100), unique=True, nullable=True)
@@ -23,6 +24,15 @@ class User(db.Model):
     phone = db.Column(db.String(45), nullable=True)
     about = db.Column(db.String(200), nullable=True)
     profile_image = db.Column(db.String(100), nullable=True)
+    ip = db.Column(db.String(45), nullable=True)
+    city = db.Column(db.String(45), nullable=True)
+    county = db.Column(db.String(45), nullable=True)
+    loc = db.Column(db.String(45), nullable=True)
+    postal = db.Column(db.String(45), nullable=True)
+    region = db.Column(db.String(45), nullable=True)
+    timezone = db.Column(db.String(45), nullable=True)
+    country_code = db.Column(db.String(45), nullable=True)
+    country_calling_code = db.Column(db.String(45), nullable=True)
 
 class TOC_SHOPS(db.Model):
     __tablename__ = 'toc_shops'
