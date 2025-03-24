@@ -700,6 +700,7 @@ function savePickingSlip(orderId, shopName) {
             $("#thresholdQty").val(sold_qty);
             $("#replenishQty").val(replenish_qty);
             $("#orderName").val(order_id);
+            $("#trackingCode").val(`TRK${getShopCodeByBlName($('#replenishShop').val())}${getCurrentDate()}`);
 
             fetch('/get_product_replenish_form', {
                 method: 'POST',  // Use POST or GET based on your requirement
