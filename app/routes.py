@@ -837,11 +837,12 @@ def get_product_replenish_form():
         selected_shop = data.get('shop')
         history_sold = data.get('sold')
         replenish_qty = data.get('replenish')
+        order_id = data.get('order_id')
 
         # Print the selected shop value
         print(f"Selected shop from client: {selected_shop}")
 
-        data = get_replenish_order_form(selected_shop,history_sold,replenish_qty)
+        data = get_replenish_order_form(order_id,selected_shop,history_sold,replenish_qty)
     #
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
@@ -1403,7 +1404,7 @@ def fetch_history_orders():
         db.session.query(TOCReplenishCtrl)
         .filter(TOCReplenishCtrl.sent_from == shop_code)  # 2/3/2025 Internal transfer Add filter condition
         .order_by(TOCReplenishCtrl.order_open_date.desc())
-        .limit(20)
+        .limit(100)
         .all()
     )
 
@@ -1555,7 +1556,7 @@ def update_count_receive_stock():
 
             if stock_record:
                 stock_record.stock_transfer = stock_record.stock_transfer + stock_count
-                stock_record.stock_qty_date = date
+                stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
             else:
                 raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the receiving shop")
 
@@ -1574,7 +1575,7 @@ def update_count_receive_stock():
             # 3. Deduct stock from the sending shop stock
             if stock_record:
                 toc_stock_record.stock_transfer = toc_stock_record.stock_transfer - stock_count
-                toc_stock_record.stock_qty_date = date
+                toc_stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
             else:
                 raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the replenish shop")
 
