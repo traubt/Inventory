@@ -339,59 +339,6 @@ $("#loadOrder" ).on("click", function () {
     });
 });
 
-// Event handler for the "loadOrder" button
-<!--$("#viewHistory").on("click", function () {-->
-<!--    $("#newOrder").prop("disabled", true);-->
-<!--    // Fetch the recent orders via AJAX-->
-
-<!--       // Get the value of #replenishShop. If not selected the default Head Office-->
-<!--    const replenishShop = $("#replenishShop").val();-->
-<!--    _history_mode = true;-->
-
-<!--    $.ajax({-->
-<!--        url: "/fetch_history_orders",-->
-<!--        method: "GET",-->
-<!--        data: { replenishShop: replenishShop },-->
-<!--        success: function (response) {-->
-<!--            if (!Array.isArray(response) || response.length === 0) {-->
-<!--                alert("No recent orders found.");-->
-<!--                return;-->
-<!--            }-->
-
-<!--            // Populate the table with the fetched orders-->
-<!--            const tableBody = $("#orderHistoryTable tbody");-->
-<!--            tableBody.empty(); // Clear existing rows-->
-
-<!--            response.forEach(order => {-->
-<!--                const shopName = getShopNameByCode(order.shop_id) || "Unknown"; // Fallback to 'Unknown' if shop name is missing-->
-<!--                const row = `-->
-<!--                    <tr>-->
-<!--                        <td>-->
-<!--                         <input type="radio" name="selectedOrder" value="${order.order_id}">-->
-<!--                        </td>-->
-<!--                        <td>${order.order_id || "N/A"}</td>-->
-<!--                        <td>${order.shop_id || "N/A"}</td>-->
-<!--                        <td>${shopName}</td>-->
-<!--                        <td>${order.order_open_date || ""}</td>-->
-<!--                        <td>${order.user || ""}</td>-->
-<!--                        <td>${order.order_status || ""}</td>-->
-<!--                        <td>${order.order_status_date || ""}</td>-->
-<!--                        <td>${order.sold_qty !== null ? order.sold_qty : ""}</td>-->
-<!--                        <td>${order.replenish_qty !== null ? order.replenish_qty : ""}</td>-->
-<!--                    </tr>-->
-<!--                `;-->
-<!--                tableBody.append(row);-->
-<!--            });-->
-
-<!--            // Show the modal-->
-<!--            $("#orderHistoryModal").modal("show");-->
-<!--        },-->
-<!--        error: function (xhr, status, error) {-->
-<!--            console.error("Failed to fetch recent orders:", error);-->
-<!--            alert("An error occurred while fetching recent orders. Please try again.");-->
-<!--        }-->
-<!--    });-->
-<!--});-->
 
 $("#viewHistory").on("click", function () {
     $("#newOrder").prop("disabled", true);
@@ -617,6 +564,73 @@ function loadOrderTemplate(data, orderId, shopName) {
     $("#submitOrder").prop("disabled", false);
 }
 
+function loadSavedOrder(data, orderId, shopName) {
+    console.log(data);
+
+    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+        $('#ProductOrderTemplate').DataTable().destroy();
+    }
+
+    const table = $('#ProductOrderTemplate').DataTable({
+        data: data,
+        columns: [
+            { title: "SKU", data: "sku" },
+            { title: "Product Name", data: "product_name" },
+            { title: "Current Stock Count", data: "current_stock" },
+            { title: "Qty Sold in Period", data: "threshold_qty" },
+            { title: "Calculated Replenish", data: "replenish_qty" },
+       //     { title: "Replenish Order", data: "replenish_order" },
+            {
+                title: "Replenish Order",
+                data: "replenish_order",
+                className: 'editable',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        replenishOrder = row.replenish_order || 0;
+                        return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
+                    }
+                    return data ?? 0;
+                }
+            },
+            {
+                title: "Comments",
+                data: null,
+                className: 'editable',
+                defaultContent: '',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="text" class="comments-edit" value="${row.comments || ''}" />`;
+                    }
+                    return data;
+                }
+            }
+        ],
+        pageLength: 300,
+        order: [[5, 'desc']],
+        autoWidth: false,
+        paging: true,
+        searching: true,
+        responsive: true,
+        dom: 'Bfrtip',
+        buttons: [
+            {
+                text: 'Save Picking Slip',
+                action: function (e, dt, button, config) {
+                    savePickingSlip(orderId, shopName);
+                }
+            }
+        ],
+    });
+
+    $('#ProductOrderTemplate').show();
+
+    $("#saveOrder").prop("disabled", false);
+    $("#resetQty").prop("disabled", false);
+    $("#cancelOrder").prop("disabled", false);
+    $("#closeOrder").prop("disabled", false);
+    $("#submitOrder").prop("disabled", false);
+}
+
 // Function to save picking slip as a CSV file
 function savePickingSlip(orderId, shopName) {
     const table = $('#ProductOrderTemplate').DataTable();
@@ -687,8 +701,25 @@ function savePickingSlip(orderId, shopName) {
             $("#replenishQty").val(replenish_qty);
             $("#orderName").val(order_id);
 
-            // Trigger the "newOrder" button click
-            $("#newOrder").trigger("click");
+            fetch('/get_product_replenish_form', {
+                method: 'POST',  // Use POST or GET based on your requirement
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    shop: $('#replenishShop').val(),  // Send the selected shop value to the server
+                    sold: $("#thresholdQty").val(),
+                    replenish: $("#replenishQty").val(),
+                    order_id: $("#orderName").val()
+                })
+            })
+            .then(response => response.json())
+            .then(rows => {
+                loadSavedOrder(rows,$("#orderName").val(),$("#replenishShop").val());
+            })
+            .catch(error => {
+                console.error('Error fetching the order template:', error);
+            });
     }
 
 
