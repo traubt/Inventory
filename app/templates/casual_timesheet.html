@@ -414,6 +414,20 @@ $("#confirmTS").on("click", function() {
         return;
     }
 
+
+    // validate if confirmation
+    const selectedWeek = $("#week option:selected").text()
+    const to_date = selectedWeek.match(/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/)[2];
+    const d_to_date = new Date(to_date);
+    const d_today = new Date();
+
+    // Check if the selected week is the current week then don't allow confirmation
+    if (d_to_date >= d_today) {
+        alert("You can't confirm the current week as it is not finished yet!");
+        return 0;
+    }
+
+
     // Send confirmation request to Flask
     $.ajax({
         url: "/confirm_timesheet",
