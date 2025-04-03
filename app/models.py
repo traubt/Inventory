@@ -158,7 +158,7 @@ class TocStock(db.Model):
     calc_stock_qty = db.Column(db.Float, nullable=True)
     variance = db.Column(db.Float, nullable=False, default=0)
     variance_rsn = db.Column(db.String(45), nullable=True)
-    stock_transfer = db.Column(db.Float, nullable=True)
+    stock_transfer = db.Column(db.Float, nullable=True, default=0)
     shop_name = db.Column(db.String(45), nullable=True)
     rejects_qty = db.Column(db.Float, nullable=True)
     final_stock_qty = db.Column(db.Float, nullable=True)
