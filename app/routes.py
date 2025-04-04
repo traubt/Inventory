@@ -1556,7 +1556,8 @@ def update_count_receive_stock():
 
             if stock_record:
                 stock_record.stock_transfer = stock_record.stock_transfer + stock_count
-                stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
+                # 4/4 - Itsik asks that stock_qty_date only be reset at count and not movement
+                # stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
             else:
                 raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the receiving shop")
 
@@ -1575,7 +1576,7 @@ def update_count_receive_stock():
             # 3. Deduct stock from the sending shop stock
             if stock_record:
                 toc_stock_record.stock_transfer = toc_stock_record.stock_transfer - stock_count
-                toc_stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
+                # toc_stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
             else:
                 raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the replenish shop")
 
@@ -1602,7 +1603,7 @@ def update_count_receive_stock():
                 new_variance_record = TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
+                    # stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,
