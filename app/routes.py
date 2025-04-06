@@ -2400,7 +2400,7 @@ def get_closest_shop():
         customer_lng = float(request.args.get('longitude'))
 
         # Connect to the database
-        conn = get_db_connection()
+        conn = get_db_connection(dictionary=True)
 
         # Define the SQL query to get shop name, longitude, and latitude where longitude is not null
         query = """
