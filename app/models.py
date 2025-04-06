@@ -46,6 +46,8 @@ class TOC_SHOPS(db.Model):
     mt_shop_name = db.Column(db.String(50))
     actv_ind = db.Column(db.Integer)
     tier =  db.Column(db.String(2))
+    longitude = db.Column(db.String(20))
+    latitude = db.Column(db.String(20))
 
 class TocMessages(db.Model):
     __tablename__ = 'toc_messages'
