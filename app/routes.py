@@ -2377,6 +2377,77 @@ def update_user_login():
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
+######################  SHIPDAY implementation ############################
+
+import math
+
+# Helper function to calculate the distance between two coordinates using the Haversine formula
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Earth radius in kilometers
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distance = R * c  # Distance in kilometers
+    return distance
+
+
+@main.route('/get_closest_shop', methods=['GET'])
+def get_closest_shop():
+    try:
+        # Retrieve the customer coordinates from the request
+        customer_lat = float(request.args.get('latitude'))
+        customer_lng = float(request.args.get('longitude'))
+
+        # Connect to the database
+        conn = get_db_connection()
+
+        # Define the SQL query to get shop name, longitude, and latitude where longitude is not null
+        query = """
+            SELECT blName AS shop_name, longitude, latitude
+            FROM toc_shops 
+            WHERE longitude IS NOT NULL;
+        """
+
+        # Execute the query and fetch the results
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+        shops = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Check if no data was returned
+        if not shops:
+            return jsonify({"status": "error", "message": "No shops found with longitude"}), 404
+
+        # Find the closest shop using the Haversine formula
+        closest_shop = None
+        min_distance = 10000  # Start with 100 km distance
+
+        for shop in shops:
+            shop_lat = shop['latitude']
+            shop_lng = shop['longitude']
+            distance = haversine(customer_lat, customer_lng, shop_lat, shop_lng)
+            print(f"Shop: {shop['shop_name']}, distance from customer address: {distance} Km ")
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_shop = shop
+
+        # Return the closest shop information as JSON
+        if closest_shop:
+            closest_shop['distance'] = min_distance
+            return jsonify(closest_shop)
+
+        return jsonify({"status": "error", "message": "No closest shop found"}), 500
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
