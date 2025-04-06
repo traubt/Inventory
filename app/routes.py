@@ -2399,15 +2399,15 @@ def haversine(lat1, lon1, lat2, lon2):
 @main.route('/get_closest_shop', methods=['GET'])
 def get_closest_shop():
     try:
-        # Get customer coordinates from the request
-        customer_lat = float(request.args.get('latitude'))
-        customer_lng = float(request.args.get('longitude'))
+        # Retrieve the customer coordinates from the request
+        customer_lat = float(request.args.get('latitude'))  # Ensure it's a float
+        customer_lng = float(request.args.get('longitude'))  # Ensure it's a float
 
         # Connect to the database
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Define and execute query
+        # Define the SQL query to get shop name, longitude, and latitude where longitude is not null
         query = """
             SELECT blName, longitude, latitude
             FROM toc_shops 
@@ -2418,18 +2418,30 @@ def get_closest_shop():
         cursor.close()
         conn.close()
 
+        # Check if no data was returned
         if not shops:
             return jsonify({"status": "error", "message": "No shops found with longitude"}), 404
 
         # Find the closest shop using the Haversine formula
         closest_shop = None
-        min_distance = float('inf')
+        min_distance = float('inf')  # Start with an infinite distance
 
         for shop in shops:
-            shop_name, shop_lng, shop_lat = shop  # unpack tuple
+            shop_name, shop_lng, shop_lat = shop  # Unpack the shop tuple
+
+            # Ensure shop latitude and longitude are floats
+            try:
+                shop_lat = float(shop_lat)
+                shop_lng = float(shop_lng)
+            except ValueError as ve:
+                print(f"Error converting shop coordinates: {ve}")
+                continue  # Skip this shop if conversion fails
+
+            # Calculate the distance using the haversine function
             distance = haversine(customer_lat, customer_lng, shop_lat, shop_lng)
             print(f"Shop: {shop_name}, distance from customer address: {distance:.2f} Km")
 
+            # Update the closest shop if this one is closer
             if distance < min_distance:
                 min_distance = distance
                 closest_shop = {
@@ -2439,6 +2451,7 @@ def get_closest_shop():
                     'distance': round(distance, 2)
                 }
 
+        # Return the closest shop information as JSON
         if closest_shop:
             return jsonify(closest_shop)
 
@@ -2447,6 +2460,7 @@ def get_closest_shop():
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 
