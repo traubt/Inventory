@@ -115,6 +115,7 @@ class TocReplenishOrder(db.Model):
     received_comment = db.Column(db.String(100), nullable=True)
     pastel_ind = db.Column(db.Integer, default=0)
     save_count = db.Column(db.Float, default=0)
+    pastel_date = db.Column(db.DateTime, nullable=True)
 
 class TocProduct(db.Model):
     __tablename__ = 'toc_product'
