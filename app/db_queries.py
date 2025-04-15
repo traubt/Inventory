@@ -610,8 +610,8 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
                 c.blName AS shop_name,
                 COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
                 COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
-                -- COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
-                SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END) AS sales_since_stock_read
+                 COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
+                -- SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END) AS sales_since_stock_read
             FROM 
                 toc_product d
              JOIN 
