@@ -124,7 +124,7 @@ def get_recent_sales(shop_name, from_date, to_date):
             SELECT                 
                 wo.customer_name,
                 wo.customer_email,
-                ROUND(SUM(wo.total_amount) / 1.15, 2) AS total_spent_excl_vat, 
+                ROUND(SUM(wi.total_amount) / 1.15, 2) AS total_spent_excl_vat, 
                 COUNT(DISTINCT wo.order_id) AS total_orders,
                 MAX(wo.order_date) AS last_order_date
             FROM 
