@@ -12,6 +12,8 @@ def create_app():
     }
     db.init_app(app)
 
+
+
     # SMTP server configuration
     SMTP_SERVER = 'mail.tasteofcannabis.co.za'
     SMTP_PORT = 465
