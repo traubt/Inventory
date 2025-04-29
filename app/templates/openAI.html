@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>TOC - admin</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
+
+  <!-- Favicons -->
+  <link href="static/assets/img/toc_logo.png" rel="icon">
+  <link href="static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+  <link href="static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- Template Main CSS File -->
+  <link href="static/assets/css/style.css" rel="stylesheet">
+
+  <!-- =======================================================
+  * Template Name: NiceAdmin
+  * Template URL: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/
+  * Updated: Apr 20 2024 with Bootstrap v5.3.3
+  * Author: BootstrapMade.com
+  * License: https://bootstrapmade.com/license/
+  ======================================================== -->
+</head>
+
+<body>
+
+  <!-- ======= Header ======= -->
+   {% include 'header-bar.html' %}
+
+   {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+
+    <div class="pagetitle">
+      <h1>Blank Page</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Pages</li>
+          <li class="breadcrumb-item active">AI Assistant</li>
+        </ol>
+      </nav>
+    </div><!-- End Page Title -->
+
+    <!-- 360 AI Assistant Page -->
+    <div class="container mt-5">
+        <h2 class="mb-4 text-center">360 AI Assistant</h2>
+
+        <div class="card p-4 shadow rounded-3">
+
+                        <!-- Username Input -->
+            <div class="mb-3">
+                <label for="userName" class="form-label">Your Name:</label>
+                <input type="text" class="form-control" id="userName" placeholder="Enter your name">
+            </div>
+
+
+            <!-- Question Input -->
+            <div class="mb-3">
+                <label for="userQuestion" class="form-label">Ask a Question about Your Business:</label>
+                <textarea class="form-control" id="userQuestion" rows="3" placeholder="e.g., Show me the top 10 selling products last month"></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button class="btn btn-primary" id="askButton" type="button">
+                    <i class="bi bi-chat-dots"></i> Ask
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Spinner (hidden by default) -->
+        <div class="text-center my-4" id="loadingSpinner" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- SQL Query Preview (Optional) -->
+        <div class="card mt-4 shadow-sm" id="queryPreviewCard" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">Generated SQL Query (Preview)</h5>
+                <pre id="generatedSQL" class="bg-light p-3 rounded"></pre>
+            </div>
+        </div>
+
+        <!-- Result Area -->
+        <div class="card mt-4 shadow-sm" id="resultCard" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">Results</h5>
+                <div id="resultArea"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Optional: Toast for Errors -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="errorToast" class="toast text-bg-danger" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">Error</strong>
+                <small>Now</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="errorToastBody">
+                An error occurred.
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.getElementById('askButton').addEventListener('click', async () => {
+        const userName = document.getElementById('userName').value.trim();
+        const userQuestion = document.getElementById('userQuestion').value.trim();
+
+        if (!userName) {
+            alert("Please enter your name before asking a question.");
+            return;
+        }
+        if (!userQuestion) {
+            alert("Please type a question first.");
+            return;
+        }
+
+        document.getElementById('loadingSpinner').style.display = 'block';
+        document.getElementById('queryPreviewCard').style.display = 'none';
+        document.getElementById('resultCard').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/ask_business', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ question: userQuestion, username: userName })  // Send both username + question
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const data = await response.json();
+
+            // Show Generated SQL (Hidden below)
+            document.getElementById('generatedSQL').textContent = data.generated_sql || 'No SQL generated.';
+            // document.getElementById('queryPreviewCard').style.display = 'block';  <--- Remove this line to hide
+
+            // Show Results
+            document.getElementById('resultArea').innerHTML = data.result_html || 'No results.';
+            document.getElementById('resultCard').style.display = 'block';
+        } catch (error) {
+            console.error('Error:', error);
+            const toast = new bootstrap.Toast(document.getElementById('errorToast'));
+            document.getElementById('errorToastBody').innerText = error.message;
+            toast.show();
+        } finally {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+    });
+
+    </script>
+
+
+
+
+  </main><!-- End #main -->
+
+  <script src="https://bootstrapmade.com/demo/NiceAdmin/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      <!-- All the links in the footer should remain intact. -->
+      <!-- You can delete the links only if you purchased the pro version. -->
+      <!-- Licensing information: https://bootstrapmade.com/license/ -->
+      <!-- Purchase the pro version with working PHP/AJAX contact form: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/ -->
+      Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
+    </div>
+  </footer><!-- End Footer -->
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Vendor JS Files -->
+  <script src="static/assets/vendor/apexcharts/apexcharts.min.js"></script>
+  <script src="static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="static/assets/vendor/chart.js/chart.umd.js"></script>
+  <script src="static/assets/vendor/echarts/echarts.min.js"></script>
+  <script src="static/assets/vendor/quill/quill.js"></script>
+  <script src="static/assets/vendor/simple-datatables/simple-datatables.js"></script>
+  <script src="static/assets/vendor/tinymce/tinymce.min.js"></script>
+  <script src="static/assets/vendor/php-email-form/validate.js"></script>
+
+  <!-- Template Main JS File -->
+  <script src="static/assets/js/main.js"></script>
+
+</body>
+
+</html>

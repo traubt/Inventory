@@ -247,3 +247,13 @@ class TOCCasualsCtrl(db.Model):
     status = db.Column(db.String(45), nullable=True)
     status_date = db.Column(db.DateTime,  nullable=True)
     confirmed_by = db.Column(db.String(45), nullable=True)
+
+class TOCOpenAI(db.Model):
+    __tablename__ = 'toc_openai'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=True)
+    shop_name = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    user_query = db.Column(db.Text, nullable=False)

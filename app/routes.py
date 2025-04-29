@@ -15,7 +15,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
 import pandas as pd
-import math
+import openai
+import re
+from app.tables_for_openAI import DATABASE_SCHEMA
 
 
 
@@ -29,6 +31,17 @@ SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 465
 SENDER_EMAIL = 'algott.team@gmail.com'
 SENDER_PASSWORD = 'ebzdcpdiilrurexz'
+
+DB_CONFIG = {
+    'host': '176.58.117.107',
+    'user': 'tasteofc_wp268',
+    'password': ']44p7214)S',
+    'database': 'tasteofc_wp268',
+    'cursorclass': pymysql.cursors.DictCursor  # Return rows as dictionaries
+}
+
+openai.api_key = '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'
+
 
 
 # Function to send email
@@ -51,6 +64,33 @@ def send_email(recipients, subject, body):
         print("Email sent successfully!")
     except Exception as e:
         print(f"Error sending email: {e}")
+
+def is_safe_sql(sql):
+    """
+    Check if a given SQL query is safe for execution (only SELECT allowed).
+    """
+    forbidden_keywords = ['DELETE', 'UPDATE', 'INSERT', 'DROP', 'ALTER']
+    for keyword in forbidden_keywords:
+        if re.search(r'\b' + keyword + r'\b', sql, re.IGNORECASE):
+            return False
+    return sql.strip().upper().startswith('SELECT')
+
+# ===============================
+# Helper Function: Execute Safe SQL
+# ===============================
+def execute_sql(sql):
+    """
+    Executes a safe SELECT SQL query and returns columns and rows.
+    """
+    connection = pymysql.connect(**DB_CONFIG)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            columns = [desc[0] for desc in cursor.description]  # Get column names
+            rows = cursor.fetchall()  # Fetch all results
+        return columns, rows
+    finally:
+        connection.close()
 
 @main.route('/send_email', methods=['POST'])
 def handle_send_email():
@@ -75,6 +115,22 @@ def handle_send_email():
 @main.route('/')
 def login():
     return render_template('login.html')
+
+@main.route('/ChatGPT')
+def ChatGPT():
+    user_data = session.get('user')
+    roles = TocRole.query.all()
+    shops = TOC_SHOPS.query.all()
+
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    list_of_shops = [shop.blName for shop in shops]
+
+    if user_data:
+        user = json.loads(user_data)
+        return render_template('openAI.html', user=user, roles=roles_list, shops=list_of_shops)  # Pass as JSON
+    else:
+        return redirect(url_for('main.login'))
 
 
 @main.route('/index')
@@ -2462,8 +2518,95 @@ def get_closest_shop():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+#########################  OPENAI section  #####################
+@main.route('/api/ask_business', methods=['POST'])
+def ask_business():
+    try:
+        # Get the user question and username from frontend
+        data = request.get_json()
+        user_question = data.get('question')
+        user_name = data.get('username')  # NEW: capture username
+
+        if not user_question or not user_name:
+            return jsonify({'error': 'Username and question are required.'}), 400
+
+        # Build the system prompt
+        system_prompt = f"""
+You are a business data analyst working on an ERP system called "360".
+ONLY respond with a clean MySQL SELECT query based on the database schema provided below.
+
+Database Schema:
+{DATABASE_SCHEMA}
+
+Strict Rules:
+- Only generate SELECT queries.
+- Never modify, delete, insert, or drop anything.
+- Never use ALTER, DELETE, UPDATE, DROP, INSERT commands.
+- Always use MySQL syntax.
+- Limit the results to 100 rows unless user explicitly says otherwise.
+- Reply ONLY with the SQL inside triple backticks (```) and nothing else.
+
+User's Question:
+"{user_question}"
+
+Example format you must use:
+```sql
+SELECT * FROM toc_ls_sales LIMIT 10;
+"""
+        # Send prompt to OpenAI
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",  # or "gpt-4-turbo" if you prefer
+            messages=[{"role": "system", "content": system_prompt}],
+            temperature=0
+        )
+
+        # Extract SQL from OpenAI response
+        chat_response = response['choices'][0]['message']['content']
+        match = re.search(r'```sql\s*(.*?)\s*```', chat_response, re.DOTALL)
+        if not match:
+            return jsonify({'error': 'Failed to extract SQL from AI response.'}), 500
+
+        generated_sql = match.group(1).strip()
+
+        # Validate SQL (only SELECT allowed)
+        if not is_safe_sql(generated_sql):
+            return jsonify({'error': 'Generated SQL is unsafe or invalid.'}), 400
+
+        # Execute the safe SQL query
+        columns, rows = execute_sql(generated_sql)
+
+        # Format the result into HTML Bootstrap table
+        table_html = '<table class="table table-striped table-bordered table-hover table-sm">'
+        table_html += '<thead><tr>' + ''.join(f'<th>{col}</th>' for col in columns) + '</tr></thead><tbody>'
+        for row in rows:
+            table_html += '<tr>' + ''.join(f'<td>{row[col]}</td>' for col in columns) + '</tr>'
+        table_html += '</tbody></table>'
+
+        # NEW: Save user query into toc_openai
+        from app.models import TOCOpenAI  # Import your model
+        from app import db  # Import your db object
+
+        new_record = TOCOpenAI(
+            username=user_name,
+            name=user_name,        # Optional until you provide better info
+            shop_name="Unknown",    # Placeholder until you send shop name
+            user_query=user_question
+        )
+        db.session.add(new_record)
+        db.session.commit()
+
+        # Return SQL + results to frontend
+        return jsonify({
+            'generated_sql': generated_sql,
+            'result_html': table_html
+        })
+
+    except Exception as e:
+        print("💥 Error in /api/ask_business:", str(e))  # DEBUG print
+        return jsonify({'error': str(e)}), 500
 
 
+############################## END OPENAI section######################################
 
 
 if __name__ == '__main__':
