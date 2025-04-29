@@ -21,7 +21,11 @@ from app.tables_for_openAI import DATABASE_SCHEMA
 
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -2547,6 +2551,7 @@ Strict Rules:
 - Never use ALTER, DELETE, UPDATE, DROP, INSERT commands.
 - Always use MySQL syntax.
 - Limit the results to 100 rows unless user explicitly says otherwise.
+- **If more than one table is used, always prefix field names with the table name.**
 - Reply ONLY with the SQL inside triple backticks (```) and nothing else.
 
 User's Question:
@@ -2605,7 +2610,7 @@ SELECT * FROM toc_ls_sales LIMIT 10;
         })
 
     except Exception as e:
-        print("💥 Error in /api/ask_business:", str(e))  # DEBUG print
+        logger.exception("💥 Error in /api/ask_business:")  # DEBUG print
         return jsonify({'error': str(e)}), 500
 
 
