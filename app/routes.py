@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app
 import pymysql
 import json
 import os
@@ -39,8 +39,6 @@ DB_CONFIG = {
     'database': 'tasteofc_wp268',
     'cursorclass': pymysql.cursors.DictCursor  # Return rows as dictionaries
 }
-
-openai.api_key = app.config["OPENAI_KEY"]
 
 
 # Function to send email
@@ -2521,6 +2519,8 @@ def get_closest_shop():
 @main.route('/api/ask_business', methods=['POST'])
 def ask_business():
     try:
+
+        openai.api_key = current_app.config["OPENAI_KEY"]
         # Get the user question and username from frontend
         data = request.get_json()
         user_question = data.get('question')
