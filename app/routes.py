@@ -2527,7 +2527,11 @@ def ask_business():
         user_question = data.get('question')
         user_name = data.get('username')  # NEW: capture username
 
-        if not user_question or not user_name:
+        user_data = json.loads(session.get('user'))
+        username = user_data['username']
+        shop_name = user_data['shop']
+
+        if not user_question or not username:
             return jsonify({'error': 'Username and question are required.'}), 400
 
         # Build the system prompt
@@ -2587,9 +2591,9 @@ SELECT * FROM toc_ls_sales LIMIT 10;
         from app import db  # Import your db object
 
         new_record = TOCOpenAI(
-            username=user_name,
+            username=username,
             name=user_name,        # Optional until you provide better info
-            shop_name="Unknown",    # Placeholder until you send shop name
+            shop_name=shop_name,
             user_query=user_question
         )
         db.session.add(new_record)

@@ -74,7 +74,7 @@ Tables:
     staff_name VARCHAR(45)                          -- Staff member name
 )
 
-- toc_wc_sales_order (
+- toc_wc_sales_order (                        -- table shows the online sales in WooCommerce
     order_id INT PRIMARY KEY,                 -- Unique WooCommerce order ID
     creation_date DATETIME,                    -- When record was created in the database
     order_date DATETIME,                       -- Date when order was placed
@@ -89,7 +89,7 @@ Tables:
     mt_status INT                               -- -- Member Track push status (0 = Not pushed, 1 = Successfully pushed)
 )
 
-- toc_wc_sales_items (
+- toc_wc_sales_items (                       -- table shows the online sales items in WooCommerce
     sales_id INT PRIMARY KEY,                -- Unique sales line item ID
     creation_date DATETIME,                   -- When this sales item was recorded
     product_name VARCHAR(100),                 -- Name of the product sold
@@ -107,6 +107,97 @@ Tables:
     payment_amount FLOAT,                      -- Amount paid
     email VARCHAR(100),                        -- Customer email address
     mt_status INT                              -- Member Track push status (0 = Not pushed, 1 = Successfully pushed)
+)
+
+- toc_stock (
+    shop_id VARCHAR(20) PRIMARY KEY,          -- Shop ID (part of composite key)
+    sku VARCHAR(45) PRIMARY KEY,               -- Product SKU (part of composite key)
+    stock_qty_date DATETIME,                   -- Date when stock was counted
+    product_name VARCHAR(100),                 -- Name of the product
+    stock_count DOUBLE,                        -- Stock quantity physically counted
+    count_by VARCHAR(45),                      -- Staff who counted stock
+    last_stock_qty DOUBLE,                     -- Previous stock quantity
+    calc_stock_qty DOUBLE,                     -- System calculated stock quantity
+    variance DOUBLE DEFAULT 0,                 -- Difference between counted and system stock
+    variance_rsn VARCHAR(45),                  -- Reason for variance
+    stock_transfer DOUBLE DEFAULT 0,           -- Quantity transferred between shops
+    shop_name VARCHAR(45),                     -- Shop Name (redundant sometimes)
+    rejects_qty DOUBLE,                        -- Rejected (bad quality) quantity
+    final_stock_qty DOUBLE,                    -- Final stock after adjustments
+    replenish_id VARCHAR(45),                  -- Replenishment ID
+    comments VARCHAR(150),                     -- Additional comments
+    pastel_ind INT DEFAULT -1,                  -- Sync indicator with Pastel accounting
+    pastel_count DOUBLE,                       -- Pastel system stock count
+    pastel_date DATETIME,                      -- Date of pastel record
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP -- Record creation date
+)
+
+- toc_replenish_ctrl (
+    order_id VARCHAR(45) PRIMARY KEY,         -- Unique replenish order ID
+    shop_id VARCHAR(45),                      -- Shop ID placing the order
+    order_open_date DATETIME,                  -- Date the order was opened
+    user VARCHAR(45),                          -- User who created the order
+    order_status VARCHAR(45),                  -- Current status of the order (e.g., pending, sent, received)
+    order_status_date DATETIME,                -- Last status change date
+    tracking_code VARCHAR(45),                 -- Tracking code for shipment
+    sold_qty INT,                              -- parameter holds number of days which an item/product sold during the past days
+    replenish_qty INT,                         -- second parameter holds number of days which an item/product sold during the past days
+    sent_from VARCHAR(45)                      -- Origin location/shop sending the stock
+)
+
+- toc_replenish_order (
+    shop_id VARCHAR(45) PRIMARY KEY,           -- Shop placing the order (part of composite key)
+    order_id VARCHAR(45) PRIMARY KEY,           -- Replenishment order ID (part of composite key). Foreign key to toc_replenish_ctrl.order_id
+    sku VARCHAR(45) PRIMARY KEY,                -- Product SKU (part of composite key)
+    order_open_date DATETIME,                   -- When the order was opened
+    user VARCHAR(45),                           -- User who opened the order
+    item_name VARCHAR(100),                     -- Name of the product ordered
+    replenish_qty DOUBLE,                       -- Quantity requested to replenish
+    comments VARCHAR(100),                      -- Comments by the user
+    received_qty DOUBLE,                        -- Quantity actually received
+    rejected_qty DOUBLE,                        -- Quantity rejected upon receipt
+    variance DOUBLE,                            -- Difference between ordered and received
+    received_date DATETIME,                     -- Date items were received
+    received_by VARCHAR(45),                    -- Staff who received the items
+    received_comment VARCHAR(100),              -- Comments upon receipt
+    pastel_ind INT DEFAULT 0,                   -- Indicator if synced to Pastel accounting system
+    save_count DOUBLE DEFAULT 0,                -- Counter for save/submit operations
+    pastel_date DATETIME                        -- Date synced with Pastel
+)
+
+- toc_stock_order (
+    shop_id VARCHAR(45) PRIMARY KEY,           -- Shop placing order from the head quarter
+    order_open_date DATETIME PRIMARY KEY,       -- Date when the order was opened (part of composite key)
+    sku VARCHAR(45) PRIMARY KEY,                -- Product SKU (part of composite key)
+    order_id VARCHAR(45),                       -- Optional unique identifier for the order
+    user VARCHAR(45),                           -- User who created the order
+    item_name VARCHAR(100),                     -- Product name
+    order_qty DOUBLE,                           -- Quantity ordered
+    comments VARCHAR(100),                      -- Additional comments
+    order_status VARCHAR(45),                   -- Status of the order (pending, sent, received)
+    order_status_date DATETIME                  -- Last status update date
+)
+
+
+
+- toc_stock_variance (
+    id INT PRIMARY KEY AUTO_INCREMENT,         -- Unique variance record ID
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,  -- When the variance was recorded
+    shop_id VARCHAR(20),                        -- Shop where variance was found
+    sku VARCHAR(45),                            -- Product SKU
+    stock_qty_date DATETIME,                    -- Date of stock count
+    product_name VARCHAR(100),                  -- Product name
+    stock_count DOUBLE,                         -- Counted stock quantity
+    count_by VARCHAR(45),                       -- Staff who counted
+    last_stock_qty DOUBLE,                      -- Previous stock recorded
+    calc_stock_qty DOUBLE,                      -- Calculated stock quantity
+    variance DOUBLE DEFAULT 0,                  -- Difference (counted - calculated)
+    stock_recount DOUBLE,                       -- Recounted stock if variance exists
+    shop_name VARCHAR(45),                      -- Shop Name
+    rejects_qty DOUBLE,                         -- Quantity rejected (damaged, etc.)
+    final_stock_qty DOUBLE,                     -- Final stock quantity after adjustments
+    replenish_id VARCHAR(45),                   -- Related replenish order ID if any
+    comments VARCHAR(150)                       -- Additional notes
 )
 
 
