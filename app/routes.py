@@ -40,8 +40,7 @@ DB_CONFIG = {
     'cursorclass': pymysql.cursors.DictCursor  # Return rows as dictionaries
 }
 
-openai.api_key = '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'
-
+openai.api_key = app.config["OPENAI_KEY"]
 
 
 # Function to send email
