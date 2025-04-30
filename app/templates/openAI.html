@@ -84,6 +84,9 @@
                 <button class="btn btn-primary" id="askButton" type="button">
                     <i class="bi bi-chat-dots"></i> Ask
                 </button>
+                <button class="btn btn-outline-secondary ms-2" id="toggleSQLButton" type="button">
+                    <i class="bi bi-code-square"></i> Toggle SQL Preview
+                </button>
             </div>
         </div>
 
@@ -127,6 +130,10 @@
 
 
     <script>
+        document.getElementById('toggleSQLButton').addEventListener('click', () => {
+            const previewCard = document.getElementById('queryPreviewCard');
+            previewCard.style.display = (previewCard.style.display === 'none') ? 'block' : 'none';
+        });
         document.getElementById('askButton').addEventListener('click', async () => {
         const userName = document.getElementById('userName').value.trim();
         const userQuestion = document.getElementById('userQuestion').value.trim();
@@ -141,7 +148,7 @@
         }
 
         document.getElementById('loadingSpinner').style.display = 'block';
-        document.getElementById('queryPreviewCard').style.display = 'none';
+        //document.getElementById('queryPreviewCard').style.display = 'none';
         document.getElementById('resultCard').style.display = 'none';
 
         try {
