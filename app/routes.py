@@ -1425,7 +1425,7 @@ def fetch_recent_orders():
         db.session.query(TOCReplenishCtrl)
         .filter(TOCReplenishCtrl.sent_from == shop_code)  # 2/3/2025 Internal transfer Add filter condition
         .order_by(TOCReplenishCtrl.order_open_date.desc())
-        .limit(20)
+        # .limit(20)
         .all()
     )
 

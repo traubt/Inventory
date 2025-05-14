@@ -164,30 +164,30 @@
                 <h5 class="modal-title" id="orderHistoryLabel">Order History</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="table-responsive"> <!-- Added responsive wrapper for better scrolling -->
-                    <table class="table table-bordered" id="orderHistoryTable">
-                        <thead>
-                            <tr>
-                                <th>Select</th>
-                                <th>Order ID</th>
-                                <th>Shop Code</th>
-                                <th>Shop Name</th>
-                                <th>Order Open Date</th>
-                                <th>User</th>
-                                <th>Order Status</th>
-                                <th>Order Status Date</th>
-                                <th>Sold Qty</th>
-                                <th>Replenish Qty</th>
-                                <th>Verify Order</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Rows will be populated dynamically -->
-                        </tbody>
-                    </table>
+                <div class="modal-body">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;"> <!-- Set scroll and height -->
+                        <table class="table table-bordered" id="orderHistoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Order ID</th>
+                                    <th>Shop Code</th>
+                                    <th>Shop Name</th>
+                                    <th>Order Open Date</th>
+                                    <th>User</th>
+                                    <th>Order Status</th>
+                                    <th>Order Status Date</th>
+                                    <th>Sold Qty</th>
+                                    <th>Replenish Qty</th>
+                                    <th>Verify Order</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" id="confirmOrderSelection">Select Order</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
