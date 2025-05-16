@@ -257,3 +257,13 @@ class TOCOpenAI(db.Model):
     shop_name = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     user_query = db.Column(db.Text, nullable=False)
+
+class TocCountCtrl(db.Model):
+    __tablename__ = 'toc_count_ctrl'
+
+    count_id = db.Column(db.String(45), primary_key=True)
+    name = db.Column(db.String(45))
+    username = db.Column(db.String(45))
+    shop_id = db.Column(db.String(45))
+    shop_name = db.Column(db.String(45))
+    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))

@@ -1489,6 +1489,8 @@ def fetch_history_orders():
 @main.route('/update_count_stock', methods=['POST'])
 def update_count_stock():
     try:
+        user_data = json.loads(session.get('user'))
+        username = user_data['username']
         # Get JSON data from the request
         data = request.get_json()
 
@@ -1568,9 +1570,20 @@ def update_count_stock():
                 )
                 db.session.add(new_variance_record)
 
+        print(f"Inserting record to count control for shop: {shop_name}")
+        #add record to toc_count_ctrl
+        new_count_ctrl = TocCountCtrl(
+            count_id=replenish_order_id,
+            name=user_name,
+            username=username,
+            shop_id=shop,
+            shop_name=shop_name,
+        )
+        db.session.add(new_count_ctrl)
 
         # Commit changes to the database
         db.session.commit()
+
 
         return jsonify({"status": "success", "message": "Stock data updated successfully"})
 
