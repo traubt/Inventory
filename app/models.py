@@ -267,3 +267,14 @@ class TocCountCtrl(db.Model):
     shop_id = db.Column(db.String(45))
     shop_name = db.Column(db.String(45))
     creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+
+class TocDamaged(db.Model):
+    __tablename__ = 'toc_damaged'
+
+    shop_id = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_id = db.Column(db.String(45), primary_key=True, nullable=False)
+    sku = db.Column(db.String(45), primary_key=True, nullable=False)
+    order_open_date = db.Column(db.DateTime, nullable=True)
+    user = db.Column(db.String(45), nullable=True)
+    item_name = db.Column(db.String(100), nullable=True)
+    rejected_qty = db.Column(db.Float, nullable=True)

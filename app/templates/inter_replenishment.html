@@ -362,8 +362,8 @@ function loadOrderTemplate(data, orderId, shopName) {
         columns: [
             { title: "SKU", data: "sku" },
             { title: "Product Name", data: "product_name" },
-            { title: "Current Stock Count", data: "current_stock" , visible: false },
-            { title: "Qty Sold in Period", data: "threshold_qty" , visible: false },
+            { title: "Current Stock Count", data: "current_stock", visible: false },
+            { title: "Qty Sold in Period", data: "threshold_qty", visible: false },
             { title: "Calculated Replenish", data: "replenish_qty", visible: false },
             {
                 title: "Send Quantity",
@@ -372,17 +372,20 @@ function loadOrderTemplate(data, orderId, shopName) {
                 render: function(data, type, row) {
                     if (type === 'display') {
                         let replenishOrder = 0;
-                        const qtySoldInPeriod = row.threshold_qty || 0;
-                        const currentStockCount = row.current_stock || 0;
-                        const calculatedReplenish = row.replenish_qty || 0;
-
-                     //   if (qtySoldInPeriod > currentStockCount) {
-                     //       replenishOrder = calculatedReplenish - currentStockCount;
-                     //   }
-
-                        return `<input type="text" class="variance-reason-edit" value="${replenishOrder}" />`;
+                        return `<input type="text" class="send-qty-edit" value="${replenishOrder}" />`;
                     }
                     return data ?? 0;
+                }
+            },
+            {
+                title: "Damaged Quantity",
+                data: null,
+                className: 'editable',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="text" class="damaged-qty-edit" value="${row.damaged_qty || 0}" />`;
+                    }
+                    return data;
                 }
             },
             {
@@ -423,6 +426,7 @@ function loadOrderTemplate(data, orderId, shopName) {
     $("#closeOrder").prop("disabled", false);
     $("#submitOrder").prop("disabled", false);
 }
+
 
 // Function to save picking slip as a CSV file
 function savePickingSlip(orderId, shopName) {
@@ -490,109 +494,103 @@ function savePickingSlip(orderId, shopName) {
     }
 
 
-    $("#saveOrder").on("click", function() {
-<!--        if(! _saved){-->
-<!--            dialog("Nothing to save","No changes made to the order");-->
-<!--            return 0;-->
-<!--        }-->
+ $("#saveOrder").on("click", function() {
+    if ($("#ProductOrderTemplate_filter input").val().length > 0) {
+        dialog("Filter Is On", "Can't save the order while search filter is on. Please clear the search filter before saving the order");
+        return;
+    }
 
-        // Check if the filter is on
-        if ($("#ProductOrderTemplate_filter input").val().length > 0) {
-            dialog("Filter Is On", "Can't save the order while search filter is on. Please clear the search filter before saving the order");
-            return;
+    if ($("#trackingCode").val() === null || $("#trackingCode").val() === "") {
+        dialog("Tracking Code", "Please enter tracking code.");
+        return 0;
+    }
+
+    const tableData = [];
+    const orderQtyIndex = $("#ProductOrderTemplate thead th").index($("#ProductOrderTemplate thead th:contains('Send Quantity')"));
+    const damagedQtyIndex = $("#ProductOrderTemplate thead th").index($("#ProductOrderTemplate thead th:contains('Damaged Quantity')"));
+
+    let allQtyZero = true;
+    let isValid = true;
+
+    $("#ProductOrderTemplate tbody tr").each(function() {
+        const row = {};
+        const $cells = $(this).find("td");
+
+        const sku = $cells.eq(0).text().trim();
+        const productName = $cells.eq(1).text().trim();
+        const sendQty = parseFloat($cells.eq(orderQtyIndex).find("input").val()) || 0;
+        const damagedQty = parseFloat($cells.eq(damagedQtyIndex).find("input").val()) || 0;
+        const comments = $cells.eq(-1).find("input").val().trim();
+
+        // Validation
+        if (isNaN(sendQty) || sendQty < 0) {
+            alert(`Please enter a valid Send Quantity for "${productName}"`);
+            isValid = false;
+            return false;
         }
 
-        if ($("#trackingCode").val() === null || $("#trackingCode").val() === "") {
-            dialog("Tracking Code","Please enter tracking code.");
-            return 0;
-        }
-        const tableData = [];
-        const orderQtyIndex = $("#ProductOrderTemplate thead th").index(
-            $("#ProductOrderTemplate thead th:contains('Send Quantity')")
-        ); // Find the index of the "Order Qty" column
-        let allQtyZero = true; // Track if all "Order Qty" are zero
-        let isValid = true; // Flag to check if all "Order Qty" are valid numbers
-
-        $("#ProductOrderTemplate tbody tr").each(function() {
-            const row = [];
-            let orderQtyValue = 0;
-            let productName = '';  // Store product name to show in the error message if needed
-
-            $(this).find("td").each(function(index) {
-                const cellValue = $(this).find("input").length > 0
-                    ? $(this).find("input").val()  // Get input value if present
-                    : $(this).text().trim();       // Otherwise, get text content
-
-                if (index === orderQtyIndex) {
-                    orderQtyValue = parseFloat(cellValue) || 0; // Parse "Order Qty" value
-                    productName = $(this).closest("tr").find("td:nth-child(2)").text().trim(); // Get product name from second column
-
-                    if (orderQtyValue !== 0) {
-                        allQtyZero = false; // If any "Order Qty" is non-zero, set allQtyZero to false
-                    }
-
-                    if (isNaN(orderQtyValue) || orderQtyValue < 0) {
-                        isValid = false; // If "Order Qty" is not a valid number (less than 0 or NaN)
-                        alert(`Please enter valid value to ${productName} field`);
-                        return false;  // Exit the loop early if invalid value is found
-                        _saved = false;
-                    }
-                }
-
-                row.push(cellValue);
-            });
-
-            // Only include the row if "Order Qty" is greater than 0
-            if (orderQtyValue > 0) {
-                tableData.push(row);
-            }
-        });
-
-        // If all "Order Qty" values are zero, show an alert and stop the process
-        if (allQtyZero) {
-            dialog("Empty Order","You have not entered any order quantity.");
-            _saved = false;
-            return; // Stop the execution of the order saving
+        if (isNaN(damagedQty) || damagedQty < 0) {
+            alert(`Please enter a valid Damaged Quantity for "${productName}"`);
+            isValid = false;
+            return false;
         }
 
-        // If the order quantities are valid, proceed to save the order
-        if (isValid) {
-            const order_id = $("#orderName").val();          // Get the order ID from input
-            const shop =  getShopCodeByBlName($('#replenishShop').val())       // Ensure shop variable is serialized
-            const user_name = {{user.username | tojson}};         // Ensure user_name variable is serialized
-            const date = getCurrentDate();                  // Get current date in YYYYMMDD format
-            const tracking_code = $("#trackingCode").val()
-            const sold_qty = $("#thresholdQty").val()
-            const replenish_qty = $("#replenishQty").val()
+        if (sendQty > 0 || damagedQty > 0) {
+            allQtyZero = false;
 
-            $.ajax({
-                url: "/save_replenish",
-                method: "POST",
-                contentType: "application/json",
-                data: JSON.stringify({
-                    table: tableData,
-                    shop: shop,
-                    user_name: user_name,
-                    order_id: order_id,
-                    date: date,
-                    tracking_code : tracking_code,
-                    sold_qty : sold_qty,
-                    replenish_qty : replenish_qty,
-                    status : "Saved",
-                    type: "inter"
-                }),
-                success: function(response) {
-                    console.log("Data submitted successfully:", response);
-                    dialog("Save Order","Order was saved successfully");
-                    _saved = true;
-                },
-                error: function(error) {
-                    console.error("Error submitting data:", error);
-                    _saved = false;
-                }
-            });
+            row['sku'] = sku;
+            row['product_name'] = productName;
+            row['send_qty'] = sendQty;
+            row['damaged_qty'] = damagedQty;
+            row['comments'] = comments;
+
+            tableData.push(row);
         }
     });
+
+    if (allQtyZero) {
+        dialog("Empty Order", "You have not entered any send or damaged quantities.");
+        _saved = false;
+        return;
+    }
+
+    if (isValid) {
+        const order_id = $("#orderName").val();
+        const shop = getShopCodeByBlName($('#replenishShop').val());
+        const user_name = {{user.username | tojson}};
+        const date = getCurrentDate();
+        const tracking_code = $("#trackingCode").val();
+        const sold_qty = $("#thresholdQty").val();
+        const replenish_qty = $("#replenishQty").val();
+
+        $.ajax({
+            url: "/save_replenish",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                table: tableData,
+                shop: shop,
+                user_name: user_name,
+                order_id: order_id,
+                date: date,
+                tracking_code: tracking_code,
+                sold_qty: sold_qty,
+                replenish_qty: replenish_qty,
+                status: "Saved",
+                type: "inter"
+            }),
+            success: function(response) {
+                console.log("Data submitted successfully:", response);
+                dialog("Save Order", "Order was saved successfully");
+                _saved = true;
+            },
+            error: function(error) {
+                console.error("Error submitting data:", error);
+                _saved = false;
+            }
+        });
+    }
+});
 
 
 $("#submitOrder").on("click", async function(event) {

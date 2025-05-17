@@ -217,7 +217,6 @@
     });
 
 
-
 function loadStockData(rows) {
     console.log(rows);
 
@@ -226,7 +225,6 @@ function loadStockData(rows) {
         $('#ProductOrderTemplate').DataTable().destroy();
     }
 
-    // Initialize DataTable
     const table = $('#ProductOrderTemplate').DataTable({
         data: rows,
         columns: [
@@ -240,12 +238,15 @@ function loadStockData(rows) {
                 data: "saved_count",
                 className: 'editable',
                 render: function (data, type, row) {
-                // 9-2-25: change the default receive qty to 0
-                    //const currentStockCount = row.replenish_qty;
-                    //const currentStockCount = 0;
-                // 11-2-25 implementing save count
                     const currentStockCount = row.received_qty;
                     return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
+                }
+            },
+            {
+                title: "Received Damaged",
+                data: "rejected_qty",
+                render: function (data, type, row) {
+                    return `<span class="received-damaged">${row.rejected_qty || 0}</span>`;
                 }
             },
             {
@@ -278,20 +279,18 @@ function loadStockData(rows) {
 
     $('#ProductOrderTemplate').show();
 
-    // Update variance dynamically when the current stock count changes
-    $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
+    // Update variance dynamically when the received qty is edited
+    $('#ProductOrderTemplate').on('input', '.current-stock-count', function () {
         const row = $(this).closest('tr');
-        const rowData = table.row(row).data();  // Get the row data object
-        const receiveQty = rowData.replenish_qty;  // Correctly get "Sent Qty" from the row data
-        const countQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-        //const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
+        const rowData = table.row(row).data();
+        const sentQty = rowData.replenish_qty;
+        const receivedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
 
-        const variance = receiveQty - countQty; // - rejectedQty;
-
+        const variance = sentQty - receivedQty;
         row.find('.variance').text(variance);
     });
-
 }
+
 
 
 

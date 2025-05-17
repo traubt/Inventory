@@ -967,25 +967,20 @@ def get_stock_count_form():
 @main.route('/get_receive_stock_form', methods=['GET'])
 def get_receive_stock_form():
     try:
-        # Retrieve the order_id parameter from the query string
-        order_id = request.args.get('order_id')  # This will get the order_id from the URL query parameter
+        order_id = request.args.get('order_id')
         if not order_id:
-            return jsonify({"message": "Order ID is required"}), 400  # Return an error if no order_id is provided
+            return jsonify({"message": "Order ID is required"}), 400
 
-        # Retrieve the shop data from session
         shop_data = json.loads(session.get('shop'))
         selected_shop = shop_data['customer']
         print(f"Selected shop from client: {selected_shop}")
         print(f"Received order_id: {order_id}")
 
-        # Assuming get_receive_stock_order is a function that now accepts order_id
         data = get_receive_stock_order(selected_shop, order_id)
 
-        # If no data is returned, respond with an error
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
 
-        # Format the data for the client
         formatted_data = [
             {
                 "sku": row[2],
@@ -993,18 +988,18 @@ def get_receive_stock_form():
                 "replenish_user": row[4],
                 "item_name": row[5],
                 "replenish_qty": row[6],
-                "received_qty" : row[8]
+                "received_qty": row[8],
+                "rejected_qty": row[9]  # Added field for "Received Damaged"
             }
             for row in data
         ]
 
-        # Return the formatted data as a JSON response
         return jsonify(formatted_data)
 
     except Exception as e:
-        # Handle any errors that occur during execution
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @main.route('/delete_order', methods=['POST'])
@@ -1291,6 +1286,7 @@ def save_order():
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
 
+
 @main.route('/save_replenish', methods=['POST'])
 def save_replenish():
     try:
@@ -1310,24 +1306,31 @@ def save_replenish():
         type = data.get('type', '')
         status = "New"
 
-        # Check for order_id and delete existing records
+        # Remove existing records if updating
         if order_id:
             db.session.query(TocReplenishOrder).filter_by(order_id=order_id).delete()
             db.session.query(TOCReplenishCtrl).filter_by(order_id=order_id).delete()
+            db.session.query(TocDamaged).filter_by(order_id=order_id).delete()
             status = "Saved"
         else:
             status = "New"
 
-        # Insert new records into the table
+        # Insert new rows into TocReplenishOrder (and TocDamaged if applicable)
         for row in table:
             if type == 'hq':
-                sku, item_name, current_stock_qty, qty_sold_period, calc_replenish, replenish_order,  comments = row
+                sku, item_name, current_stock_qty, qty_sold_period, calc_replenish, replenish_order, comments = row
+                damaged_qty = 0
             else:
-                sku, item_name, replenish_order, comments = row  # Unpack only the required values
+                sku = row.get('sku', '')
+                item_name = row.get('product_name', '')
+                replenish_order = row.get('send_qty', 0)
+                damaged_qty = row.get('damaged_qty', 0)
+                comments = row.get('comments', '')
                 current_stock_qty = "0"
                 qty_sold_period = "0"
                 calc_replenish = "0"
 
+            # Insert into replenish order table
             new_record = TocReplenishOrder(
                 shop_id=shop,
                 order_open_date=datetime.now(),
@@ -1335,33 +1338,44 @@ def save_replenish():
                 order_id=order_id,
                 user=user_name,
                 item_name=item_name,
-                replenish_qty = float(replenish_order) if replenish_order else 0,
+                replenish_qty=float(replenish_order) if replenish_order else 0,
+                rejected_qty=float(damaged_qty) if damaged_qty else 0,
                 comments=comments
             )
             db.session.add(new_record)
 
-        #2/3/25 Add internal transfer - source shop
+            # If damaged quantity > 0, insert into TocDamaged
+            if float(damaged_qty) > 0:
+                damaged_record = TocDamaged(
+                    shop_id=user_data['shop'],
+                    order_id=order_id,
+                    sku=sku,
+                    order_open_date=datetime.now(),
+                    user=user_name,
+                    item_name=item_name,
+                    rejected_qty=float(damaged_qty)
+                )
+                db.session.add(damaged_record)
+
+        # Insert control row (tracking header)
         shop_name = user_data["shop"]
-        # Get the store code
         from_shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
 
         new_record = TOCReplenishCtrl(
-            order_id = order_id,
-            shop_id = shop,
+            order_id=order_id,
+            shop_id=shop,
             order_open_date=datetime.now(),
             user=user_name,
-            order_status = status,
-            order_status_date = datetime.now(),
-            tracking_code = tracking_code,
+            order_status=status,
+            order_status_date=datetime.now(),
+            tracking_code=tracking_code,
             sold_qty=sold_qty,
             replenish_qty=replenish_qty,
-            sent_from = from_shop.store
+            sent_from=from_shop.store
         )
         db.session.add(new_record)
 
-        # Commit changes to the database
         db.session.commit()
-
         return jsonify({"status": "success", "message": "Data saved successfully"})
 
     except SQLAlchemyError as e:
@@ -1372,6 +1386,8 @@ def save_replenish():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+
 
 
 
