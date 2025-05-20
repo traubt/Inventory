@@ -1,7 +1,9 @@
 import pymysql
 import json
 from flask import session
-from datetime import datetime
+import pandas as pd
+
+
 
 # Database connection details
 db_config = {
@@ -2457,6 +2459,84 @@ def get_replenishment_data(order_id):
     conn.close()
 
     return columns, result_as_dicts  # Now returning two values
+
+def   get_detailed_damaged_return(from_date, to_date):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = f'''
+        SELECT 
+            d.shop_id,
+            d.order_id,
+            d.sku,
+            d.order_open_date,
+            d.user,
+            d.item_name,
+            d.rejected_qty,
+            d.rcv_damaged,
+            d.variance,
+            p.cost_price,
+            p.retail_price,
+            ROUND(d.rejected_qty * p.cost_price, 2) AS total_cost_value,
+            ROUND(d.rejected_qty * p.retail_price, 2) AS total_retail_value
+        FROM toc_damaged d
+        JOIN toc_product p ON d.sku = p.item_sku
+        WHERE d.order_open_date BETWEEN %s AND %s
+        ORDER BY d.order_open_date DESC
+    '''
+    # Execute the query with the parameter
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
+
+def get_consolidated_damaged_return(from_date, to_date):
+
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = f'''
+        SELECT 
+            d.shop_id,
+            DATE(d.order_open_date) AS order_date,
+            SUM(d.rejected_qty) AS total_damaged_qty,
+            SUM(d.rcv_damaged) AS total_rcv_damaged,
+            SUM(d.variance) AS total_variance,
+            round(SUM(d.rejected_qty * p.cost_price)) AS total_cost_value,
+            round(SUM(d.rejected_qty * p.retail_price)) AS total_retail_value
+        FROM toc_damaged d
+        JOIN toc_product p ON d.sku = p.item_sku
+        WHERE d.order_open_date BETWEEN %s AND %s
+        GROUP BY d.shop_id
+     --   ORDER BY order_date DESC
+    '''
+    # Execute the query with the parameter
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
 
 
 

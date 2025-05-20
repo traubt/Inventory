@@ -1927,6 +1927,10 @@ def get_variance_report():
             data = get_back_order()
         elif report_type == "Consolidated Shop Stock Report":
             data = get_stock_value_per_shop()
+        elif report_type == "Detailed Damaged Returns":
+            data = get_detailed_damaged_return(from_date, to_date)
+        elif report_type == "Consolidated Damaged Returns":
+            data = get_consolidated_damaged_return(from_date, to_date)
         elif report_type == "Consolidated Variance Report":
             conn = get_db_connection()
 
