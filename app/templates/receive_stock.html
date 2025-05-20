@@ -220,7 +220,6 @@
 function loadStockData(rows) {
     console.log(rows);
 
-    // Destroy existing DataTable if it exists
     if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
         $('#ProductOrderTemplate').DataTable().destroy();
     }
@@ -235,18 +234,25 @@ function loadStockData(rows) {
             { title: "Sent Qty", data: "replenish_qty" },
             {
                 title: "Received Qty",
-                data: "saved_count",
+                data: "received_qty",
                 className: 'editable',
                 render: function (data, type, row) {
-                    const currentStockCount = row.received_qty;
-                    return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
+                    return `<input type="number" class="current-stock-count" value="${data || 0}" min="0" step="1" />`;
+                }
+            },
+            {
+                title: "Sent Damaged",
+                data: "rejected_qty",
+                render: function (data, type, row) {
+                    return `<span class="sent-damaged">${data || 0}</span>`;
                 }
             },
             {
                 title: "Received Damaged",
-                data: "rejected_qty",
+                data: "rcv_damaged",
+                className: 'editable',
                 render: function (data, type, row) {
-                    return `<span class="received-damaged">${row.rejected_qty || 0}</span>`;
+                    return `<input type="number" class="received-damaged-input" value="${data || 0}" min="0" step="1" />`;
                 }
             },
             {
@@ -254,8 +260,10 @@ function loadStockData(rows) {
                 data: null,
                 render: function (data, type, row) {
                     const sentQty = row.replenish_qty || 0;
+                    const sentDamaged = row.rejected_qty || 0;
                     const receivedQty = row.received_qty || 0;
-                    const variance = sentQty - receivedQty;
+                    const receivedDamaged = row.rcv_damaged || 0;
+                    const variance = (sentQty + sentDamaged) - (receivedQty + receivedDamaged);
                     return `<span class="variance">${variance}</span>`;
                 }
             },
@@ -279,17 +287,21 @@ function loadStockData(rows) {
 
     $('#ProductOrderTemplate').show();
 
-    // Update variance dynamically when the received qty is edited
-    $('#ProductOrderTemplate').on('input', '.current-stock-count', function () {
+    // Update variance dynamically
+    $('#ProductOrderTemplate').on('input', '.current-stock-count, .received-damaged-input', function () {
         const row = $(this).closest('tr');
         const rowData = table.row(row).data();
-        const sentQty = rowData.replenish_qty;
-        const receivedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
 
-        const variance = sentQty - receivedQty;
-        row.find('.variance').text(variance);
+        const sentQty = parseFloat(rowData.replenish_qty) || 0;
+        const sentDamaged = parseFloat(row.find('.sent-damaged').text()) || 0;
+        const receivedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
+        const receivedDamaged = parseFloat(row.find('.received-damaged-input').val()) || 0;
+
+        const variance = (sentQty + sentDamaged) - (receivedQty + receivedDamaged);
+        row.find('.variance').text(variance.toFixed(2));
     });
 }
+
 
 
 
@@ -444,58 +456,46 @@ function loadStockData(rows) {
 
 
 $("#saveOrder").on("click", function () {
-
     if ($("#ProductOrderTemplate_filter input").val().length > 0) {
         dialog("Filter Is On", "Can't save order while filter is on. Please clear the table filter before saving");
         return;
     }
 
-    let isValid = true; // Flag to validate the data
-    const tableData = []; // Array to store table data for sending to the server
+    let isValid = true;
+    const tableData = [];
 
-    // Iterate through each row in the `count_stock` table
     $("#ProductOrderTemplate tbody tr").each(function () {
         const row = $(this);
-        const rowData = {}; // Object to store data for each row
+        const rowData = {};
 
-        // Collect data from each cell in the row
-        rowData.sku = row.find("td:nth-child(1)").text().trim(); // SKU
-        rowData.product_name = row.find("td:nth-child(2)").text().trim(); // Product Name
-        rowData.hq_user = row.find("td:nth-child(3)").text().trim(); // HQ User
-        rowData.replenish_date = row.find("td:nth-child(4)").text().trim(); // Replenish Date
-        rowData.sent_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sent Quantity
-        rowData.received_qty = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Received Quantity
-        rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance
-        rowData.comments = row.find(".comments").val().trim(); // Editable Comments
+        rowData.sku = row.find("td:nth-child(1)").text().trim();
+        rowData.product_name = row.find("td:nth-child(2)").text().trim();
+        rowData.hq_user = row.find("td:nth-child(3)").text().trim();
+        rowData.replenish_date = row.find("td:nth-child(4)").text().trim();
+        rowData.sent_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0;
+        rowData.received_qty = parseFloat(row.find(".current-stock-count").val()) || 0;
+        rowData.received_damaged = parseFloat(row.find(".received-damaged-input").val()) || 0;
+        rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0;
+        rowData.comments = row.find(".comments").val().trim();
 
-        // Validate the data (example: received quantity and rejected quantity cannot be negative)
-        if (rowData.received_qty < 0) {
+        if (rowData.received_qty < 0 || rowData.received_damaged < 0) {
             alert(`Invalid stock values for SKU: ${rowData.sku}. Please enter valid data.`);
             isValid = false;
-            return false; // Exit loop if invalid data is found
+            return false;
         }
 
-        // Check for variance without comments
         if (rowData.variance !== 0 && !rowData.comments) {
             alert(`There is a variance in count for ${rowData.product_name}. Please enter a comment before confirming stock count.`);
             isValid = false;
-            return false; // Exit loop
+            return false;
         }
 
-        // Push the row data to `tableData` array
         tableData.push(rowData);
     });
 
-    // Stop execution if validation fails
-    if (!isValid) {
-        return;
-    }
-
-    // confirm saving to database:
-
+    if (!isValid) return;
     if (!confirm("Are you sure you want to commit stock count to the database?")) return;
 
-    // Show spinner and text
     const spinnerWrapper = $(`
         <div class="spinner-wrapper">
             <div class="spinner"></div>
@@ -504,15 +504,14 @@ $("#saveOrder").on("click", function () {
     `);
     $("body").append(spinnerWrapper);
 
-    // AJAX request to send data to Flask route
-    const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized
-    const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized
-    const date = getCurrentDate(); // Get current date in YYYYMMDD format
+    const user_name = {{user.username | tojson}};
+    const shop = {{shop.customer | tojson}};
+    const date = getCurrentDate();
     const shop_name = {{shop.name | tojson}};
     const replenish_order_id = $("#orderName").val();
 
     $.ajax({
-        url: "/update_count_receive_stock", // Flask route for updating stock data
+        url: "/update_count_receive_stock",
         method: "POST",
         contentType: "application/json",
         data: JSON.stringify({
@@ -526,23 +525,18 @@ $("#saveOrder").on("click", function () {
         success: function (response) {
             console.log("Data submitted successfully:", response);
             dialog("Save Stock Data", "Stock data was saved successfully.");
-            // Disable save order button
-            $("#saveOrder").prop("disabled", true);
-            $("#saveForm").prop("disabled", true);
-            $("#resetQty").prop("disabled", true);
-            $("#cancelOrder").prop("disabled", true);
-            $("#submitOrder").prop("disabled", true);
+            $("#saveOrder, #saveForm, #resetQty, #cancelOrder, #submitOrder").prop("disabled", true);
         },
         error: function (error) {
             console.error("Error submitting data:", error);
             dialog("Error", "Failed to save stock data. Please try again.");
         },
         complete: function () {
-            // Hide spinner after request completes
             spinnerWrapper.remove();
         }
     });
 });
+
 
 $("#saveForm").on("click", function () {
 

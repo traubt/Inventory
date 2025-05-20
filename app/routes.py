@@ -1615,10 +1615,8 @@ def update_count_stock():
 @main.route('/update_count_receive_stock', methods=['POST'])
 def update_count_receive_stock():
     try:
-        # Get JSON data from the request
         data = request.get_json()
 
-        # Extract relevant information
         table = data.get('table', [])
         shop = data.get('shop', '')
         shop_name = data.get('shop_name', '')
@@ -1626,32 +1624,32 @@ def update_count_receive_stock():
         date = data.get('date', '')
         replenish_order_id = data.get('replenish_order_id', '')
 
-        # Process each row and update the database
         for row in table:
             sku = row.get('sku', '')
             product_name = row.get('product_name', '')
             stock_sent = row.get('sent_qty', 0)
             stock_count = row.get('received_qty', 0)
+            rcv_damaged = row.get('received_damaged', 0)
             variance = row.get('variance', 0)
-            # variance_rsn = row.get('variance_reason', 'NA')
-            # stock_rejected = row.get('rejected_qty', 0)
             comments = row.get('comments', '')
 
-            # 11/3 Update toc_stock.stock_transfer
-            # 1. Update the stock movement of the receiving shop
-            stock_record = TocStock.query.filter_by(
-                shop_id=shop,
-                sku=sku
-            ).first()
+            # 1. Update receiving shop toc_stock
+            stock_record = TocStock.query.filter_by(shop_id=shop, sku=sku).first()
+            if not stock_record:
+                raise Exception(f"Receiving shop {shop} SKU {sku} not found in toc_stock")
 
-            if stock_record:
-                stock_record.stock_transfer = stock_record.stock_transfer + stock_count
-                # 4/4 - Itsik asks that stock_qty_date only be reset at count and not movement
-                # stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
-            else:
-                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the receiving shop")
+            # 3. Get replenish record for reference
+            existing_record = TocReplenishOrder.query.filter_by(order_id=replenish_order_id, sku=sku).first()
+            if not existing_record:
+                raise Exception(f"toc_replenish_order not found for {sku}")
 
-            # 2. Update origin (replenish) shop stock
+            # Set received + sent damage values
+            stock_record.stock_transfer += stock_count
+            stock_record.rcv_damaged = float(rcv_damaged)
+            stock_record.rejects_qty = float(existing_record.rejected_qty or 0)
+            stock_record.final_stock_qty = float(stock_count) - float(rcv_damaged)
+
+            # 2. Update sending shop toc_stock
             toc_stock_record = (
                 db.session.query(TocStock)
                 .join(TOC_SHOPS, TocStock.shop_id == TOC_SHOPS.customer)
@@ -1660,68 +1658,58 @@ def update_count_receive_stock():
                     TOCReplenishCtrl.order_id == replenish_order_id,
                     TocStock.sku == sku
                 )
-                .first()  # Fetch only one record
+                .first()
             )
-
-            # 3. Deduct stock from the sending shop stock
-            if stock_record:
-                toc_stock_record.stock_transfer = toc_stock_record.stock_transfer - stock_count
-                # toc_stock_record.stock_qty_date = datetime.strptime(date, '%Y%m%d%H%M')
+            if toc_stock_record:
+                toc_stock_record.stock_transfer -= stock_count
             else:
-                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_stock for the replenish shop")
+                raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")
 
+            # 4. Update replenish record
+            existing_record.received_date = datetime.now(timezone.utc)
+            existing_record.received_qty = stock_count
+            existing_record.variance = variance
+            existing_record.received_by = user_name
+            existing_record.received_comment = comments
 
-            #4. Update the replenish and replenish control tables
-            existing_record = TocReplenishOrder.query.filter_by(
-                order_id=replenish_order_id,
-                sku=sku
-            ).first()
+            # 5. Update toc_damaged if exists
+            damaged_record = TocDamaged.query.filter_by(order_id=replenish_order_id, sku=sku).first()
+            if damaged_record:
+                damaged_record.rcv_damaged = float(rcv_damaged)
+                damaged_record.variance = float(damaged_record.rejected_qty or 0) - float(rcv_damaged)
 
-            if existing_record:
-                # Update the existing record in TocStock
-                existing_record.received_date = datetime.now(timezone.utc)
-                existing_record.received_qty = stock_count
-                # existing_record.rejected_qty = stock_rejected
-                existing_record.variance = variance
-                existing_record.received_by = user_name
-                existing_record.received_comment = comments
-            else:
-                raise Exception(f"Shop {shop} SKU {sku} combination does not exist in toc_replenish_order")
-
-            # Insert into TOCStockVariance if Variance > 0
+            # 6. Log variance if needed
             if variance != 0:
-                new_variance_record = TOCStockVariance(
+                db.session.add(TOCStockVariance(
                     shop_id=shop,
                     sku=sku,
-                    # stock_qty_date=datetime.strptime(date, '%Y%m%d%H%M'),
                     product_name=product_name,
                     stock_count=float(stock_count),
                     count_by=user_name,
                     last_stock_qty=float(stock_count),
                     calc_stock_qty=float(stock_sent),
                     variance=float(variance),
-                    # variance_rsn=variance_rsn,
-                    stock_recount=0,  # Add a default value if not provided
+                    stock_recount=0,
                     shop_name=shop_name,
-                    # rejects_qty=float(stock_rejected),
                     final_stock_qty=float(stock_count),
                     comments=comments,
-                    replenish_id = replenish_order_id
-                )
-                db.session.add(new_variance_record)
+                    replenish_id=replenish_order_id
+                ))
 
-        # Update stock control
-        toc_replenish_ctrl = TOCReplenishCtrl.query.filter(
-            or_(TOCReplenishCtrl.order_status == "New", TOCReplenishCtrl.order_status == "Submitted"),
-            TOCReplenishCtrl.order_id == replenish_order_id,
+        # 7. Finalize control
+        ctrl = TOCReplenishCtrl.query.filter(
+            or_(
+                TOCReplenishCtrl.order_status == "New",
+                TOCReplenishCtrl.order_status == "Submitted"
+            ),
+            TOCReplenishCtrl.order_id == replenish_order_id
         ).first()
 
-        toc_replenish_ctrl.order_status = "Completed"
-        toc_replenish_ctrl.order_status_date = datetime.now(timezone.utc)
+        if ctrl:
+            ctrl.order_status = "Completed"
+            ctrl.order_status_date = datetime.now(timezone.utc)
 
-        # Commit changes to the database
         db.session.commit()
-
         return jsonify({"status": "success", "message": "Stock data updated successfully"})
 
     except SQLAlchemyError as e:
@@ -1732,8 +1720,10 @@ def update_count_receive_stock():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
     finally:
         db.session.close()
+
 
 @main.route('/save_count_receive_stock', methods=['POST'])
 def save_count_receive_stock():

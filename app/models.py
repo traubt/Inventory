@@ -164,6 +164,7 @@ class TocStock(db.Model):
     stock_transfer = db.Column(db.Float, nullable=True, default=0)
     shop_name = db.Column(db.String(45), nullable=True)
     rejects_qty = db.Column(db.Float, nullable=True)
+    rcv_damaged = db.Column(db.Float, nullable=True)
     final_stock_qty = db.Column(db.Float, nullable=True)
     replenish_id = db.Column(db.String(45), nullable=True)
     comments = db.Column(db.String(150), nullable=True)
@@ -277,4 +278,6 @@ class TocDamaged(db.Model):
     order_open_date = db.Column(db.DateTime, nullable=True)
     user = db.Column(db.String(45), nullable=True)
     item_name = db.Column(db.String(100), nullable=True)
-    rejected_qty = db.Column(db.Float, nullable=True)
+    rejected_qty = db.Column(db.Float, nullable=True)  # Sent Damaged
+    rcv_damaged = db.Column(db.Float, nullable=True)   # Received Damaged
+    variance = db.Column(db.Float, nullable=True)      # Difference between sent and received damaged
