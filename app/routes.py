@@ -34,7 +34,7 @@ main = Blueprint('main', __name__)
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 465
 SENDER_EMAIL = 'algott.team@gmail.com'
-SENDER_PASSWORD = 'ebzdcpdiilrurexz'
+SENDER_PASSWORD = 'xiyaxiztcekbkvtu'
 
 DB_CONFIG = {
     'host': '176.58.117.107',
