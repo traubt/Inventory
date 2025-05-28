@@ -19,6 +19,15 @@ import openai
 import re
 from app.tables_for_openAI import DATABASE_SCHEMA
 
+from shipday import Shipday
+from shipday.order import Address, Customer, Pickup, OrderItem, Order
+
+shipday_api = Blueprint('shipday_api', __name__)
+
+# Set your Shipday API key
+API_KEY = 'VXveiHsYGE.eLK6vIxvz1gQixI9tOvm'
+shipday_obj = Shipday(api_key=API_KEY)
+
 
 
 logging.basicConfig(
@@ -2539,6 +2548,65 @@ def get_closest_shop():
 
     except Exception as e:
         print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@shipday_api.route('/shipday_create_order', methods=['POST'])
+def shipday_create_order():
+    try:
+        data = request.get_json()
+
+        # Extract payload from WooCommerce
+        order_number = data.get('order_number')
+        customer_info = data.get('customer')
+        pickup_info = data.get('pickup')
+        items_info = data.get('items')
+        delivery_note = data.get('delivery_instruction', '')
+        pickup_note = data.get('pickup_instruction', '')
+        payment_method = data.get('payment_method', 'ONLINE')
+
+        # Construct Shipday objects
+        customer_address = Address(**customer_info['address'])
+        customer = Customer(
+            name=customer_info['name'],
+            address=customer_address,
+            phone_number=customer_info['phone_number'],
+            email=customer_info['email']
+        )
+
+        pickup_address = Address(**pickup_info['address'])
+        pickup = Pickup(
+            name=pickup_info['name'],
+            phone_number=pickup_info['phone_number'],
+            address=pickup_address
+        )
+
+        order_items = [OrderItem(**item) for item in items_info]
+
+        new_order = Order(
+            order_number=order_number,
+            customer=customer,
+            pickup=pickup,
+            order_items=order_items,
+            delivery_instruction=delivery_note,
+            pickup_instruction=pickup_note,
+            payment_method=payment_method
+        )
+
+        # Optional lat/lng if available
+        if 'latitude' in customer_info['address']:
+            new_order.customer.address.latitude = customer_info['address']['latitude']
+            new_order.customer.address.longitude = customer_info['address']['longitude']
+
+        if 'latitude' in pickup_info['address']:
+            new_order.pickup.address.latitude = pickup_info['address']['latitude']
+            new_order.pickup.address.longitude = pickup_info['address']['longitude']
+
+        # Submit to Shipday
+        result = shipday_obj.OrderService.insert_order(new_order)
+        return jsonify({"status": "success", "result": result}), 200
+
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
