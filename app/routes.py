@@ -2550,8 +2550,7 @@ def get_closest_shop():
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-@shipday_api.route('/shipday_create_order', methods=['POST'])
+@main.route('/shipday_create_order', methods=['POST'])
 def shipday_create_order():
     try:
         data = request.get_json()
