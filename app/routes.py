@@ -2589,10 +2589,24 @@ def shipday_create_order():
             email=customer_info['email']
         )
 
-        pickup_address = Address(**pickup_info['address'])
+        # Fetch shop info from the database using the shop name
+        shop = TOC_SHOPS.query.filter_by(blName=pickup_info['name']).first()
+        if not shop:
+            raise Exception(f"Shop '{pickup_info['name']}' not found in database")
+
+        pickup_address = Address(
+            street=shop.address,
+            city="Rosebank",  # You can map this from DB later if needed
+            state="GP",
+            country="South Africa",
+            zip=shop.zip,
+            latitude=float(shop.latitude),
+            longitude=float(shop.longitude)
+        )
+
         pickup = Pickup(
-            name=pickup_info['name'],
-            phone_number=pickup_info['phone_number'],
+            name=shop.blName,
+            phone_number=shop.phone,
             address=pickup_address
         )
 
@@ -2632,39 +2646,6 @@ def shipday_create_order():
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-@main.route('/insert_shipday_order', methods=['POST'])
-def insert_shipday_order():
-    try:
-        data = request.get_json()
-
-        wc_orderid = data.get('wc_orderid')
-        total_amt = data.get('total_amt', 0)
-
-        if not wc_orderid:
-            return jsonify({"status": "error", "message": "Missing wc_orderid"}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        query = """
-            INSERT INTO toc_shipday (wc_orderid, total_amt, status)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-                total_amt = VALUES(total_amt),
-                update_date = CURRENT_TIMESTAMP
-        """
-        cursor.execute(query, (wc_orderid, total_amt, 'pending'))
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({"status": "success", "message": f"Order {wc_orderid} inserted into toc_shipday"}), 200
-
-    except Exception as e:
-        print(f"Error inserting Shipday order: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 #########################  OPENAI section  #####################
