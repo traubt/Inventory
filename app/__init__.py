@@ -3,13 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from flask_cors import CORS
 
+
 db = SQLAlchemy()
 
 
 def create_app():
     app = Flask(__name__)
     CORS(app)
-
     # Core Configs
     app.config['SECRET_KEY'] = 'your_secret_key'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://tasteofc_wp268:]44p7214)S@176.58.117.107/tasteofc_wp268'
@@ -18,8 +18,8 @@ def create_app():
     }
 
     # OpenAI Key from Environment
-    app.config["OPENAI_KEY"] = os.getenv("OPENAI_API_KEY")
-
+   # app.config["OPENAI_KEY"] = os.getenv("OPENAI_API_KEY")
+    app.config["OPENAI_KEY"] = "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"
     # Initialize DB
     db.init_app(app)
 
@@ -35,3 +35,5 @@ def create_app():
     app.register_blueprint(main_blueprint)
 
     return app
+
+
