@@ -19,7 +19,7 @@ def create_app():
 
     # OpenAI Key from Environment
    # app.config["OPENAI_KEY"] = os.getenv("OPENAI_API_KEY")
-    app.config["OPENAI_KEY"] = "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"
+
     # Initialize DB
     db.init_app(app)
 
