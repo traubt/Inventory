@@ -2609,6 +2609,40 @@ def shipday_create_order():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@main.route('/insert_shipday_order', methods=['POST'])
+def insert_shipday_order():
+    try:
+        data = request.get_json()
+
+        wc_orderid = data.get('wc_orderid')
+        total_amt = data.get('total_amt', 0)
+
+        if not wc_orderid:
+            return jsonify({"status": "error", "message": "Missing wc_orderid"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        query = """
+            INSERT INTO toc_shipday (wc_orderid, total_amt, status)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE 
+                total_amt = VALUES(total_amt),
+                update_date = CURRENT_TIMESTAMP
+        """
+        cursor.execute(query, (wc_orderid, total_amt, 'pending'))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"status": "success", "message": f"Order {wc_orderid} inserted into toc_shipday"}), 200
+
+    except Exception as e:
+        print(f"Error inserting Shipday order: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 #########################  OPENAI section  #####################
 @main.route('/api/ask_business', methods=['POST'])
 def ask_business():

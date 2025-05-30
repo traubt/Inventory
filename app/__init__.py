@@ -1,12 +1,14 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
+from flask_cors import CORS
 
 db = SQLAlchemy()
 
 
 def create_app():
     app = Flask(__name__)
+    CORS(app)
 
     # Core Configs
     app.config['SECRET_KEY'] = 'your_secret_key'
