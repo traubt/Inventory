@@ -2555,8 +2555,11 @@ def shipday_create_order():
     try:
         data = request.get_json()
 
-        # Extract payload from WooCommerce
-        order_number = data.get('order_number')
+        # Extract WooCommerce order details
+        order_number = data.get('order_number')  # e.g., "WC420431"
+        wc_orderid = int(order_number.replace("WC", ""))  # Strip prefix
+        total_amt = data.get('total_amt')
+
         customer_info = data.get('customer')
         pickup_info = data.get('pickup')
         items_info = data.get('items')
@@ -2564,7 +2567,20 @@ def shipday_create_order():
         pickup_note = data.get('pickup_instruction', '')
         payment_method = data.get('payment_method', 'ONLINE')
 
-        # Construct Shipday objects
+        # Insert basic record into toc_shipday
+        new_record = TocShipday(
+            wc_orderid=wc_orderid,
+            wc_name=customer_info['name'],
+            wc_email=customer_info['email'],
+            wc_phone=customer_info['phone_number'],
+            shop_name=pickup_info['name'],
+            status='pending',
+            total_amt=float(total_amt)
+        )
+        db.session.add(new_record)
+        db.session.commit()
+
+        # Build Shipday objects
         customer_address = Address(**customer_info['address'])
         customer = Customer(
             name=customer_info['name'],
@@ -2581,7 +2597,6 @@ def shipday_create_order():
         )
 
         order_items = [OrderItem(**item) for item in items_info]
-
         new_order = Order(
             order_number=order_number,
             customer=customer,
@@ -2592,20 +2607,29 @@ def shipday_create_order():
             payment_method=payment_method
         )
 
-        # Optional lat/lng if available
         if 'latitude' in customer_info['address']:
             new_order.customer.address.latitude = customer_info['address']['latitude']
             new_order.customer.address.longitude = customer_info['address']['longitude']
-
         if 'latitude' in pickup_info['address']:
             new_order.pickup.address.latitude = pickup_info['address']['latitude']
             new_order.pickup.address.longitude = pickup_info['address']['longitude']
 
-        # Submit to Shipday
+        # Send to Shipday
         result = shipday_obj.OrderService.insert_order(new_order)
-        return jsonify({"status": "success", "result": result}), 200
+        shipday_id = result.get("orderId")
+
+        # Update shipday record
+        TocShipday.query.filter_by(wc_orderid=wc_orderid).update({
+            "status": "completed",
+            "shipday_id": shipday_id,
+            "update_date": datetime.utcnow()
+        })
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Order accepted", "shipday_id": shipday_id}), 200
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 

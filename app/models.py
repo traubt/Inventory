@@ -281,3 +281,18 @@ class TocDamaged(db.Model):
     rejected_qty = db.Column(db.Float, nullable=True)  # Sent Damaged
     rcv_damaged = db.Column(db.Float, nullable=True)   # Received Damaged
     variance = db.Column(db.Float, nullable=True)      # Difference between sent and received damaged
+
+class TocShipday(db.Model):
+    __tablename__ = 'toc_shipday'
+
+    wc_orderid = db.Column(db.Integer, primary_key=True, nullable=False)
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    wc_name = db.Column(db.String(45), nullable=True)
+    wc_email = db.Column(db.String(45), nullable=True)
+    wc_phone = db.Column(db.String(45), nullable=True)
+    shop_name = db.Column(db.String(45), nullable=True)
+    status = db.Column(db.String(45), nullable=True)
+    update_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ls_order_id = db.Column(db.String(45), nullable=True)
+    shipday_id = db.Column(db.String(45), nullable=True)
+    total_amt = db.Column(db.Float, nullable=True)
