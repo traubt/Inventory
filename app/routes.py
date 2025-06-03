@@ -1653,7 +1653,7 @@ def update_count_receive_stock():
                 raise Exception(f"toc_replenish_order not found for {sku}")
 
             # Set received + sent damage values
-            stock_record.stock_transfer += stock_count
+            stock_record.stock_transfer += float(existing_record.received_qty or 0)
             stock_record.rcv_damaged = float(rcv_damaged)
             stock_record.rejects_qty = float(existing_record.rejected_qty or 0)
             stock_record.final_stock_qty = float(stock_count) - float(rcv_damaged)
@@ -1670,7 +1670,7 @@ def update_count_receive_stock():
                 .first()
             )
             if toc_stock_record:
-                toc_stock_record.stock_transfer -= stock_count
+                toc_stock_record.stock_transfer -= float(existing_record.received_qty or 0)
             else:
                 raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")
 

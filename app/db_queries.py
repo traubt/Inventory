@@ -748,13 +748,6 @@ SELECT DISTINCT
     COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
     st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity, -- Current quantity (last stock count - sold quantity)
     st.stock_transfer AS received_stock 
---    COALESCE((
---        SELECT SUM(tro.received_qty) 
---        FROM toc_replenish_order tro
---        WHERE tro.shop_id = st.shop_id 
---          AND tro.sku = st.sku
---          AND tro.received_date > st.stock_qty_date
---    ), 0) AS received_stock -- Received stock
 FROM 
     toc_stock st
 LEFT JOIN 
