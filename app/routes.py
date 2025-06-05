@@ -1671,6 +1671,7 @@ def update_count_receive_stock():
             )
             if toc_stock_record:
                 toc_stock_record.stock_transfer -= float(existing_record.received_qty or 0)
+                #5/6 update damaged
                 toc_stock_record.rejects_qty += float(existing_record.rejects_qty or 0)
             else:
                 raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")

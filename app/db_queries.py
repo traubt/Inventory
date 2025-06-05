@@ -702,6 +702,7 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
 
 
 def get_stock_count_per_shop(shop):
+    #5/6 update damaged
 
     # Connect to the database
     conn = get_db_connection()
