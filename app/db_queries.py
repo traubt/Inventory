@@ -702,7 +702,6 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
 
 
 def get_stock_count_per_shop(shop):
-    #5/6 update damaged
 
     # Connect to the database
     conn = get_db_connection()
@@ -748,7 +747,7 @@ SELECT DISTINCT
     st.stock_qty_date AS last_stock_count_date, -- Last stock count date (stock_qty_date from toc_stock)
     COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
     st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity, -- Current quantity (last stock count - sold quantity)
-    st.stock_transfer + st.rejects_qty AS received_stock 
+    st.stock_transfer AS received_stock 
 FROM 
     toc_stock st
 LEFT JOIN 
