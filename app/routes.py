@@ -1561,7 +1561,7 @@ def update_count_stock():
                 # existing_record.variance_rsn = variance_rsn
                 # 11/3 Reset stock movement
                 existing_record.stock_transfer = 0
-                existing_record.rejects_qty = float(stock_rejected)
+                existing_record.rejects_qty = 0
                 existing_record.comments = comments
                 existing_record.count_by = user_name
                 existing_record.calc_stock_qty = float(calc_stock_qty)
@@ -1671,6 +1671,7 @@ def update_count_receive_stock():
             )
             if toc_stock_record:
                 toc_stock_record.stock_transfer -= float(existing_record.received_qty or 0)
+                toc_stock_record.rejects_qty += float(existing_record.rejects_qty or 0)
             else:
                 raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")
 
