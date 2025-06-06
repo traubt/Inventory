@@ -701,6 +701,74 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
     return result
 
 
+# def get_stock_count_per_shop(shop):
+#
+#     # Connect to the database
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#
+#     # Query to retrieve the stock order form
+#     query = '''
+# WITH sales_data AS (
+#     SELECT
+#         d.item_sku,
+#         d.item_name,
+#         b.store_customer,
+#         c.blName AS shop_name,
+#         st.stock_qty_date,
+#         -- COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
+#         SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END) AS sales_since_stock_read
+#     FROM
+#         toc_product d
+#     LEFT JOIN
+#         toc_ls_sales_item a
+#         ON d.item_sku = a.item_sku
+#     LEFT JOIN
+#         toc_ls_sales b
+#         ON a.sales_id = b.sales_id
+#     LEFT JOIN
+#         toc_shops c
+#         ON b.store_customer = c.customer
+#     LEFT JOIN
+#         toc_stock st
+#         ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+#     WHERE
+#         d.acct_group <> 'Specials'
+#         AND c.blName = %s -- Ensures we only get sales related to this shop
+#     GROUP BY
+#         d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+# )
+# SELECT DISTINCT
+#     st.sku AS item_sku,
+#     st.product_name AS item_name,
+#     st.shop_id AS store_customer,
+#     st.shop_name,
+#     st.stock_count AS last_stock_count, -- Last stock count (final_stock_qty from toc_stock)
+#     st.stock_qty_date AS last_stock_count_date, -- Last stock count date (stock_qty_date from toc_stock)
+#     COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
+#     st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity, -- Current quantity (last stock count - sold quantity)
+#     st.stock_transfer AS received_stock
+# FROM
+#     toc_stock st
+# LEFT JOIN
+#     sales_data s
+# ON
+#     st.sku = s.item_sku AND st.shop_id = s.store_customer
+# WHERE
+#     st.shop_name = %s -- Filter to include only entries for the specified shop
+# ORDER BY
+#     COALESCE(s.sales_since_stock_read, 0) DESC;
+#     '''
+#
+#     # Execute the query with the parameter
+#     cursor.execute(query, (shop,shop))
+#     result = cursor.fetchall()
+#
+#     cursor.close()
+#     conn.close()
+#
+#     return result
+
 def get_stock_count_per_shop(shop):
 
     # Connect to the database
@@ -716,58 +784,66 @@ WITH sales_data AS (
         b.store_customer,
         c.blName AS shop_name,
         st.stock_qty_date,
-        -- COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
         SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END) AS sales_since_stock_read
     FROM 
         toc_product d
-    LEFT JOIN 
-        toc_ls_sales_item a
-        ON d.item_sku = a.item_sku
-    LEFT JOIN 
-        toc_ls_sales b 
-        ON a.sales_id = b.sales_id
-    LEFT JOIN 
-        toc_shops c
-        ON b.store_customer = c.customer
-    LEFT JOIN
-        toc_stock st
-        ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+    LEFT JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
+    LEFT JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+    LEFT JOIN toc_shops c ON b.store_customer = c.customer
+    LEFT JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
     WHERE 
         d.acct_group <> 'Specials'
-        AND c.blName = %s -- Ensures we only get sales related to this shop
+        AND c.blName = %s
     GROUP BY 
         d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+),
+damaged_data AS (
+    SELECT 
+        d.sku,
+        d.shop_id,
+        SUM(d.rcv_damaged) AS total_damaged
+    FROM 
+        toc_damaged d
+    INNER JOIN toc_stock st
+        ON d.sku = st.sku AND d.shop_id = st.shop_name
+    WHERE 
+        d.order_open_date > st.stock_qty_date
+        AND d.shop_id = %s
+    GROUP BY 
+        d.sku, d.shop_id
 )
 SELECT DISTINCT
     st.sku AS item_sku,
     st.product_name AS item_name,
     st.shop_id AS store_customer,
     st.shop_name,
-    st.stock_count AS last_stock_count, -- Last stock count (final_stock_qty from toc_stock)
-    st.stock_qty_date AS last_stock_count_date, -- Last stock count date (stock_qty_date from toc_stock)
-    COALESCE(s.sales_since_stock_read, 0) AS sold_quantity, -- Sold quantity (sales_since_stock_read from sales_data, or 0 if no sales data)
-    st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity, -- Current quantity (last stock count - sold quantity)
-    st.stock_transfer AS received_stock 
+    st.stock_count AS last_stock_count,
+    st.stock_qty_date AS last_stock_count_date,
+    COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
+    st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
+    st.stock_transfer + COALESCE(dd.total_damaged, 0) AS received_stock
 FROM 
     toc_stock st
-LEFT JOIN 
-    sales_data s
-ON 
-    st.sku = s.item_sku AND st.shop_id = s.store_customer
+LEFT JOIN sales_data s
+    ON st.sku = s.item_sku AND st.shop_id = s.store_customer
+LEFT JOIN damaged_data dd
+    ON st.sku = dd.sku AND st.shop_name = dd.shop_id
 WHERE 
-    st.shop_name = %s -- Filter to include only entries for the specified shop
+    st.shop_name = %s
 ORDER BY 
     COALESCE(s.sales_since_stock_read, 0) DESC;
     '''
 
-    # Execute the query with the parameter
-    cursor.execute(query, (shop,shop))
+    # Execute the query with the shop name as parameter (used 3 times)
+    cursor.execute(query, (shop, shop, shop))
     result = cursor.fetchall()
 
     cursor.close()
     conn.close()
 
     return result
+
+
 
 def get_receive_stock_order(shop,order_id):
 
