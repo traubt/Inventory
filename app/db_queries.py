@@ -821,7 +821,7 @@ SELECT DISTINCT
     st.stock_qty_date AS last_stock_count_date,
     COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
     st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
-    st.stock_transfer + COALESCE(dd.total_damaged, 0) AS received_stock
+    st.stock_transfer - COALESCE(dd.total_damaged, 0) AS received_stock
 FROM 
     toc_stock st
 LEFT JOIN sales_data s
