@@ -300,3 +300,4 @@ class TocShipday(db.Model):
     ls_order_id = db.Column(db.String(45), nullable=True)
     shipday_id = db.Column(db.String(45), nullable=True)
     total_amt = db.Column(db.Float, nullable=True)
+    closest_shop_json = db.Column(db.JSON)

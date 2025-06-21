@@ -2488,49 +2488,50 @@ def haversine(lat1, lon1, lat2, lon2):
 @main.route('/get_closest_shop', methods=['GET'])
 def get_closest_shop():
     try:
-        # Retrieve the customer coordinates from the request
-        customer_lat = float(request.args.get('latitude'))  # Ensure it's a float
-        customer_lng = float(request.args.get('longitude'))  # Ensure it's a float
+        # ✅ OPTION 1: Check if this is a lookup by order_id
+        order_id = request.args.get('order_id')
+        if order_id:
+            record = TocShipday.query.filter_by(wc_orderid=int(order_id)).first()
+            if record and record.closest_shop_json:
+                return jsonify(record.closest_shop_json)
+            else:
+                return jsonify({"status": "error", "message": "No closest shop found for this order"}), 404
+
+        # ✅ OPTION 2: Proceed with lat/lng based proximity search
+        customer_lat = float(request.args.get('latitude'))
+        customer_lng = float(request.args.get('longitude'))
 
         # Connect to the database
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Define the SQL query to get shop name, longitude, and latitude where longitude is not null
-        query = """
+        cursor.execute("""
             SELECT blName, longitude, latitude
             FROM toc_shops 
             WHERE longitude IS NOT NULL;
-        """
-        cursor.execute(query)
+        """)
         shops = cursor.fetchall()
         cursor.close()
         conn.close()
 
-        # Check if no data was returned
         if not shops:
             return jsonify({"status": "error", "message": "No shops found with longitude"}), 404
 
-        # Find the closest shop using the Haversine formula
         closest_shop = None
-        min_distance = float('inf')  # Start with an infinite distance
+        min_distance = float('inf')
 
         for shop in shops:
-            shop_name, shop_lng, shop_lat = shop  # Unpack the shop tuple
-
-            # Ensure shop latitude and longitude are floats
+            shop_name, shop_lng, shop_lat = shop
             try:
                 shop_lat = float(shop_lat)
                 shop_lng = float(shop_lng)
             except ValueError as ve:
                 print(f"Error converting shop coordinates: {ve}")
-                continue  # Skip this shop if conversion fails
+                continue
 
-            # Calculate the distance using the haversine function
             distance = haversine(customer_lat, customer_lng, shop_lat, shop_lng)
             print(f"Shop: {shop_name}, distance from customer address: {distance:.2f} Km")
 
-            # Update the closest shop if this one is closer
             if distance < min_distance:
                 min_distance = distance
                 closest_shop = {
@@ -2540,7 +2541,6 @@ def get_closest_shop():
                     'distance': round(distance, 2)
                 }
 
-        # Return the closest shop information as JSON
         if closest_shop:
             return jsonify(closest_shop)
 
@@ -2549,6 +2549,7 @@ def get_closest_shop():
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @main.route('/shipday_create_order', methods=['POST'])
 def shipday_create_order():
@@ -2646,7 +2647,26 @@ def shipday_create_order():
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@main.route('/save_closest_shop', methods=['POST'])
+def save_closest_shop():
+    try:
+        data = request.get_json()
+        order_id = data.get('order_id')
+        shop = data.get('shop')
 
+        if not order_id or not shop:
+            return jsonify({'error': 'Missing order_id or shop'}), 400
+
+        record = TocShipday.query.filter_by(wc_orderid=order_id).first()
+        if record:
+            record.closest_shop_json = shop
+            db.session.commit()
+            return jsonify({'status': 'ok', 'message': f'Saved shop for order {order_id}'})
+        else:
+            return jsonify({'error': f'Order {order_id} not found'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 #########################  OPENAI section  #####################
 @main.route('/api/ask_business', methods=['POST'])
