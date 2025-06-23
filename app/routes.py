@@ -2702,7 +2702,7 @@ def check_shop_stock():
         return jsonify({ "available": False, "error": str(e) }), 500
 
 
-@app.route('/create_lightspeed_order', methods=['POST'])
+@main.route('/create_lightspeed_order', methods=['POST'])
 def create_lightspeed_order():
     from app.models import TocShipday, TOC_SHOPS  # your actual imports
     from datetime import datetime, timedelta, timezone
