@@ -18,6 +18,7 @@ import pandas as pd
 import openai
 import re
 from app.tables_for_openAI import DATABASE_SCHEMA
+import requests
 
 from shipday import Shipday
 from shipday.order import Address, Customer, Pickup, OrderItem, Order
@@ -27,6 +28,9 @@ shipday_api = Blueprint('shipday_api', __name__)
 # Set your Shipday API key
 API_KEY = 'VXveiHsYGE.eLK6vIxvz1gQixI9tOvm'
 shipday_obj = Shipday(api_key=API_KEY)
+
+LIGHTSPEED_API_URL = "https://api.lsk.lightspeed.app/o/op/1/order/toGo"
+LIGHTSPEED_ACCESS_TOKEN = "d03f8f2e-67df-4210-b388-8011be9e7bf6"
 
 
 
@@ -2696,6 +2700,90 @@ def check_shop_stock():
     except Exception as e:
         print(f"❌ Error in check_shop_stock: {e}")
         return jsonify({ "available": False, "error": str(e) }), 500
+
+
+@app.route('/create_lightspeed_order', methods=['POST'])
+def create_lightspeed_order():
+    from app.models import TocShipday, TOC_SHOPS  # your actual imports
+    from datetime import datetime, timedelta, timezone
+
+    try:
+        data = request.get_json()
+        wc_orderid = int(data.get('wc_orderid'))
+
+        record = TocShipday.query.filter_by(wc_orderid=wc_orderid).first()
+        if not record:
+            return jsonify({"error": "Order not found"}), 404
+
+        shop = TOC_SHOPS.query.filter_by(blName=record.shop_name).first()
+        if not shop:
+            return jsonify({"error": "Shop not found"}), 404
+
+        tz = timezone(timedelta(hours=2))
+        timestamp = datetime.now(tz).isoformat(timespec="seconds")
+
+        # 🛒 Build items list
+        # from app.wp_utils import get_order_items  # You must define this function to fetch Woo items
+        # items = get_order_items(wc_orderid)  # Returns [{'sku': 'BUD004', 'quantity': 1}, ...]
+
+        order_payload = {
+            "businessLocationId": shop.blId,
+            "thirdPartyReference": f"WC{wc_orderid}",
+            "endpointId": "WEB",
+            "customerInfo": {
+                "firstName": record.wc_name.split()[0],
+                "lastName": record.wc_name.split()[-1],
+                "email": record.wc_email,
+                "contactNumberAsE164": record.wc_phone
+            },
+            "deliveryAddress": {
+                "addressLine1": record.wc_email,
+                "addressLine2": record.shop_name
+            },
+            "accountProfileCode": "ONLINE",
+            "payment": {
+                "paymentMethod": "Online",
+                "paymentAmount": str(record.total_amt)
+            },
+            "orderNote": "LOCAL PICKUP",
+            "tableNumber": 1,
+            "items": [
+                {
+                    "quantity": 1,
+                    "sku": "BUD004",
+                    "subItems": []
+                },
+                {
+                    "quantity": 1,
+                    "sku": "FT2",
+                    "customItemName": "Payfast Transaction ID : 123456",
+                    "subItems": []
+                }
+            ]
+
+        }
+
+        # Send to Lightspeed
+        headers = {
+            "Authorization": f"Bearer {LIGHTSPEED_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        res = requests.post("https://api.lsk.lightspeed.app/o/op/1/order/toGo",
+                            headers=headers, json=order_payload)
+
+        if res.status_code == 200:
+            TocShipday.query.filter_by(wc_orderid=wc_orderid).update({
+                "ls_order_id": f"{wc_orderid}"
+            })
+            db.session.commit()
+            return jsonify({"status": "success", "ls_order_id": f"{wc_orderid}"})
+
+        return jsonify({"error": res.text}), res.status_code
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 #########################  OPENAI section  #####################
