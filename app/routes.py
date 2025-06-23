@@ -2558,7 +2558,7 @@ def shipday_create_order():
         # Extract WooCommerce order details
         order_number = data.get('order_number')  # e.g., "WC420431"
         wc_orderid = int(order_number.replace("WC", ""))  # Strip prefix
-        total_amt = data.get('total_amt')
+        total_amt = data.get('total_amt') or 0
 
         customer_info = data.get('customer')
         pickup_info = data.get('pickup')
