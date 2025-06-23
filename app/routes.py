@@ -2729,7 +2729,7 @@ def create_lightspeed_order():
         order_payload = {
             "businessLocationId": shop.blId,
             "thirdPartyReference": f"WC{wc_orderid}",
-            "endpointId": "WEB",
+            "endpointId": "TEST",
             "customerInfo": {
                 "firstName": record.wc_name.split()[0],
                 "lastName": record.wc_name.split()[-1],
