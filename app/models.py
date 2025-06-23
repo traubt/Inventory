@@ -51,7 +51,8 @@ class TOC_SHOPS(db.Model):
     address = db.Column(db.String(50))
     phone = db.Column(db.String(15))
     zip = db.Column(db.String(5))
-
+    city  = db.Column(db.String(20))
+    state = db.Column(db.String(20))
 
 class TocMessages(db.Model):
     __tablename__ = 'toc_messages'

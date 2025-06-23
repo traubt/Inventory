@@ -2580,7 +2580,7 @@ def shipday_create_order():
         db.session.add(new_record)
         db.session.commit()
 
-        # Build Shipday objects
+        # Build customer object
         customer_address = Address(**customer_info['address'])
         customer = Customer(
             name=customer_info['name'],
@@ -2589,17 +2589,18 @@ def shipday_create_order():
             email=customer_info['email']
         )
 
-        # Fetch shop info from the database using the shop name
+        # ✅ Fetch shop info from the database using blName (shop_name)
         shop = TOC_SHOPS.query.filter_by(blName=pickup_info['name']).first()
         if not shop:
             raise Exception(f"Shop '{pickup_info['name']}' not found in database")
 
+        # ✅ Use fields from TOC_SHOPS model
         pickup_address = Address(
-            street=shop.address,
-            city="Rosebank",  # You can map this from DB later if needed
-            state="GP",
-            country="South Africa",
-            zip=shop.zip,
+            street=shop.address or "",
+            city=shop.city or "",
+            state=shop.state or "GP",
+            country=shop.country or "South Africa",
+            zip=shop.zip or "",
             latitude=float(shop.latitude),
             longitude=float(shop.longitude)
         )
@@ -2610,6 +2611,7 @@ def shipday_create_order():
             address=pickup_address
         )
 
+        # Build order
         order_items = [OrderItem(**item) for item in items_info]
         new_order = Order(
             order_number=order_number,
@@ -2621,18 +2623,19 @@ def shipday_create_order():
             payment_method=payment_method
         )
 
+        # 🧠 Only overwrite if present
         if 'latitude' in customer_info['address']:
             new_order.customer.address.latitude = customer_info['address']['latitude']
             new_order.customer.address.longitude = customer_info['address']['longitude']
-        if 'latitude' in pickup_info['address']:
-            new_order.pickup.address.latitude = pickup_info['address']['latitude']
-            new_order.pickup.address.longitude = pickup_info['address']['longitude']
 
-        # Send to Shipday
+        # ✅ Don't overwrite pickup coords — already pulled from DB
+        # (skip setting pickup address.lat/lng here)
+
+        # 🚀 Send to Shipday
         result = shipday_obj.OrderService.insert_order(new_order)
         shipday_id = result.get("orderId")
 
-        # Update shipday record
+        # Update order with Shipday ID
         TocShipday.query.filter_by(wc_orderid=wc_orderid).update({
             "status": "completed",
             "shipday_id": shipday_id,
@@ -2645,6 +2648,7 @@ def shipday_create_order():
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @main.route('/save_closest_shop', methods=['POST'])
 def save_closest_shop():
@@ -2659,6 +2663,7 @@ def save_closest_shop():
         record = TocShipday.query.filter_by(wc_orderid=order_id).first()
         if record:
             record.closest_shop_json = shop
+            record.shop_name = shop.get("shop_name") or "Unknown"
             db.session.commit()
             return jsonify({'status': 'ok', 'message': f'Saved shop for order {order_id}'})
         else:
@@ -2666,6 +2671,7 @@ def save_closest_shop():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @main.route('/check_shop_stock', methods=['POST'])
 def check_shop_stock():
