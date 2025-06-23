@@ -2488,6 +2488,15 @@ def haversine(lat1, lon1, lat2, lon2):
 @main.route('/get_closest_shop', methods=['GET'])
 def get_closest_shop():
     try:
+        # ✅ New logic to return stored closest shop from toc_shipday
+        order_id = request.args.get('order_id')
+        if order_id:
+            record = TocShipday.query.filter_by(wc_orderid=int(order_id)).first()
+            if record and record.closest_shop_json:
+                return jsonify(record.closest_shop_json)
+            else:
+                return jsonify({"status": "error", "message": "No closest shop found for order"}),
+
         # Retrieve the customer coordinates from the request
         customer_lat = float(request.args.get('latitude'))  # Ensure it's a float
         customer_lng = float(request.args.get('longitude'))  # Ensure it's a float
