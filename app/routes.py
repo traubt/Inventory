@@ -2663,6 +2663,7 @@ def save_closest_shop():
         data = request.get_json()
         order_id = data.get('order_id')
         shop = data.get('shop')
+        print(f"order id {order_id}, shop {shop} XXXXXXXXXXXXXXXX")
 
         if not order_id or not shop:
             return jsonify({'error': 'Missing order_id or shop'}), 400
