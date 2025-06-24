@@ -2747,20 +2747,7 @@ def create_lightspeed_order():
             },
             "orderNote": "LOCAL PICKUP",
             "tableNumber": 1,
-            "items": [
-                {
-                    "quantity": 1,
-                    "sku": "BUD004",
-                    "subItems": []
-                },
-                {
-                    "quantity": 1,
-                    "sku": "FT2",
-                    "customItemName": "Payfast Transaction ID : 123456",
-                    "subItems": []
-                }
-            ]
-
+            "items": data.get("items", [])
         }
 
         # Send to Lightspeed
