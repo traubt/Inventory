@@ -2578,17 +2578,30 @@ def shipday_create_order():
         pickup_note = data.get('pickup_instruction', '')
         payment_method = data.get('payment_method', 'ONLINE')
 
-        # Insert basic record into toc_shipday
-        new_record = TocShipday(
-            wc_orderid=wc_orderid,
-            wc_name=customer_info['name'],
-            wc_email=customer_info['email'],
-            wc_phone=customer_info['phone_number'],
-            shop_name=pickup_info['name'],
-            status='pending',
-            total_amt=float(total_amt)
-        )
-        db.session.add(new_record)
+        # Upsert into toc_shipday
+        record = TocShipday.query.filter_by(wc_orderid=wc_orderid).first()
+
+        if record:
+            # Update existing
+            record.wc_name = customer_info['name']
+            record.wc_email = customer_info['email']
+            record.wc_phone = customer_info['phone_number']
+            record.shop_name = pickup_info['name']
+            record.status = 'paid'
+            record.total_amt = float(total_amt)
+        else:
+            # Insert new
+            record = TocShipday(
+                wc_orderid=wc_orderid,
+                wc_name=customer_info['name'],
+                wc_email=customer_info['email'],
+                wc_phone=customer_info['phone_number'],
+                shop_name=pickup_info['name'],
+                status='paid',
+                total_amt=float(total_amt)
+            )
+            db.session.add(record)
+
         db.session.commit()
 
         # Build customer object
