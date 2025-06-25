@@ -2578,18 +2578,17 @@ def shipday_create_order():
         pickup_note = data.get('pickup_instruction', '')
         payment_method = data.get('payment_method', 'ONLINE')
 
-
-        record = TocShipday(
+        # Insert basic record into toc_shipday
+        new_record = TocShipday(
             wc_orderid=wc_orderid,
             wc_name=customer_info['name'],
             wc_email=customer_info['email'],
             wc_phone=customer_info['phone_number'],
             shop_name=pickup_info['name'],
-            status='paid',
+            status='pending',
             total_amt=float(total_amt)
         )
-        db.session.add(record)
-
+        db.session.add(new_record)
         db.session.commit()
 
         # Build customer object
