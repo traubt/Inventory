@@ -2727,7 +2727,7 @@ def create_lightspeed_order():
         # items = get_order_items(wc_orderid)  # Returns [{'sku': 'BUD004', 'quantity': 1}, ...]
 
         order_payload = {
-            "businessLocationId": shop.blId,
+            "businessLocationId": str(shop.blId),
             "thirdPartyReference": f"WC{wc_orderid}",
             "endpointId": "TEST",
             "customerInfo": {
@@ -2743,7 +2743,7 @@ def create_lightspeed_order():
             "accountProfileCode": "ONLINE",
             "payment": {
                 "paymentMethod": "Online",
-                "paymentAmount": str(record.total_amt)
+                "paymentAmount": f"{record.total_amt:.2f}"
             },
             "orderNote": "LOCAL PICKUP",
             "tableNumber": 1,
