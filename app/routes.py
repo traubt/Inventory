@@ -2750,17 +2750,17 @@ def create_lightspeed_order():
         #     "items": data.get("items", [])
         # }
         #
-        # # Send to Lightspeed
-        # headers = {
-        #     "Authorization": f"Bearer {LIGHTSPEED_ACCESS_TOKEN}",
-        #     "Content-Type": "application/json"
-        # }
+        # Send to Lightspeed
+        headers = {
+            "Authorization": f"Bearer {LIGHTSPEED_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
 
-        # TEST working payload from himaal. Change the reference each time.
+        # TEST working payload from Heemal. Change the reference each time.
 
         order_payload = {
             "businessLocationId": "195051644848426",
-            "thirdPartyReference": "final test 4",
+            "thirdPartyReference": "final test 5",
             "endpointId": "TEST",
             "customerInfo": {
                 "firstName": "Tomer",
