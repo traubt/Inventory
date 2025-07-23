@@ -2756,7 +2756,8 @@ def create_lightspeed_order():
             "Content-Type": "application/json"
         }
 
-        print(f"Lightspeed order: {order_payload}")
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Lightspeed order: {order_payload}")
 
         # TEST working payload from Heemal. Change the reference each time.
 
