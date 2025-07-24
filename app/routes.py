@@ -2726,73 +2726,78 @@ def create_lightspeed_order():
         # from app.wp_utils import get_order_items  # You must define this function to fetch Woo items
         # items = get_order_items(wc_orderid)  # Returns [{'sku': 'BUD004', 'quantity': 1}, ...]
 
-        order_payload = {
-            "businessLocationId": str(shop.blId),
-            "thirdPartyReference": f"WC{wc_orderid}",
-            "endpointId": "TEST",
-            "customerInfo": {
-                "firstName": record.wc_name.split()[0],
-                "lastName": record.wc_name.split()[-1],
-                "email": record.wc_email,
-                "contactNumberAsE164": record.wc_phone
-            },
-            "deliveryAddress": {
-                "addressLine1": record.wc_email,
-                "addressLine2": record.shop_name
-            },
-            "accountProfileCode": "ONLINE",
-            "payment": {
-                "paymentMethod": "Online",
-                "paymentAmount": f"{record.total_amt:.2f}"
-            },
-            "orderNote": "LOCAL PICKUP",
-            "tableNumber": 1,
-            "items": data.get("items", [])
-        }
-        #
-        # Send to Lightspeed
+        # order_payload = {
+        #     "businessLocationId": str(shop.blId),
+        #     "thirdPartyReference": f"WC{wc_orderid}",
+        #     "endpointId": "TEST",
+        #     "customerInfo": {
+        #         "firstName": record.wc_name.split()[0],
+        #         "lastName": record.wc_name.split()[-1],
+        #         "email": record.wc_email,
+        #         "contactNumberAsE164": record.wc_phone
+        #     },
+        #     "deliveryAddress": {
+        #         "addressLine1": record.wc_email,
+        #         "addressLine2": record.shop_name
+        #     },
+        #     "accountProfileCode": "ONLINE",
+        #     "payment": {
+        #         "paymentMethod": "Online",
+        #         "paymentAmount": f"{record.total_amt:.2f}"
+        #     },
+        #     "orderNote": "LOCAL PICKUP",
+        #     "tableNumber": 1,
+        #     "items": data.get("items", [])
+        # }
+
+        # #
+        # # Send to Lightspeed
         headers = {
             "Authorization": f"Bearer {LIGHTSPEED_ACCESS_TOKEN}",
             "Content-Type": "application/json"
         }
 
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Lightspeed order: {order_payload}")
+
 
         # TEST working payload from Heemal. Change the reference each time.
 
-    #     order_payload = {
-    #         "businessLocationId": "195051644848426",
-    #         "thirdPartyReference": "final test 5",
-    #         "endpointId": "TEST",
-    #         "customerInfo": {
-    #             "firstName": "Tomer",
-    #             "lastName": "Traub",
-    #             "email": "tomer.traub@gmail.com",
-    #             "contactNumberAsE164": "+2723456789"
-    #         },
-    #         "deliveryAddress": {
-    #             "addressLine1": "test@gmail.com",
-    #             "addressLine2": "Addressline2"
-    #         },
-    #         "accountProfileCode": "ONLINE",
-    #         "payment": {
-    #             "paymentMethod": "Online",
-    #             "paymentAmount": "150.00"
-    #         },
-    #         "orderNote": "LOCAL PICKUP",
-    #         "tableNumber": 1,
-    #         "items": [
-    #             {
-    #                 "quantity": 1,
-    #                 "sku": "4880",
-    #                 "subItems": []
-    #             }
-    #         ]
-    # }
+        order_payload = {
+            "businessLocationId": "195051644848426",
+            "thirdPartyReference": "final test 5",
+            "endpointId": "TEST",
+            "customerInfo": {
+                "firstName": "Tomer",
+                "lastName": "Traub",
+                "email": "tomer.traub@gmail.com",
+                "contactNumberAsE164": "+2723456789"
+            },
+            "deliveryAddress": {
+                "addressLine1": "test@gmail.com",
+                "addressLine2": "Addressline2"
+            },
+            "accountProfileCode": "ONLINE",
+            "payment": {
+                "paymentMethod": "Online",
+                "paymentAmount": "150.00"
+            },
+            "orderNote": "LOCAL PICKUP",
+            "tableNumber": 1,
+            "items": [
+                {
+                    "quantity": 1,
+                    "sku": "4880",
+                    "subItems": []
+                }
+            ]
+    }
+
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Lightspeed order: {order_payload}")
 
         res = requests.post("https://api.lsk.lightspeed.app/o/op/1/order/toGo",
                             headers=headers, json=order_payload)
+
+        logger.warning(f"Lightspeed status: {res.status_code}")
 
         if res.status_code == 200:
             TocShipday.query.filter_by(wc_orderid=wc_orderid).update({
