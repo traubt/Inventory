@@ -2729,7 +2729,7 @@ def create_lightspeed_order():
         # ✅ Add required item
         items.append({
             "quantity": 1,
-            "sku": "28156",
+            "sku": "3401/001",
             "subItems": []
         })
 
