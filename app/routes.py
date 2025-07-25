@@ -2723,8 +2723,15 @@ def create_lightspeed_order():
         timestamp = datetime.now(tz).isoformat(timespec="seconds")
 
         # 🛒 Build items list
-        # from app.wp_utils import get_order_items  # You must define this function to fetch Woo items
-        # items = get_order_items(wc_orderid)  # Returns [{'sku': 'BUD004', 'quantity': 1}, ...]
+        # Build initial items list
+        items = data.get("items", [])
+
+        # ✅ Add required item
+        items.append({
+            "quantity": 1,
+            "sku": "28156",
+            "subItems": []
+        })
 
         order_payload = {
             "businessLocationId": str(shop.blId),
@@ -2747,7 +2754,7 @@ def create_lightspeed_order():
             },
             "orderNote": "LOCAL PICKUP",
             "tableNumber": 1,
-            "items": data.get("items", [])
+            "items": items
         }
 
         # #
