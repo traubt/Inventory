@@ -302,3 +302,40 @@ class TocShipday(db.Model):
     shipday_id = db.Column(db.String(45), nullable=True)
     total_amt = db.Column(db.Float, nullable=True)
     closest_shop_json = db.Column(db.JSON)
+    shipday_distance_km = db.Column(db.Float)
+    assign_datetime = db.Column(db.DateTime)
+    driver_id = db.Column(db.String(45))
+    driver_base_fee = db.Column(db.Float)
+    collection_datetime = db.Column(db.DateTime)
+    delivered_datetime = db.Column(db.DateTime)
+    shipping_status = db.Column(db.String(45))
+    driver_rating = db.Column(db.Float)
+
+class TocShipdayDriver(db.Model):
+    __tablename__ = 'toc_shipday_drivers'
+
+    driver_id = db.Column(db.String(45), primary_key=True)  # Shipday ID
+    full_name = db.Column(db.String(100))
+    phone_number = db.Column(db.String(45))
+    email = db.Column(db.String(100))
+    vehicle_type = db.Column(db.String(45))
+    vehicle_number = db.Column(db.String(45))
+    current_rating = db.Column(db.Float)
+    active_status = db.Column(db.Boolean, default=True)
+    creation_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+    last_update = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
+
+class TocShipdayDriverPayment(db.Model):
+    __tablename__ = 'toc_shipday_drivers_payments'
+
+    payment_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    driver_id = db.Column(db.String(45), db.ForeignKey('toc_shipday_drivers.driver_id'), nullable=False)
+
+    from_date = db.Column(db.DateTime, nullable=False)
+    to_date = db.Column(db.DateTime, nullable=False)
+    total_base_fee = db.Column(db.Float, default=0)
+    payment_reference = db.Column(db.String(100))
+    payment_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+    notes = db.Column(db.Text)
+

@@ -2818,6 +2818,59 @@ def create_lightspeed_order():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@main.route('/shipday_webhook', methods=['POST'])
+def shipday_webhook():
+
+    try:
+        data = request.get_json(force=True)
+        shipday_id = str(data.get('orderId'))
+        event_type = data.get('eventType')  # optional, depends on webhook setup
+
+        if not shipday_id:
+            return "Missing order ID", 400
+
+        record = TocShipday.query.filter_by(shipday_id=shipday_id).first()
+        if not record:
+            return f"No toc_shipday found for shipday_id {shipday_id}", 404
+
+        # Update delivery fields
+        record.shipping_status = data.get('status') or record.shipping_status
+        record.assign_datetime = parse_dt(data.get('assignedTime')) or record.assign_datetime
+        record.collection_datetime = parse_dt(data.get('pickupTime')) or record.collection_datetime
+        record.delivered_datetime = parse_dt(data.get('deliveredTime')) or record.delivered_datetime
+        record.driver_base_fee = data.get('deliveryFee') or record.driver_base_fee
+        record.shipday_distance_km = data.get('distance') or record.shipday_distance_km
+
+        # Update driver
+        driver_data = data.get('driver', {})
+        if driver_data.get('driverId'):
+            driver = TocShipdayDriver.query.get(driver_data['driverId']) or TocShipdayDriver(driver_id=driver_data['driverId'])
+
+            driver.full_name = driver_data.get('name')
+            driver.phone_number = driver_data.get('phone')
+            driver.email = driver_data.get('email')
+            driver.vehicle_type = driver_data.get('vehicleType')
+            driver.vehicle_number = driver_data.get('vehicleNumber')
+            driver.current_rating = driver_data.get('rating')
+
+            db.session.merge(driver)
+
+        db.session.commit()
+        return "OK", 200
+
+    except Exception as e:
+        print(f"❌ Shipday webhook error: {e}")
+        return f"Error: {str(e)}", 500
+
+def parse_dt(dt_str):
+    from datetime import datetime
+    if not dt_str:
+        return None
+    try:
+        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
 
 
 #########################  OPENAI section  #####################
