@@ -2831,7 +2831,11 @@ def shipday_webhook():
         data = request.get_json(force=True)
         print(f"📦 Raw webhook payload: {data}")
 
-        shipday_id = str(data.get('orderId'))
+        # shipday_id = str(data.get('orderId'))
+        # Try top-level field
+        shipday_id = str(data.get('orderId') or data.get('order', {}).get('id'))
+        print(f"🔎 Extracted shipday_id: {shipday_id}")
+
         event_type = data.get('eventType')  # optional, depends on Shipday config
 
         if not shipday_id:
