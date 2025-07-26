@@ -2823,61 +2823,69 @@ def shipday_webhook():
     try:
         print("🚨 Shipday webhook called")
 
-        # Optional security: temporarily disable token check
-        # if request.headers.get('Token') != 'shipday-secret-token-360':
-        #     print("❌ Invalid token")
-        #     return "Unauthorized", 401
-
         data = request.get_json(force=True)
-        print(f"📦 Raw webhook payload: {data}")
+        print(f"📦 Raw payload: {data}")
 
-        # shipday_id = str(data.get('orderId'))
-        # Try top-level field
-        shipday_id = str(data.get('orderId') or data.get('order', {}).get('id'))
+        # Safely extract order ID
+        order_data = data.get('order', {})
+        shipday_id = str(data.get('orderId') or order_data.get('id'))
+
         print(f"🔎 Extracted shipday_id: {shipday_id}")
 
-        event_type = data.get('eventType')  # optional, depends on Shipday config
-
         if not shipday_id:
-            print("❌ Missing order ID in webhook")
+            print("❌ No order ID found in webhook payload.")
             return "Missing order ID", 400
 
+        # Confirm order exists
         record = TocShipday.query.filter_by(shipday_id=shipday_id).first()
         if not record:
             print(f"❌ No toc_shipday record found for shipday_id={shipday_id}")
             return f"No toc_shipday found for shipday_id {shipday_id}", 404
 
-        # 🚚 Update delivery details
-        record.shipping_status = data.get('status') or record.shipping_status
-        record.assign_datetime = parse_dt(data.get('assignedTime')) or record.assign_datetime
-        record.collection_datetime = parse_dt(data.get('pickupTime')) or record.collection_datetime
-        record.delivered_datetime = parse_dt(data.get('deliveredTime')) or record.delivered_datetime
-        record.driver_base_fee = data.get('deliveryFee') or record.driver_base_fee
-        record.shipday_distance_km = data.get('distance') or record.shipday_distance_km
+        # Map known fields
+        record.shipping_status = data.get('order_status') or record.shipping_status
+        record.assign_datetime = parse_dt(data.get('assigned_time')) or record.assign_datetime
+        record.collection_datetime = parse_dt(data.get('expected_pickup_time')) or record.collection_datetime
+        record.delivered_datetime = parse_dt(data.get('expected_delivery_time')) or record.delivered_datetime
+        record.driver_base_fee = data.get('delivery_fee') or record.driver_base_fee
+        record.shipday_distance_km = (data.get('driving_distance') or 0) / 1000.0  # if meters
 
-        # 👤 Update driver details
-        driver_data = data.get('driver', {})
-        if driver_data.get('driverId'):
-            driver_id = driver_data['driverId']
-            driver = TocShipdayDriver.query.get(driver_id) or TocShipdayDriver(driver_id=driver_id)
+        # Extract driver info from nested dict
+        driver_info = order_data.get('driver', {})
+        if driver_info.get('driverId'):
+            driver = TocShipdayDriver.query.get(driver_info['driverId']) or TocShipdayDriver(driver_id=driver_info['driverId'])
 
-            driver.full_name = driver_data.get('name')
-            driver.phone_number = driver_data.get('phone')
-            driver.email = driver_data.get('email')
-            driver.vehicle_type = driver_data.get('vehicleType')
-            driver.vehicle_number = driver_data.get('vehicleNumber')
-            driver.current_rating = driver_data.get('rating')
+            driver.full_name = driver_info.get('name')
+            driver.phone_number = driver_info.get('phone')
+            driver.email = driver_info.get('email')
+            driver.vehicle_type = driver_info.get('vehicleType')
+            driver.vehicle_number = driver_info.get('vehicleNumber')
+            driver.current_rating = driver_info.get('rating')
 
             db.session.merge(driver)
-            print(f"👤 Driver {driver_id} info updated")
+            print(f"👤 Updated driver {driver.driver_id}")
 
         db.session.commit()
-        print(f"✅ Shipday webhook update complete for order {shipday_id}")
+        print(f"✅ Webhook update committed for order {shipday_id}")
         return "OK", 200
 
     except Exception as e:
         print(f"❌ Shipday webhook error: {e}")
         return f"Error: {str(e)}", 500
+
+
+def parse_dt(dt_str):
+    from datetime import datetime
+    if not dt_str:
+        return None
+    try:
+        return datetime.fromtimestamp(int(dt_str))  # Shipday uses epoch in ms/sec sometimes
+    except Exception:
+        try:
+            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        except:
+            return None
+
 
 
 def parse_dt(dt_str):
