@@ -2820,20 +2820,30 @@ def create_lightspeed_order():
 
 @main.route('/shipday_webhook', methods=['POST'])
 def shipday_webhook():
-
     try:
+        print("🚨 Shipday webhook called")
+
+        # Optional security: temporarily disable token check
+        # if request.headers.get('Token') != 'shipday-secret-token-360':
+        #     print("❌ Invalid token")
+        #     return "Unauthorized", 401
+
         data = request.get_json(force=True)
+        print(f"📦 Raw webhook payload: {data}")
+
         shipday_id = str(data.get('orderId'))
-        event_type = data.get('eventType')  # optional, depends on webhook setup
+        event_type = data.get('eventType')  # optional, depends on Shipday config
 
         if not shipday_id:
+            print("❌ Missing order ID in webhook")
             return "Missing order ID", 400
 
         record = TocShipday.query.filter_by(shipday_id=shipday_id).first()
         if not record:
+            print(f"❌ No toc_shipday record found for shipday_id={shipday_id}")
             return f"No toc_shipday found for shipday_id {shipday_id}", 404
 
-        # Update delivery fields
+        # 🚚 Update delivery details
         record.shipping_status = data.get('status') or record.shipping_status
         record.assign_datetime = parse_dt(data.get('assignedTime')) or record.assign_datetime
         record.collection_datetime = parse_dt(data.get('pickupTime')) or record.collection_datetime
@@ -2841,10 +2851,11 @@ def shipday_webhook():
         record.driver_base_fee = data.get('deliveryFee') or record.driver_base_fee
         record.shipday_distance_km = data.get('distance') or record.shipday_distance_km
 
-        # Update driver
+        # 👤 Update driver details
         driver_data = data.get('driver', {})
         if driver_data.get('driverId'):
-            driver = TocShipdayDriver.query.get(driver_data['driverId']) or TocShipdayDriver(driver_id=driver_data['driverId'])
+            driver_id = driver_data['driverId']
+            driver = TocShipdayDriver.query.get(driver_id) or TocShipdayDriver(driver_id=driver_id)
 
             driver.full_name = driver_data.get('name')
             driver.phone_number = driver_data.get('phone')
@@ -2854,13 +2865,16 @@ def shipday_webhook():
             driver.current_rating = driver_data.get('rating')
 
             db.session.merge(driver)
+            print(f"👤 Driver {driver_id} info updated")
 
         db.session.commit()
+        print(f"✅ Shipday webhook update complete for order {shipday_id}")
         return "OK", 200
 
     except Exception as e:
         print(f"❌ Shipday webhook error: {e}")
         return f"Error: {str(e)}", 500
+
 
 def parse_dt(dt_str):
     from datetime import datetime
