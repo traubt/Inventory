@@ -2821,6 +2821,7 @@ def create_lightspeed_order():
 
 @main.route('/webhook/shipday', methods=['POST'])
 def shipday_webhook():
+    from datetime import datetime
 
     logger = logging.getLogger(__name__)
     logger.warning("🚨 Shipday webhook called")
@@ -2841,7 +2842,7 @@ def shipday_webhook():
         return "Order not found", 404
 
     def parse_epoch(ms):
-        return datetime.datetime.fromtimestamp(ms / 1000.0) if ms else None
+        return datetime.fromtimestamp(ms / 1000.0) if ms else None
 
     if event == "ORDER_ACCEPTED_AND_STARTED":
         shipday.shipday_distance_km = order.get("driving_distance", 0) / 1000.0
@@ -2879,7 +2880,7 @@ def shipday_webhook():
         shipday.driving_duration = order.get("driving_duration", 0)
 
     shipday.shipping_status = payload.get("order_status")
-    shipday.update_date = datetime.datetime.utcnow()
+    shipday.update_date = datetime.utcnow()   # ✅ FIXED HERE
 
     db.session.commit()
     logger.warning(f"✅ Webhook update committed for order {shipday_id}")
