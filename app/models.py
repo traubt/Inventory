@@ -290,29 +290,26 @@ class TocDamaged(db.Model):
 class TocShipday(db.Model):
     __tablename__ = 'toc_shipday'
 
-    id = db.Column(db.Integer, primary_key=True)
-    wc_orderid = db.Column(db.String(20))
+    wc_orderid = db.Column(db.String(20), primary_key=True)
     creation_date = db.Column(db.DateTime)
-    wc_name = db.Column(db.String(255))
-    wc_email = db.Column(db.String(255))
+    wc_name = db.Column(db.String(100))
+    wc_email = db.Column(db.String(100))
     wc_phone = db.Column(db.String(20))
-    shop_name = db.Column(db.String(255))
-    status = db.Column(db.String(50))
+    shop_name = db.Column(db.String(100))
+    status = db.Column(db.String(20))
     update_date = db.Column(db.DateTime)
-
-    ls_order_id = db.Column(db.String(50))
+    ls_order_id = db.Column(db.String(20))
     shipday_id = db.Column(db.String(50))
     total_amt = db.Column(db.Float)
     shipday_distance_km = db.Column(db.Float)
-
-    assigned_time = db.Column(db.DateTime)         # formerly assign_datetime
-    pickedup_time = db.Column(db.DateTime)         # formerly collection_datetime
-    delivery_time = db.Column(db.DateTime)         # formerly delivered_datetime
-    driving_duration = db.Column(db.Integer)       # in seconds
-
+    assigned_time = db.Column(db.DateTime)
+    pickedup_time = db.Column(db.DateTime)
+    delivery_time = db.Column(db.DateTime)
+    driving_duration = db.Column(db.Integer)
     driver_id = db.Column(db.String(50))
     driver_base_fee = db.Column(db.Float)
     shipping_status = db.Column(db.String(50))
+
 
 
 class TocShipdayDriver(db.Model):
