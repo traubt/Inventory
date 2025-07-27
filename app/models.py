@@ -331,12 +331,19 @@ class TocShipdayDriverPayment(db.Model):
     __tablename__ = 'toc_shipday_drivers_payments'
 
     payment_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    driver_id = db.Column(db.String(45), db.ForeignKey('toc_shipday_drivers.driver_id'), nullable=False)
+    driver_id = db.Column(db.String(45), db.ForeignKey('toc_shipday_drivers.driver_id'))
+    total_amount = db.Column(db.Float)
+    status = db.Column(db.String(20), default='open')
+    paid_date = db.Column(db.DateTime)
+    note = db.Column(db.Text)
+    creation_date = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-    from_date = db.Column(db.DateTime, nullable=False)
-    to_date = db.Column(db.DateTime, nullable=False)
-    total_base_fee = db.Column(db.Float, default=0)
-    payment_reference = db.Column(db.String(100))
-    payment_date = db.Column(db.DateTime, default=db.func.current_timestamp())
-    notes = db.Column(db.Text)
+
+class TocShopsHours(db.Model):
+    __tablename__ = 'toc_shops_hours'
+    shop_name = db.Column(db.String(100), primary_key=True)
+    day_of_week = db.Column(db.String(10), primary_key=True)
+    open_hour = db.Column(db.Time, nullable=False)
+    closing_hour = db.Column(db.Time, nullable=False)
+
 

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>TOC - Shipday Drivers</title>
+  <link href="/static/assets/img/toc_logo.png" rel="icon">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+    <div class="pagetitle">
+      <h1>Shipday Drivers</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="/">Home</a></li>
+          <li class="breadcrumb-item active">Shipday Drivers</li>
+        </ol>
+      </nav>
+    </div>
+
+    <section class="section dashboard">
+      <div class="row">
+        <!-- Driver List -->
+        <div class="col-lg-4">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Select Driver</h5>
+              <select class="form-select" id="driverSelect">
+                <option selected disabled>Choose a driver</option>
+                {% for driver in drivers %}
+                  <option value="{{ driver.driver_id }}">{{ driver.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Driver Actions -->
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Driver Actions</h5>
+              <div id="driverActions" style="display:none;">
+                <div class="mb-2">
+                  <label for="rideStart">Start Date:</label>
+                  <input type="date" id="rideStart">
+                  <label for="rideEnd" class="ms-2">End Date:</label>
+                  <input type="date" id="rideEnd">
+                  <label for="ridePaymentId" class="ms-2">Payment ID:</label>
+                  <input type="text" id="ridePaymentId" style="width: 100px;">
+                </div>
+                <button class="btn btn-outline-primary me-2" id="viewHistory">View Payment History</button>
+                <button class="btn btn-outline-success me-2" id="viewRides">View Rides</button>
+                <button class="btn btn-outline-warning" id="payDriver">Pay Driver</button>
+                <button class="btn btn-outline-secondary ms-2" id="exportCSV">Export CSV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic Section for AJAX results -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body" id="dynamicContent">
+              <p>Select a driver to view information.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+  <script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/assets/js/main.js"></script>
+
+  <script>
+    let selectedDriver = null;
+    let lastTableHTML = '';
+
+    $('#driverSelect').change(function() {
+      selectedDriver = $(this).val();
+      $('#driverActions').show();
+      $('#dynamicContent').html('<p>Select an action to view data.</p>');
+    });
+
+    $('#viewHistory').click(function() {
+      if (!selectedDriver) return;
+      $.get(`/shipday/driver/${selectedDriver}/payments`, function(data) {
+        if (data.length === 0) {
+          $('#dynamicContent').html('<p>No payment history found.</p>');
+          return;
+        }
+        let html = `<h5>Payment History</h5><table class="table table-bordered"><thead><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>`;
+        data.forEach(p => {
+          html += `<tr class="${p.status === 'paid' ? 'table-success' : 'table-warning'}"><td>${p.payment_id}</td><td>R${p.total_amount.toFixed(2)}</td><td>${p.status}</td><td>${p.created_at}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        lastTableHTML = html;
+        $('#dynamicContent').html(html);
+      });
+    });
+
+    $('#viewRides').click(function() {
+      if (!selectedDriver) return;
+      const params = {
+        start_date: $('#rideStart').val(),
+        end_date: $('#rideEnd').val(),
+        payment_id: $('#ridePaymentId').val()
+      };
+      $.get(`/shipday/driver/${selectedDriver}/rides`, params, function(data) {
+        if (data.length === 0) {
+          $('#dynamicContent').html('<p>No rides found.</p>');
+          return;
+        }
+        let html = `<h5>Ride History</h5><table class="table table-bordered"><thead><tr><th>Order ID</th><th>Assigned</th><th>Fee</th><th>Status</th><th>Payment ID</th></tr></thead><tbody>`;
+        data.forEach(r => {
+          const rowClass = r.payment_id ? 'table-success' : 'table-warning';
+          html += `<tr class="${rowClass}"><td>${r.wc_orderid}</td><td>${r.assigned_time}</td><td>R${(r.driver_base_fee || 0).toFixed(2)}</td><td>${r.status}</td><td>${r.payment_id || ''}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        lastTableHTML = html;
+        $('#dynamicContent').html(html);
+      });
+    });
+
+    $('#payDriver').click(function() {
+      if (!selectedDriver) return;
+      if (confirm("Confirm payment for outstanding rides?")) {
+        $.post(`/shipday/driver/${selectedDriver}/pay`, {}, function(data) {
+          alert(data.message);
+          $('#dynamicContent').html('');
+        }).fail(function(xhr) {
+          alert(xhr.responseJSON.message || "Payment failed");
+        });
+      }
+    });
+
+    $('#exportCSV').click(function() {
+      if (!lastTableHTML) {
+        alert('No data to export.');
+        return;
+      }
+      const rows = $(lastTableHTML).find('tr');
+      let csv = [];
+      rows.each(function() {
+        const cols = $(this).find('th,td');
+        let row = [];
+        cols.each(function() {
+          row.push($(this).text().trim());
+        });
+        csv.push(row.join(","));
+      });
+      const blob = new Blob([csv.join("\n")], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `shipday_export_${selectedDriver}.csv`);
+      a.click();
+    });
+  </script>
+</body>
+</html>

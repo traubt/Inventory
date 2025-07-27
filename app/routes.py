@@ -2886,44 +2886,109 @@ def shipday_webhook():
     return "OK", 200
 
 
+@main.route('/shipday/drivers', methods=['GET'])
+def shipday_drivers_page():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    drivers = TocShipdayDriver.query.all()
+    return render_template('shipday-drivers.html', drivers=drivers, user=user, roles=roles_list)
 
-def parse_dt(dt_str):
-    from datetime import datetime
-    if not dt_str:
-        return None
+
+
+@main.route('/shipday/driver/<int:driver_id>/payments', methods=['GET'])
+def get_driver_payments(driver_id):
+    payments = TocShipdayDriverPayment.query.filter_by(driver_id=driver_id).order_by(TocShipdayDriverPayment.created_at.desc()).all()
+    results = [
+        {
+            'payment_id': p.payment_id,
+            'total_amount': p.total_amount,
+            'status': p.status,
+            'created_at': p.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+        for p in payments
+    ]
+    return jsonify(results)
+
+
+@main.route('/shipday/driver/<int:driver_id>/rides', methods=['GET'])
+def get_driver_rides(driver_id):
+    payment_id = request.args.get('payment_id')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    query = TocShipday.query.filter_by(driver_id=driver_id)
+    if payment_id:
+        query = query.filter_by(payment_id=payment_id)
+    if start_date:
+        query = query.filter(TocShipday.assigned_time >= start_date)
+    if end_date:
+        query = query.filter(TocShipday.assigned_time <= end_date)
+
+    rides = query.order_by(TocShipday.assigned_time.desc()).all()
+    results = [
+        {
+            'wc_orderid': r.wc_orderid,
+            'assigned_time': r.assigned_time.strftime('%Y-%m-%d %H:%M') if r.assigned_time else '',
+            'driver_base_fee': r.driver_base_fee,
+            'status': r.status,
+            'payment_id': r.payment_id,
+        }
+        for r in rides
+    ]
+    return jsonify(results)
+
+
+@main.route('/shipday/driver/<int:driver_id>/pay', methods=['POST'])
+def pay_driver(driver_id):
+    unpaid_orders = TocShipday.query.filter_by(driver_id=driver_id, payment_id=None).all()
+    if not unpaid_orders:
+        return jsonify({'message': 'No unpaid orders found'}), 400
+
+    total_amount = sum([o.driver_base_fee for o in unpaid_orders if o.driver_base_fee])
+    new_payment = TocShipdayDriverPayment(
+        driver_id=driver_id,
+        total_amount=total_amount,
+        status='paid',
+        created_at=datetime.now()
+    )
+    db.session.add(new_payment)
+    db.session.commit()
+
+    for order in unpaid_orders:
+        order.payment_id = new_payment.payment_id
+
+    db.session.commit()
+    return jsonify({'message': 'Driver paid successfully', 'payment_id': new_payment.payment_id})
+
+@main.route('/get_shop_hours', methods=['GET'])
+def get_shop_hours():
+    shop_name = request.args.get('shop_name')
+    if not shop_name:
+        return jsonify({'error': 'Missing shop_name parameter'}), 400
+
+    today = datetime.now()
+    day_of_week = today.strftime('%A')  # e.g., 'Monday'
+
     try:
-        return datetime.fromtimestamp(int(dt_str))  # Handle UNIX epoch
-    except Exception:
-        try:
-            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))  # Handle ISO 8601
-        except Exception:
-            return None
+        record = TocShopsHours.query.filter_by(
+            shop_name=shop_name.strip(),
+            day_of_week=day_of_week
+        ).first()
 
+        if not record:
+            return jsonify({'error': 'Shop hours not found'}), 404
 
+        return jsonify({
+            'shop_name': shop_name,
+            'day_of_week': day_of_week,
+            'open_hour': record.open_hour.strftime('%H:%M'),
+            'closing_hour': record.closing_hour.strftime('%H:%M')
+        })
 
-def parse_dt(dt_str):
-    from datetime import datetime
-    if not dt_str:
-        return None
-    try:
-        return datetime.fromtimestamp(int(dt_str))  # Shipday uses epoch in ms/sec sometimes
-    except Exception:
-        try:
-            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-        except:
-            return None
-
-
-
-def parse_dt(dt_str):
-    from datetime import datetime
-    if not dt_str:
-        return None
-    try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-    except Exception:
-        return None
-
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 #########################  OPENAI section  #####################
