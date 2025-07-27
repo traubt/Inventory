@@ -2862,10 +2862,9 @@ def shipday_webhook():
         if not existing_driver:
             new_driver = TocShipdayDriver(
                 driver_id=driver_id,
-                driver_name=carrier.get("name"),
-                driver_phone=carrier.get("phone"),
-                driver_email=carrier.get("email"),
-                tracking_url=tracking_url
+                full_name=carrier.get("name"),
+                phone_number=carrier.get("phone"),
+                email=carrier.get("email"),
             )
             db.session.add(new_driver)
             logger.warning(f"👤 Created driver {carrier.get('name')}")
@@ -2880,11 +2879,12 @@ def shipday_webhook():
         shipday.driving_duration = order.get("driving_duration", 0)
 
     shipday.shipping_status = payload.get("order_status")
-    shipday.update_date = datetime.utcnow()   # ✅ FIXED HERE
+    shipday.update_date = datetime.utcnow()
 
     db.session.commit()
     logger.warning(f"✅ Webhook update committed for order {shipday_id}")
     return "OK", 200
+
 
 
 def parse_dt(dt_str):
