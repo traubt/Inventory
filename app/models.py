@@ -290,26 +290,30 @@ class TocDamaged(db.Model):
 class TocShipday(db.Model):
     __tablename__ = 'toc_shipday'
 
-    wc_orderid = db.Column(db.Integer, primary_key=True, nullable=False)
-    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
-    wc_name = db.Column(db.String(45), nullable=True)
-    wc_email = db.Column(db.String(45), nullable=True)
-    wc_phone = db.Column(db.String(45), nullable=True)
-    shop_name = db.Column(db.String(45), nullable=True)
-    status = db.Column(db.String(45), nullable=True)
-    update_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    ls_order_id = db.Column(db.String(45), nullable=True)
-    shipday_id = db.Column(db.String(45), nullable=True)
-    total_amt = db.Column(db.Float, nullable=True)
-    closest_shop_json = db.Column(db.JSON)
+    id = db.Column(db.Integer, primary_key=True)
+    wc_orderid = db.Column(db.String(20))
+    creation_date = db.Column(db.DateTime)
+    wc_name = db.Column(db.String(255))
+    wc_email = db.Column(db.String(255))
+    wc_phone = db.Column(db.String(20))
+    shop_name = db.Column(db.String(255))
+    status = db.Column(db.String(50))
+    update_date = db.Column(db.DateTime)
+
+    ls_order_id = db.Column(db.String(50))
+    shipday_id = db.Column(db.String(50))
+    total_amt = db.Column(db.Float)
     shipday_distance_km = db.Column(db.Float)
-    assign_datetime = db.Column(db.DateTime)
-    driver_id = db.Column(db.String(45))
+
+    assigned_time = db.Column(db.DateTime)         # formerly assign_datetime
+    pickedup_time = db.Column(db.DateTime)         # formerly collection_datetime
+    delivery_time = db.Column(db.DateTime)         # formerly delivered_datetime
+    driving_duration = db.Column(db.Integer)       # in seconds
+
+    driver_id = db.Column(db.String(50))
     driver_base_fee = db.Column(db.Float)
-    collection_datetime = db.Column(db.DateTime)
-    delivered_datetime = db.Column(db.DateTime)
-    shipping_status = db.Column(db.String(45))
-    driver_rating = db.Column(db.Float)
+    shipping_status = db.Column(db.String(50))
+
 
 class TocShipdayDriver(db.Model):
     __tablename__ = 'toc_shipday_drivers'

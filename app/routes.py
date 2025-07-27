@@ -2821,69 +2821,77 @@ def create_lightspeed_order():
 
 @main.route('/shipday_webhook', methods=['POST'])
 def shipday_webhook():
-    data = request.get_json()
+    from app.models import TocShipday, TocShipdayDriver
+    from app import db
+    import logging
+
     logger = logging.getLogger(__name__)
-    logger.warning("🚨 Shipday webhook called")
-    logger.warning(f"📦 Raw payload: {data}")
+    logger.warning("🚚 Shipday webhook called")
 
-    try:
-        event = data.get("event")
-        order_data = data.get("order", {})
-        carrier_data = data.get("carrier", {})
-        wc_order_id = order_data.get("order_number", "").replace("WC", "")
-        shipday_id = order_data.get("id")
+    data = request.get_json(force=True)
+    logger.warning(json.dumps(data, indent=2))  # Log the full webhook data
 
-        logger.warning(f"🔎 Extracted shipday_id: {shipday_id}")
+    order_id = str(data.get("order", {}).get("order_id") or data.get("order_id"))
+    event = data.get("event", "")
+    order_status = data.get("order_status", "")
+    driver = data.get("driver", {})
+    order = data.get("order", {})
+    tracking_url = order.get("tracking_url")
 
-        order = TocShipday.query.filter_by(wc_orderid=wc_order_id).first()
-        if not order:
-            logger.warning(f"⚠️ Order not found: WC{wc_order_id}")
-            return "Order not found", 404
+    record = TocShipday.query.filter_by(shipday_id=order_id).first()
+    if not record:
+        logger.warning(f"❌ No Shipday record found for order_id: {order_id}")
+        return jsonify({"error": "Not found"}), 404
 
-        # Set common fields
-        order.shipday_id = shipday_id
-        order.shipping_status = data.get("order_status")
-        order.update_date = datetime.utcnow()
+    now = datetime.now()
+    record.update_date = now
+    record.shipping_status = order_status
 
-        if event == "ORDER_ACCEPTED_AND_STARTED":
-            logger.warning("🚚 ORDER_ACCEPTED_AND_STARTED - updating driver and distance")
-            # Convert meters to kilometers
-            order.shipday_distance_km = round(order_data.get("driving_distance", 0) / 1000, 2)
+    # Update timestamps by event
+    if event == "ORDER_ACCEPTED_AND_STARTED":
+        record.assigned_time = datetime.fromtimestamp(order.get("accepted_pickup_time") / 1000)
 
-            # Handle driver (carrier)
-            driver_id = str(carrier_data.get("id"))
-            if driver_id:
-                order.driver_id = driver_id
-                driver = TocShipdayDriver.query.filter_by(driver_id=driver_id).first()
-                if not driver:
-                    driver = TocShipdayDriver(driver_id=driver_id)
-                    db.session.add(driver)
+    if event == "ORDER_PICKEDUP":
+        record.pickedup_time = datetime.fromtimestamp(order.get("start_time") / 1000)
 
-                driver.full_name = carrier_data.get("name")
-                driver.phone_number = carrier_data.get("phone")
-                driver.email = carrier_data.get("email")
-                driver.vehicle_type = carrier_data.get("vehicle_description")
-                driver.last_update = datetime.utcnow()
+    if event == "ORDER_COMPLETED":
+        record.delivery_time = datetime.fromtimestamp(order.get("end_time") / 1000)
+        record.driving_duration = order.get("duration")
 
-        elif event == "ORDER_PIKEDUP":
-            logger.warning("📦 ORDER_PIKEDUP - setting collection_datetime")
-            ts = order_data.get("pickedup_time")
-            if ts:
-                order.collection_datetime = datetime.utcfromtimestamp(ts / 1000)
+    # Driver info
+    if driver:
+        record.driver_id = str(driver.get("driver_id") or driver.get("id"))
+        # Calculate driver fee
+        distance = order.get("distance", 0) / 1000  # meters to KM
+        base_fee = 50
+        base_km = 5
+        extra_fee_per_km = 10
+        fee = base_fee
+        if distance > base_km:
+            fee += (distance - base_km) * extra_fee_per_km
+        record.driver_base_fee = round(fee, 2)
 
-        elif event == "ORDER_COMPLETED":
-            logger.warning("✅ ORDER_COMPLETED - setting delivered_datetime")
-            ts = order_data.get("delivery_time")
-            if ts:
-                order.delivered_datetime = datetime.utcfromtimestamp(ts / 1000)
+        # Optionally update or insert driver profile
+        driver_obj = TocShipdayDriver.query.filter_by(driver_id=record.driver_id).first()
+        if not driver_obj:
+            driver_obj = TocShipdayDriver(
+                driver_id=record.driver_id,
+                full_name=driver.get("name"),
+                phone_number=driver.get("phone"),
+                email=driver.get("email"),
+                vehicle_type=driver.get("vehicle_type"),
+                vehicle_number=driver.get("vehicle_number"),
+                creation_date=now,
+                last_update=now
+            )
+            db.session.add(driver_obj)
+        else:
+            driver_obj.last_update = now
 
-        db.session.commit()
-        logger.warning(f"✅ Webhook update committed for order {wc_order_id}")
-        return "OK", 200
+    db.session.commit()
+    logger.warning(f"✅ Webhook update committed for order {order_id}")
+    return jsonify({"status": "ok"}), 200
 
-    except Exception as e:
-        logger.exception("❌ Error processing Shipday webhook")
-        return "Error", 500
 
 
 
