@@ -2871,7 +2871,7 @@ def shipday_webhook():
 
         shipday.driver_id = driver_id
 
-    elif event == "ORDER_PIKEDUP":
+    elif event == "ORDER_PICKEDUP":
         shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
 
     elif event == "ORDER_COMPLETED":

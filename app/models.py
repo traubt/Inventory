@@ -291,7 +291,7 @@ class TocShipday(db.Model):
     __tablename__ = 'toc_shipday'
 
     wc_orderid = db.Column(db.String(20), primary_key=True)
-    creation_date = db.Column(db.DateTime)
+    creation_date = db.Column(db.DateTime, default=db.func.current_timestamp())
     wc_name = db.Column(db.String(100))
     wc_email = db.Column(db.String(100))
     wc_phone = db.Column(db.String(20))
