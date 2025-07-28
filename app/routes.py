@@ -2920,11 +2920,13 @@ def get_driver_payments(driver_id):
             'payment_id': p.payment_id,
             'total_amount': p.total_amount,
             'status': p.status,
+            'note': p.note,  # 👈 Add this line
             'created_at': p.created_at.strftime('%Y-%m-%d %H:%M')
         }
         for p in payments
     ]
     return jsonify(results)
+
 
 
 @main.route('/shipday/driver/<int:driver_id>/rides', methods=['GET'])

@@ -112,9 +112,15 @@
           $('#dynamicContent').html('<p>No payment history found.</p>');
           return;
         }
-        let html = `<h5>Payment History</h5><table class="table table-bordered"><thead><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>`;
+        let html = `<h5>Payment History</h5><table class="table table-bordered"><thead><tr><th>ID</th><th>Amount</th><th>Status</th><th>Reference</th><th>Date</th></tr></thead><tbody>`;
         data.forEach(p => {
-          html += `<tr class="${p.status === 'paid' ? 'table-success' : 'table-warning'}"><td>${p.payment_id}</td><td>R${p.total_amount.toFixed(2)}</td><td>${p.status}</td><td>${p.created_at}</td></tr>`;
+          html += `<tr class="${p.status === 'paid' ? 'table-success' : 'table-warning'}">
+                    <td>${p.payment_id}</td>
+                    <td>R${p.total_amount.toFixed(2)}</td>
+                    <td>${p.status}</td>
+                    <td>${p.note || ''}</td>
+                    <td>${p.created_at}</td>
+                  </tr>`;
         });
         html += '</tbody></table>';
         lastTableHTML = html;
