@@ -309,6 +309,7 @@ class TocShipday(db.Model):
     driver_id = db.Column(db.String(50))
     driver_base_fee = db.Column(db.Float)
     shipping_status = db.Column(db.String(50))
+    payment_id = db.Column(db.Integer)
 
 
 
