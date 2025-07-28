@@ -337,7 +337,7 @@ class TocShipdayDriverPayment(db.Model):
     status = db.Column(db.String(20), default='open')
     paid_date = db.Column(db.DateTime)
     note = db.Column(db.Text)
-    creation_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
 
 class TocShopsHours(db.Model):
