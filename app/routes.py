@@ -2850,26 +2850,40 @@ def shipday_webhook():
 
         # 🚚 Driver base fee = 50 for first 5km, then 10/km
         distance_km = shipday.shipday_distance_km or 0
-        if distance_km <= 5:
-            shipday.driver_base_fee = 50
-        else:
-            shipday.driver_base_fee = round(50 + (distance_km - 5) * 10, 2)
+        shipday.driver_base_fee = 50 if distance_km <= 5 else round(50 + (distance_km - 5) * 10, 2)
 
-        # Create driver if doesn't exist
+        # Get correct driver info from carrier
         driver_id = str(carrier.get("id"))
-        existing_driver = db.session.query(TocShipdayDriver).filter_by(driver_id=driver_id).first()
+        full_name = carrier.get("name", "").strip()
+        phone_number = carrier.get("phone", "").strip()
+        email = carrier.get("email", "").strip()
 
+        existing_driver = db.session.query(TocShipdayDriver).filter_by(driver_id=driver_id).first()
         if not existing_driver:
             new_driver = TocShipdayDriver(
                 driver_id=driver_id,
-                full_name=carrier.get("name"),
-                phone_number=carrier.get("phone"),
-                email=carrier.get("email"),
+                full_name=full_name,
+                phone_number=phone_number,
+                email=email,
+                active_status=1
             )
             db.session.add(new_driver)
-            logger.warning(f"👤 Created driver {carrier.get('name')}")
+            logger.warning(f"👤 Created driver {full_name}")
+        else:
+            # Optional: update contact info if it changed
+            if (
+                    existing_driver.full_name != full_name or
+                    existing_driver.phone_number != phone_number or
+                    existing_driver.email != email
+            ):
+                existing_driver.full_name = full_name
+                existing_driver.phone_number = phone_number
+                existing_driver.email = email
+                existing_driver.last_update = datetime.utcnow()
+                logger.warning(f"✏️ Updated driver info for {driver_id} - {full_name}")
 
         shipday.driver_id = driver_id
+
 
     elif event == "ORDER_PICKEDUP":
         shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
