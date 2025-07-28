@@ -2965,17 +2965,21 @@ def pay_driver(driver_id):
 @main.route('/get_shop_hours', methods=['GET'])
 def get_shop_hours():
     shop_name = request.args.get('shop_name')
+    logger.warning(f"👤 In get shop hours for shop:  {shop_name}")
     if not shop_name:
         return jsonify({'error': 'Missing shop_name parameter'}), 400
 
     today = datetime.now()
     day_of_week = today.strftime('%A')  # e.g., 'Monday'
+    logger.warning(f"Today's day of the week is:  {day_of_week}")
 
     try:
         record = TocShopsHours.query.filter_by(
             shop_name=shop_name.strip(),
             day_of_week=day_of_week
         ).first()
+
+        logger.warning(f"Return to client: {shop_name}, {day_of_week}, open hour: {record.open_hour.strftime('%H:%M')}, closing hour: {record.closing_hour.strftime('%H:%M')}")
 
         if not record:
             return jsonify({'error': 'Shop hours not found'}), 404
