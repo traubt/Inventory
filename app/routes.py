@@ -2685,21 +2685,107 @@ def save_closest_shop():
         return jsonify({'error': str(e)}), 500
 
 
+# @main.route('/check_shop_stock', methods=['POST'])
+# def check_shop_stock():
+#     try:
+#         data = request.get_json()
+#         shop_id = data.get('shop_id')
+#         skus = data.get('skus')
+#
+#         print(f"📦 Checking stock for shop: {shop_id}, SKUs: {skus}")
+#
+#         # TEMP: Always return available = true
+#         return jsonify({ "available": True })
+#
+#     except Exception as e:
+#         print(f"❌ Error in check_shop_stock: {e}")
+#         return jsonify({ "available": False, "error": str(e) }), 500
+
 @main.route('/check_shop_stock', methods=['POST'])
 def check_shop_stock():
     try:
+        from sqlalchemy.sql import text
         data = request.get_json()
-        shop_id = data.get('shop_id')
+        shop_name = data.get('shop_name')
         skus = data.get('skus')
 
-        print(f"📦 Checking stock for shop: {shop_id}, SKUs: {skus}")
+        if not shop_name or not skus:
+            return jsonify({"available": False, "error": "Missing shop_name or skus"}), 400
 
-        # TEMP: Always return available = true
+        # Prepare dynamic SKU placeholders
+        placeholders = ','.join([f":sku_{i}" for i in range(len(skus))])
+        sku_params = {f'sku_{i}': sku for i, sku in enumerate(skus)}
+
+        sql = text(f"""
+            WITH sales_data AS (
+                SELECT 
+                    d.item_sku,
+                    d.item_name,
+                    b.store_customer,
+                    c.blName AS shop_name,
+                    COALESCE(SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END), 0) AS sales_since_stock_read
+                FROM toc_product d
+                JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
+                JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+                JOIN toc_shops c ON b.store_customer = c.customer
+                JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+                WHERE d.acct_group <> 'Specials'
+                    AND c.blName = :shop_name
+                    AND d.item_sku <> '9568'
+                    AND d.item_sku IN ({placeholders})
+                GROUP BY d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+
+                UNION ALL
+
+                SELECT 
+                    st.sku AS item_sku,
+                    d.item_name,
+                    st.shop_id AS store_customer,
+                    c.blName AS shop_name,
+                    0 AS sales_since_stock_read
+                FROM toc_stock st
+                JOIN toc_product d ON st.sku = d.item_sku AND d.acct_group <> 'Specials' AND d.item_sku <> '9568'
+                JOIN toc_shops c ON st.shop_id = c.customer
+                WHERE c.blName = :shop_name
+                    AND st.sku IN ({placeholders})
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM toc_ls_sales_item a
+                        JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+                        WHERE a.item_sku = st.sku AND b.store_customer = st.shop_id
+                    )
+            )
+            SELECT 
+                s.item_sku,
+                st.final_stock_qty,
+                s.sales_since_stock_read,                
+                st.stock_transfer,
+                (st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer) AS current_stock_qty
+            FROM sales_data s
+            LEFT JOIN toc_stock st ON s.item_sku = st.sku AND s.store_customer = st.shop_id
+        """)
+
+        params = {'shop_name': shop_name}
+        params.update(sku_params)
+
+        result = db.session.execute(sql, params).fetchall()
+
+        # Check if any item is out of stock
+        for row in result:
+            current_stock = row['current_stock_qty']
+            if current_stock is None or current_stock <= 0:
+                return jsonify({
+                    "available": False,
+                    "out_of_stock_sku": row['item_sku'],
+                    "current_stock": current_stock
+                })
+
         return jsonify({ "available": True })
 
     except Exception as e:
         print(f"❌ Error in check_shop_stock: {e}")
         return jsonify({ "available": False, "error": str(e) }), 500
+
 
 
 @main.route('/create_lightspeed_order', methods=['POST'])
