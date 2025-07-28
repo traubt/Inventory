@@ -2716,6 +2716,9 @@ def check_shop_stock():
         placeholders = ','.join([f":sku_{i}" for i in range(len(skus))])
         sku_params = {f'sku_{i}': sku for i, sku in enumerate(skus)}
 
+        logger.warning(f"Check stock skus: {placeholders}")
+        logger.warning(f"Check stock sku_params: {sku_params}")
+
         sql = text(f"""
             WITH sales_data AS (
                 SELECT 
@@ -2768,11 +2771,14 @@ def check_shop_stock():
         params = {'shop_name': shop_name}
         params.update(sku_params)
 
+        logger.warning(f"Check stock sku_params: {sql}")
+
         result = db.session.execute(sql, params).fetchall()
 
         # Check if any item is out of stock
         for row in result:
             current_stock = row['current_stock_qty']
+            logger.warning(f"Check stock current stock: {current_stock}")
             if current_stock is None or current_stock <= 0:
                 return jsonify({
                     "available": False,
