@@ -2887,7 +2887,7 @@ def shipday_webhook():
 
     elif event == "ORDER_PICKEDUP":
         shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
-        logger.warning(f"Event Pickudup. get pickup time: {parse_epoch(order.get("pickedup_time"))}")
+        logger.warning(f"Event Pickudup. get pickup time: {shipday.pickedup_time}")
 
     elif event == "ORDER_COMPLETED":
         shipday.delivery_time = parse_epoch(order.get("delivery_time"))
