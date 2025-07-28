@@ -2887,6 +2887,7 @@ def shipday_webhook():
 
     elif event == "ORDER_PICKEDUP":
         shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
+        logger.warning(f"Event Pickudup. get pickup time: {parse_epoch(order.get("pickedup_time"))}")
 
     elif event == "ORDER_COMPLETED":
         shipday.delivery_time = parse_epoch(order.get("delivery_time"))
@@ -2960,11 +2961,16 @@ def pay_driver(driver_id):
     if not unpaid_orders:
         return jsonify({'message': 'No unpaid orders found'}), 400
 
+    note = request.form.get('note', '').strip()
+    if not note:
+        return jsonify({'message': 'Payment reference is required'}), 400
+
     total_amount = sum([o.driver_base_fee for o in unpaid_orders if o.driver_base_fee])
     new_payment = TocShipdayDriverPayment(
         driver_id=driver_id,
         total_amount=total_amount,
         status='paid',
+        note=note,
         created_at=datetime.now()
     )
     db.session.add(new_payment)
@@ -2975,6 +2981,7 @@ def pay_driver(driver_id):
 
     db.session.commit()
     return jsonify({'message': 'Driver paid successfully', 'payment_id': new_payment.payment_id})
+
 
 @main.route('/get_shop_hours', methods=['GET'])
 def get_shop_hours():

@@ -145,17 +145,17 @@
       });
     });
 
-    $('#payDriver').click(function() {
-      if (!selectedDriver) return;
-      if (confirm("Confirm payment for outstanding rides?")) {
-        $.post(`/shipday/driver/${selectedDriver}/pay`, {}, function(data) {
-          alert(data.message);
-          $('#dynamicContent').html('');
-        }).fail(function(xhr) {
-          alert(xhr.responseJSON.message || "Payment failed");
-        });
-      }
-    });
+<!--    $('#payDriver').click(function() {-->
+<!--      if (!selectedDriver) return;-->
+<!--      if (confirm("Confirm payment for outstanding rides?")) {-->
+<!--        $.post(`/shipday/driver/${selectedDriver}/pay`, {}, function(data) {-->
+<!--          alert(data.message);-->
+<!--          $('#dynamicContent').html('');-->
+<!--        }).fail(function(xhr) {-->
+<!--          alert(xhr.responseJSON.message || "Payment failed");-->
+<!--        });-->
+<!--      }-->
+<!--    });-->
 
     $('#exportCSV').click(function() {
       if (!lastTableHTML) {
@@ -180,5 +180,77 @@
       a.click();
     });
   </script>
+
+<!-- Add this inside <body> before </body> -->
+<div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="payModalLabel">Confirm Payment to Driver</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modalRideTable"></div>
+        <div class="form-group mt-3">
+          <label for="paymentNote">Payment Reference <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="paymentNote" required>
+        </div>
+        <div class="text-end mt-3">
+          <strong>Total Due: R<span id="modalTotalAmount">0.00</span></strong>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelPayment">Cancel</button>
+        <button type="button" class="btn btn-warning" id="confirmPayDriver">Pay Driver</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  $('#payDriver').click(function() {
+    if (!selectedDriver) return;
+    $.get(`/shipday/driver/${selectedDriver}/rides`, function(data) {
+      const unpaidRides = data.filter(r => !r.payment_id);
+      if (unpaidRides.length === 0) {
+        alert("No unpaid rides found.");
+        return;
+      }
+      let html = `<table class="table table-bordered"><thead><tr><th>Order ID</th><th>Date</th><th>Fee</th></tr></thead><tbody>`;
+      let total = 0;
+      unpaidRides.forEach(r => {
+        html += `<tr><td>${r.wc_orderid}</td><td>${r.assigned_time}</td><td>R${(r.driver_base_fee || 0).toFixed(2)}</td></tr>`;
+        total += r.driver_base_fee || 0;
+      });
+      html += '</tbody></table>';
+      $('#modalRideTable').html(html);
+      $('#modalTotalAmount').text(total.toFixed(2));
+      $('#paymentNote').val('');
+      $('#payModal').modal('show');
+    });
+  });
+
+  $('#cancelPayment').click(function() {
+    if (confirm('Cancel payment and close modal?')) {
+      $('#payModal').modal('hide');
+    }
+  });
+
+  $('#confirmPayDriver').click(function() {
+    const note = $('#paymentNote').val().trim();
+    if (!note) {
+      alert("Please enter a payment reference.");
+      return;
+    }
+    $.post(`/shipday/driver/${selectedDriver}/pay`, { note }, function(data) {
+      alert(data.message);
+      $('#payModal').modal('hide');
+      $('#dynamicContent').html('');
+    }).fail(function(xhr) {
+      alert(xhr.responseJSON.message || "Payment failed");
+    });
+  });
+</script>
+
 </body>
 </html>
