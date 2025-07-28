@@ -2774,6 +2774,14 @@ def check_shop_stock():
         logger.warning(f"Check stock sku_params: {sql}")
 
         result = db.session.execute(sql, params).fetchall()
+        logger.warning(f"✅ Rows returned from stock check: {len(result)}")
+
+        if not result:
+            return jsonify({
+                "available": False,
+                "out_of_stock_sku": skus[0],
+                "reason": "SKU not found in stock data"
+            })
 
         # Check if any item is out of stock
         for row in result:
@@ -2786,7 +2794,8 @@ def check_shop_stock():
                     "current_stock": current_stock
                 })
 
-        return jsonify({ "available": True })
+        return jsonify({"available": True})
+
 
     except Exception as e:
         print(f"❌ Error in check_shop_stock: {e}")
