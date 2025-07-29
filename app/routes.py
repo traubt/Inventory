@@ -2773,7 +2773,7 @@ def check_shop_stock():
 
         logger.warning(f"Check stock sku_params: {sql}")
 
-        result = db.session.execute(sql, params).fetchall()
+        result = db.session.execute(sql, params).mappings().all()
         logger.warning(f"✅ Rows returned from stock check: {len(result)}")
 
         if not result:
