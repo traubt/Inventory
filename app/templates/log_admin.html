@@ -167,9 +167,9 @@ $("#getLogs").on("click", function (event) {
             // Initialize the DataTable
             $('#Logs').DataTable({
                 data: tableData,
-                paging: true,
+                paging: false,
                 searching: true,
-                pageLength: 30,
+<!--                pageLength: 30,-->
                 ordering: true,
                 order: [[0, 'desc']], // Sort by the first column (Run ID) in descending order
                 createdRow: function (row, data, dataIndex) {

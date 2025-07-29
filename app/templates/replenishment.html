@@ -465,7 +465,7 @@ $.ajax({
                     }
                 ],
                 fixedHeader: true,
-                pageLength: 50,
+                <!--            pageLength: 50,-->
                 lengthMenu: [
                     [50, 100, 150, 200],
                     [50, 100, 150, 200]
@@ -538,10 +538,10 @@ function loadOrderTemplate(data, orderId, shopName) {
                 }
             }
         ],
-        pageLength: 300,
+        <!--            pageLength: 300,-->
         order: [[5, 'desc']],
         autoWidth: false,
-        paging: true,
+        paging: false,
         searching: true,
         responsive: true,
         dom: 'Bfrtip',
@@ -605,10 +605,10 @@ function loadSavedOrder(data, orderId, shopName) {
                 }
             }
         ],
-        pageLength: 300,
+        <!--            pageLength: 300,-->
         order: [[5, 'desc']],
         autoWidth: false,
-        paging: true,
+        paging: false,
         searching: true,
         responsive: true,
         dom: 'Bfrtip',
