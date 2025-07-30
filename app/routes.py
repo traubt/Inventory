@@ -1611,10 +1611,29 @@ def update_count_stock():
         db.session.add(new_count_ctrl)
 
         # Commit changes to the database
-        db.session.commit()
+        # ✅ Deadlock-safe commit logic
+        from sqlalchemy.exc import OperationalError
+        import time
 
+        MAX_RETRIES = 3
+        for attempt in range(MAX_RETRIES):
+            try:
+                db.session.commit()
+                return jsonify({"status": "success", "message": "Stock data updated successfully"})
+            except OperationalError as e:
+                if 'Deadlock found' in str(e):
+                    print(f"⚠️ Deadlock detected (attempt {attempt + 1}/{MAX_RETRIES}), retrying...")
+                    db.session.rollback()
+                    time.sleep(2)
+                else:
+                    raise
+            except Exception as e:
+                db.session.rollback()
+                print("Error committing:", e)
+                return jsonify({"status": "error", "message": "Commit failed", "error": str(e)}), 500
 
-        return jsonify({"status": "success", "message": "Stock data updated successfully"})
+        return jsonify({"status": "error", "message": "Deadlock: too many retries"}), 500
+
 
     except SQLAlchemyError as e:
         db.session.rollback()
