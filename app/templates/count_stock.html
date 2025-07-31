@@ -806,97 +806,122 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
 
 });
 
-$("#loadDraft").on("click", async function () {
-  const shop_id = {{ shop.customer | tojson }};
+    $("#loadDraft").on("click", async function () {
+      const shop_id = {{ shop.customer | tojson }};
 
-  // Show spinner
-  $("body").append(`
-    <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;">
-      <div class="card p-4">
-        <i class="bi bi-hourglass-split me-2"></i> Loading Form...
-      </div>
-    </div>
-  `);
+      // Show spinner
+      $("body").append(`
+        <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+          <div class="card p-4">
+            <i class="bi bi-hourglass-split me-2"></i> Loading Form...
+          </div>
+        </div>
+      `);
 
-  function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  try {
-    const response = await fetch("/load_count_draft", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ shop_id })
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        dialog("No Draft Found", "There is no existing saved count. Please click 'New Form' to begin.");
-      } else {
-        dialog("Error", "Failed to load draft.");
+      function waitForTableReady(selector, maxWait = 7000, interval = 200) {
+        return new Promise((resolve, reject) => {
+          const start = Date.now();
+          const check = () => {
+            if ($(selector).length > 0) {
+              resolve();
+            } else if (Date.now() - start > maxWait) {
+              reject("Timeout waiting for table to render");
+            } else {
+              setTimeout(check, interval);
+            }
+          };
+          check();
+        });
       }
-      throw new Error("Draft load failed");
-    }
 
-    const res = await response.json();
-    console.log("✅ Draft loaded from server:", res);
+      try {
+        const response = await fetch("/load_count_draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shop_id })
+        });
 
-    $("#countBy").val(res.counted_by || "");
-    $("#newOrder").click();
-
-    // Wait for table rows to render
-    await waitForTableReady("#ProductOrderTemplate tbody tr");
-
-    $("#orderName").val(res.count_id || "");
-
-    // Map each row by SKU
-    const rowMap = new Map();
-    $("#ProductOrderTemplate tbody tr").each(function () {
-      const sku = $(this).find("td:first").text().trim();
-      rowMap.set(sku, $(this));
-    });
-
-    // Patch saved data
-    res.table.forEach(savedItem => {
-      const sku = (savedItem.sku || "").toString().trim();
-      const row = rowMap.get(sku);
-
-      if (row && row.length) {
-        console.log(`✅ Found row for SKU ${sku}`, savedItem);
-        const stockCountInput = row.find("input.current-stock-count");
-        const stockRejectedInput = row.find("input.current-stock-rejected");
-        const commentsInput = row.find("input.comments");
-
-        stockCountInput.val(savedItem.stock_count || 0);
-        stockRejectedInput.val(savedItem.stock_rejected || 0);
-        commentsInput.val(savedItem.comments || "");
-
-        // 🧠 Recalculate variance
-        const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
-        const countedQty = parseFloat(stockCountInput.val()) || 0;
-        const variance = currentQty - countedQty;
-        row.find(".variance").text(variance);
-
-        // 🚨 If variance exists, mark red border
-        if (variance !== 0) {
-          stockCountInput.css("border", "5px solid red");
-        } else {
-          stockCountInput.css("border", "");
+        if (!response.ok) {
+          if (response.status === 404) {
+            dialog("No Draft Found", "There is no existing saved count. Please click 'New Form' to begin.");
+          } else {
+            dialog("Error", "Failed to load draft.");
+          }
+          throw new Error("Draft load failed");
         }
-      } else {
-        console.warn(`⚠️ No matching row for SKU: ${sku}`);
+
+        const res = await response.json();
+        console.log("✅ Draft loaded from server:", res);
+
+        // Step 1: Set header fields
+        $("#countBy").val(res.counted_by || "");
+        $("#orderName").val(res.count_id || "");
+
+        // Step 2: Manually fetch and load form
+        const stockResponse = await fetch('/get_stock_count_form');
+        const stockData = await stockResponse.json();
+
+        $("#loadOrder").prop("disabled", true);
+        $("#saveOrder").prop("disabled", false);
+        $("#resetQty").prop("disabled", false);
+        $("#submitOrder").prop("disabled", false);
+        $("#cancelOrder").prop("disabled", false);
+        $("#closeOrder").prop("disabled", false);
+        $("#newOrder").prop("disabled", true);
+        $("#saveDraft").prop("disabled", false);
+
+        loadStockData(stockData);
+
+        // Step 3: Wait for table to render
+        await waitForTableReady("#ProductOrderTemplate tbody tr");
+
+        // Step 4: Map rows by SKU
+        const rowMap = new Map();
+        $("#ProductOrderTemplate tbody tr").each(function () {
+          const sku = $(this).find("td:first").text().trim();
+          rowMap.set(sku, $(this));
+        });
+
+        // Step 5: Patch draft data into table
+        res.table.forEach(savedItem => {
+          const sku = (savedItem.sku || "").toString().trim();
+          const row = rowMap.get(sku);
+
+          if (row && row.length) {
+            console.log(`✅ Found row for SKU ${sku}`, savedItem);
+
+            const stockCountInput = row.find("input.current-stock-count");
+            const stockRejectedInput = row.find("input.current-stock-rejected");
+            const commentsInput = row.find("input.comments");
+
+            stockCountInput.val(savedItem.stock_count || 0);
+            stockRejectedInput.val(savedItem.stock_rejected || 0);
+            commentsInput.val(savedItem.comments || "");
+
+            // Recalculate variance
+            const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
+            const countedQty = parseFloat(stockCountInput.val()) || 0;
+            const variance = currentQty - countedQty;
+            row.find(".variance").text(variance);
+
+            if (variance !== 0) {
+              stockCountInput.css("border", "5px solid red");
+            } else {
+              stockCountInput.css("border", "");
+            }
+          } else {
+            console.warn(`⚠️ No matching row for SKU: ${sku}`);
+          }
+        });
+
+      } catch (err) {
+        console.error("❌ Draft load failed:", err);
+        alert("Something went wrong loading the draft.");
+      } finally {
+        $("#loadingOverlay").remove();
       }
     });
 
-    $("#saveDraft").prop("disabled", false);
-  } catch (err) {
-    console.error("Draft load failed:", err);
-  } finally {
-    $("#loadingOverlay").remove();
-  }
-});
 
 
 $("#saveExcel").on("click", function () {
