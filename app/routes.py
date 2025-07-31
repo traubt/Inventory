@@ -1734,6 +1734,54 @@ def load_count_draft():
         return jsonify({'error': str(e)}), 500
 
 
+@main.route('/check_count_draft', methods=['POST'])
+def check_count_draft():
+    data = request.get_json()
+    shop_id = data.get('shop_id')
+
+    if not shop_id:
+        return jsonify({'error': 'Missing shop_id'}), 400
+
+    drafts = TocCountCtrl.query.filter_by(shop_id=shop_id, status='Draft').all()
+
+    if not drafts:
+        return jsonify({'exists': False, 'draft_ids': []})
+
+    draft_ids = [d.count_id for d in drafts]
+    return jsonify({'exists': True, 'draft_ids': draft_ids})
+
+
+@main.route('/delete_count_draft', methods=['POST'])
+def delete_count_draft():
+    data = request.get_json()
+    shop_id = data.get('shop_id')
+
+    if not shop_id:
+        return jsonify({'error': 'Missing shop_id'}), 400
+
+    from app import db
+    from app.models import TocCount, TocCountCtrl
+
+    # Step 1: Get all draft count_ids for the given shop
+    draft_ctrls = TocCountCtrl.query.filter_by(shop_id=shop_id, status='Draft').all()
+    draft_ids = [ctrl.count_id for ctrl in draft_ctrls]
+
+    if not draft_ids:
+        return jsonify({'message': 'No drafts found to delete'}), 200
+
+    # Step 2: Delete from toc_count (line items)
+    TocCount.query.filter(TocCount.count_id.in_(draft_ids)).delete(synchronize_session=False)
+
+    # Step 3: Delete from toc_count_ctrl (headers)
+    TocCountCtrl.query.filter(TocCountCtrl.count_id.in_(draft_ids)).delete(synchronize_session=False)
+
+    db.session.commit()
+
+    return jsonify({'message': f'Deleted drafts: {draft_ids}'})
+
+
+
+
 @main.route('/update_count_receive_stock', methods=['POST'])
 def update_count_receive_stock():
     try:

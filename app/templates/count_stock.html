@@ -109,6 +109,8 @@
 <!--              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>-->
               <button class="btn btn-danger" id="resetQty"  disabled>Reset Count</button>
                 <button id="saveExcel" class="btn btn-secondary">Save Excel</button>
+                <button id="deleteDraft" class="btn btn-outline-danger">Delete History Draft</button>
+
 
             </div>
 
@@ -304,37 +306,54 @@
 
 
     $("#newOrder").on("click", function (event) {
-        // check count by is populated
-          if ($("#countBy").val() == '') {
-            alert('Please fill in the "Stock Counted By" field.');
-            return 0;
+      event.preventDefault();
+
+      // 1. Check 'Stock Counted By' is filled
+      if ($("#countBy").val() === '') {
+        alert('Please fill in the "Stock Counted By" field.');
+        return;
+      }
+
+      const shop_id = {{ shop.customer | tojson }};
+
+      // 2. Check for existing drafts
+      fetch('/check_count_draft', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.draft_ids.length > 0) {
+            alert(`There is a draft ${data.draft_ids.join(", ")}. Please reload it or delete it before creating a new form.`);
+            return;
           }
 
-        // Set the order name based on shop customer and current date
-        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}C`);
+          // 3. No drafts → proceed with normal logic
+          $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}C`);
 
-        // Fetch stock data
-        fetch('/get_stock_count_form')
+          fetch('/get_stock_count_form')
             .then(response => response.json())
             .then(data => {
-                // Pass the fetched data to loadStockData function
-                $("#loadOrder").prop("disabled",true);
-                $("#saveOrder").prop("disabled", false);
-                $("#resetQty").prop("disabled", false);
-                $("#submitOrder").prop("disabled", false);
-                $("#cancelOrder").prop("disabled", false);
-                $("#closeOrder").prop("disabled", false);
-                $("#newOrder").prop("disabled", true);
-                $("#saveDraft").prop("disabled", false);
-                loadStockData(data);
+              $("#loadOrder").prop("disabled", true);
+              $("#saveOrder").prop("disabled", false);
+              $("#resetQty").prop("disabled", false);
+              $("#submitOrder").prop("disabled", false);
+              $("#cancelOrder").prop("disabled", false);
+              $("#closeOrder").prop("disabled", false);
+              $("#newOrder").prop("disabled", true);
+              $("#saveDraft").prop("disabled", false);
+              loadStockData(data);
             })
             .catch(error => {
-                console.error('Error fetching stock count form:', error);
+              console.error('Error fetching stock count form:', error);
             });
+        })
+        .catch(err => {
+          console.error("Error checking for existing drafts:", err);
+          alert("Failed to verify draft count history.");
+        });
     });
-
-
-
 
 
    // Event handler for the "loadOrder" button
@@ -923,6 +942,47 @@ $("#saveExcel").on("click", function () {
   // Download file
   XLSX.writeFile(workbook, `Stock_Count_${countId}.xlsx`);
 });
+
+$("#deleteDraft").on("click", function () {
+  const shop_id = {{ shop.customer | tojson }};
+
+  fetch('/check_count_draft', {
+    method: 'POST',
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shop_id })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Network response was not ok");
+    return res.json();
+  })
+  .then(data => {
+    const draft_ids = data?.draft_ids || [];
+
+    if (draft_ids.length === 0) {
+      return alert("No draft counts to delete.");
+    }
+
+    const confirmMsg = `You are about to delete history draft count(s):\n\n${draft_ids.join(", ")}\n\nAre you sure?`;
+    if (!confirm(confirmMsg)) return;
+
+    return fetch('/delete_count_draft', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shop_id })
+    });
+  })
+  .then(res => res ? res.json() : null)
+  .then(data => {
+    if (data?.message) {
+      alert(data.message);
+    }
+  })
+  .catch(err => {
+    console.error("Error deleting drafts:", err);
+    alert("Something went wrong deleting drafts.");
+  });
+});
+
 
 
     </script>
