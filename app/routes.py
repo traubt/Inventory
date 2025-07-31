@@ -1601,14 +1601,20 @@ def update_count_stock():
 
         print(f"Inserting record to count control for shop: {shop_name}")
         #add record to toc_count_ctrl
-        new_count_ctrl = TocCountCtrl(
-            count_id=replenish_order_id,
-            name=user_name,
-            username=username,
-            shop_id=shop,
-            shop_name=shop_name,
-        )
-        db.session.add(new_count_ctrl)
+        # Upsert toc_count_ctrl with status = Completed
+        existing_ctrl = TocCountCtrl.query.get(replenish_order_id)
+        if existing_ctrl:
+            existing_ctrl.status = 'Completed'
+        else:
+            new_count_ctrl = TocCountCtrl(
+                count_id=replenish_order_id,
+                name=user_name,
+                username=username,
+                shop_id=shop,
+                shop_name=shop_name,
+                status='Completed'
+            )
+            db.session.add(new_count_ctrl)
 
         # Commit changes to the database
         # ✅ Deadlock-safe commit logic
@@ -1643,6 +1649,90 @@ def update_count_stock():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+@main.route('/save_count_draft', methods=['POST'])
+def save_count_draft():
+    try:
+        data = request.get_json()
+        count_id = data.get('count_id')
+        username = data.get('username')
+        shop_id = data.get('shop_id')
+        shop_name = data.get('shop_name')
+        counted_by = data.get('counted_by')
+        rows = data.get('table', [])
+
+        if not count_id or not shop_id or not username:
+            return jsonify({'error': 'Missing required parameters'}), 400
+
+        # Upsert control row
+        ctrl = TocCountCtrl.query.get(count_id)
+        if not ctrl:
+            ctrl = TocCountCtrl(
+                count_id=count_id,
+                name=counted_by,
+                username=username,
+                shop_id=shop_id,
+                shop_name=shop_name,
+                status='Draft'
+            )
+            db.session.add(ctrl)
+        else:
+            ctrl.status = 'Draft'
+
+        # Delete existing line items for this draft
+        TocCount.query.filter_by(count_id=count_id).delete()
+
+        for row in rows:
+            db.session.add(TocCount(
+                count_id=count_id,
+                sku=row['sku'],
+                stock_count=row['stock_count'],
+                damaged_stock=row['stock_rejected'],
+                comments=row['comments']
+            ))
+
+        db.session.commit()
+        return jsonify({'message': 'Draft saved'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@main.route('/load_count_draft', methods=['POST'])
+def load_count_draft():
+    try:
+        data = request.get_json()
+        shop_id = data.get('shop_id')
+        if not shop_id:
+            return jsonify({'error': 'Missing shop_id'}), 400
+
+        ctrl = TocCountCtrl.query.filter_by(shop_id=shop_id, status='Draft').order_by(TocCountCtrl.creation_date.desc()).first()
+        if not ctrl:
+            return jsonify({'message': 'No draft found'}), 404
+
+        items = TocCount.query.filter_by(count_id=ctrl.count_id).all()
+        item_list = [{
+            'sku': i.sku,
+            'stock_count': i.stock_count,
+            'stock_rejected': i.damaged_stock,
+            'comments': i.comments
+        } for i in items]
+
+        return jsonify({
+            'count_id': ctrl.count_id,
+            'counted_by': ctrl.name,
+            'table': [{
+                'sku': i.sku,
+                'stock_count': i.stock_count,
+                'stock_rejected': i.damaged_stock,
+                'comments': i.comments
+            } for i in items]
+        })
+
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @main.route('/update_count_receive_stock', methods=['POST'])
 def update_count_receive_stock():

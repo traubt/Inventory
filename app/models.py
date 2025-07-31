@@ -273,6 +273,20 @@ class TocCountCtrl(db.Model):
     shop_id = db.Column(db.String(45))
     shop_name = db.Column(db.String(45))
     creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    status = db.Column(db.Enum('Draft', 'Completed'), default='Draft')
+
+class TocCount(db.Model):
+    __tablename__ = 'toc_count'
+
+    count_id = db.Column(db.String(45), db.ForeignKey('toc_count_ctrl.count_id'), primary_key=True)
+    sku = db.Column(db.String(45), primary_key=True)
+    stock_count = db.Column(db.Integer, default=0)
+    damaged_stock = db.Column(db.Integer, default=0)
+    comments = db.Column(db.Text)
+    last_updated = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+    count_ctrl = db.relationship('TocCountCtrl', backref=db.backref('counts', lazy=True))
+
 
 class TocDamaged(db.Model):
     __tablename__ = 'toc_damaged'
