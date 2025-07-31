@@ -824,35 +824,48 @@ $("#loadDraft").on("click", async function () {
     const res = await response.json();
     console.log("✅ Draft loaded from server:", res);
 
-    // Set Counted By before triggering form
     $("#countBy").val(res.counted_by || "");
-
-    // Trigger New Form
     $("#newOrder").click();
 
-    // Wait for DataTable + DOM to fully render
+    // Wait for table rows to render
     await waitForTableReady("#ProductOrderTemplate tbody tr");
-
 
     $("#orderName").val(res.count_id || "");
 
-    // 🔁 Build SKU → Row map
+    // Map each row by SKU
     const rowMap = new Map();
     $("#ProductOrderTemplate tbody tr").each(function () {
       const sku = $(this).find("td:first").text().trim();
       rowMap.set(sku, $(this));
     });
 
-    // 🔁 Patch data from saved table
+    // Patch saved data
     res.table.forEach(savedItem => {
       const sku = (savedItem.sku || "").toString().trim();
       const row = rowMap.get(sku);
 
       if (row && row.length) {
         console.log(`✅ Found row for SKU ${sku}`, savedItem);
-        row.find("input.current-stock-count").val(savedItem.stock_count || 0);
-        row.find("input.current-stock-rejected").val(savedItem.stock_rejected || 0);
-        row.find("input.comments").val(savedItem.comments || "");
+        const stockCountInput = row.find("input.current-stock-count");
+        const stockRejectedInput = row.find("input.current-stock-rejected");
+        const commentsInput = row.find("input.comments");
+
+        stockCountInput.val(savedItem.stock_count || 0);
+        stockRejectedInput.val(savedItem.stock_rejected || 0);
+        commentsInput.val(savedItem.comments || "");
+
+        // 🧠 Recalculate variance
+        const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
+        const countedQty = parseFloat(stockCountInput.val()) || 0;
+        const variance = currentQty - countedQty;
+        row.find(".variance").text(variance);
+
+        // 🚨 If variance exists, mark red border
+        if (variance !== 0) {
+          stockCountInput.css("border", "5px solid red");
+        } else {
+          stockCountInput.css("border", "");
+        }
       } else {
         console.warn(`⚠️ No matching row for SKU: ${sku}`);
       }
@@ -865,6 +878,7 @@ $("#loadDraft").on("click", async function () {
     $("#loadingOverlay").remove();
   }
 });
+
 
 $("#saveExcel").on("click", function () {
   const countedBy = $("#countBy").val() || "Unknown";
