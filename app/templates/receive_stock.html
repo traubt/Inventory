@@ -288,18 +288,35 @@ function loadStockData(rows) {
     $('#ProductOrderTemplate').show();
 
     // Update variance dynamically
+    // Update variance dynamically
     $('#ProductOrderTemplate').on('input', '.current-stock-count, .received-damaged-input', function () {
         const row = $(this).closest('tr');
+        const rowIndex = $('#ProductOrderTemplate').DataTable().row(row).index();
+        const table = $('#ProductOrderTemplate').DataTable();
         const rowData = table.row(row).data();
 
+        // Get current values
         const sentQty = parseFloat(rowData.replenish_qty) || 0;
         const sentDamaged = parseFloat(row.find('.sent-damaged').text()) || 0;
         const receivedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
         const receivedDamaged = parseFloat(row.find('.received-damaged-input').val()) || 0;
 
+        // Update rowData (important for saving)
+        rowData.received_qty = receivedQty;
+        rowData.rcv_damaged = receivedDamaged;
+
         const variance = (sentQty + sentDamaged) - (receivedQty + receivedDamaged);
+
+        // Update the cell visually
         row.find('.variance').text(variance.toFixed(2));
+
+        // Also update rowData for saveForm/saveOrder accuracy
+        rowData.variance = variance;
+
+        // Update the DataTable with the new rowData
+        table.row(row).data(rowData).invalidate();
     });
+
 }
 
 
