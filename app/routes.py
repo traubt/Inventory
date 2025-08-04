@@ -2041,7 +2041,7 @@ def get_shipday_report():
             s.assigned_time,
             s.delivery_time,
             s.shipday_distance_km,
-            s.driving_duration,
+            ROUND(s.driving_duration / 60, 1) AS driving_minutes,
             s.status as order_status,
             s.shipping_status,
             s.creation_date,
