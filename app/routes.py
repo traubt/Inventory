@@ -2046,6 +2046,7 @@ def get_shipday_report():
             s.shipping_status,
             s.creation_date,
             d.full_name AS driver_name,
+            s.driver_base_fee,
             d.phone_number AS driver_phone,
             s.payment_id
         FROM toc_shipday s
