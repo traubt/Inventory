@@ -2011,6 +2011,64 @@ def sales_report():
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('sales_report_by_shop.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
 
+@main.route('/shipday_report')
+def shipday_report():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('shipday_reports.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
+
+@main.route("/get_shipday_report", methods=["GET"])
+def get_shipday_report():
+    from_date = request.args.get("fromDate")
+    to_date = request.args.get("toDate")
+
+    if not from_date or not to_date:
+        return jsonify({"error": "Missing date range"}), 400
+
+    query = text("""
+            SELECT
+            s.wc_orderid,
+            s.wc_name,
+            s.wc_phone,
+            s.shop_name,
+            s.total_amt as order_amount,
+            s.assigned_time,
+            s.delivery_time,
+            s.shipday_distance_km,
+            s.driving_duration,
+            s.status as order_status,
+            s.shipping_status,
+            s.creation_date,
+            d.full_name AS driver_name,
+            d.phone_number AS driver_phone,
+            s.payment_id
+        FROM toc_shipday s
+        LEFT JOIN toc_shipday_drivers d ON s.driver_id = d.driver_id
+        WHERE DATE(s.creation_date) BETWEEN :from_date AND :to_date
+        ORDER BY s.creation_date DESC;
+    """)
+
+    with db.engine.connect() as conn:
+        result = conn.execute(query, {"from_date": from_date, "to_date": to_date})
+        rows = result.fetchall()
+        columns = result.keys()
+
+    data = [dict(zip(columns, row)) for row in rows]
+    response = {
+        "columns": [{"title": col} for col in columns],
+        "data": data
+    }
+    return jsonify(response)
+
+
+
+
 @main.route('/variance_report')
 def variance_report():
     user_data = session.get('user')
