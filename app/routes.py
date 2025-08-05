@@ -3210,6 +3210,27 @@ def shipday_webhook():
         shipday.delivery_time = parse_epoch(order.get("delivery_time"))
         shipday.driving_duration = order.get("driving_duration", 0)
 
+    # Set order status in WooCommerce to completed
+    # 🔄 Sync to WooCommerce: mark as completed
+    wc_order_id = shipday.wc_orderid.replace("WC", "")  # Strip 'WC' if it exists
+
+    try:
+        wc_api_url = f"https://tasteofcannabis.co.za/wp-json/wc/v3/orders/{wc_order_id}"
+        wc_auth = (
+            'ck_ff071fa1ba0d5e8b86a5d292591b13bdb7fcd9af',
+            'cs_dcaf67ca6281e4ed724e10a5cc3aba3a836fd7d3'
+        )
+        payload = {"status": "completed"}
+
+        response = requests.put(wc_api_url, auth=wc_auth, json=payload, timeout=10)
+
+        if response.status_code == 200:
+            logger.warning(f"✅ WooCommerce order {wc_order_id} marked as completed.")
+        else:
+            logger.warning(f"❌ Failed to update WooCommerce order {wc_order_id}. Status {response.status_code}: {response.text}")
+    except Exception as e:
+        logger.exception(f"🔥 Exception while updating WooCommerce order {wc_order_id}: {e}")
+
     shipday.shipping_status = payload.get("order_status")
     shipday.update_date = datetime.utcnow()
 
