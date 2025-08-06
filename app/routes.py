@@ -3202,9 +3202,12 @@ def shipday_webhook():
         shipday.driver_id = driver_id
 
 
-    elif event == "ORDER_PICKEDUP":
+    # elif event == "ORDER_PICKEDUP":
+    #     shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
+    #     logger.warning(f"Event Pickudup. get pickup time: {shipday.pickedup_time}")
+    elif event in ["ORDER_PICKEDUP", "ORDER_PIKEDUP"]:  # 👈 Add both
         shipday.pickedup_time = parse_epoch(order.get("pickedup_time"))
-        logger.warning(f"Event Pickudup. get pickup time: {shipday.pickedup_time}")
+        logger.warning(f"📦 Picked up time set to: {shipday.pickedup_time}")
 
     elif event == "ORDER_COMPLETED":
         shipday.delivery_time = parse_epoch(order.get("delivery_time"))
@@ -3231,7 +3234,7 @@ def shipday_webhook():
     except Exception as e:
         logger.exception(f"🔥 Exception while updating WooCommerce order {wc_order_id}: {e}")
 
-    shipday.shipping_status = payload.get("order_status")
+    shipday.shipping_status = order.get("status") or order.get("order_status")
     shipday.update_date = datetime.utcnow()
 
     db.session.commit()
