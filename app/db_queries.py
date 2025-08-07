@@ -883,7 +883,7 @@ def get_sales_by_shop_last_three_months(user_shop):
                     toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
                 JOIN toc_shops s on ts.store_customer = s.customer
                 WHERE 
-                    tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                    tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
                     AND s.actv_ind = 1
                 GROUP BY 
                     ts.store_name, sale_month
@@ -895,7 +895,7 @@ def get_sales_by_shop_last_three_months(user_shop):
                 FROM 
                     toc_wc_sales_order
                 WHERE 
-                    order_date >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01')
+                    order_date >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
                     AND status NOT IN ('wc-cancelled','wc-pending')
                 GROUP BY 
                     store_name, sale_month;
@@ -915,7 +915,7 @@ def get_sales_by_shop_last_three_months(user_shop):
                 toc_ls_sales ts ON tlsi.sales_id = ts.sales_id
             JOIN toc_shops s ON ts.store_customer = s.customer
             WHERE 
-                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%%Y-%%m-01')
+                tlsi.time_of_sale >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%%Y-%%m-01')
                 AND s.actv_ind = 1
                 AND TRIM(LOWER(ts.store_name)) = TRIM(LOWER(%s))
             GROUP BY 

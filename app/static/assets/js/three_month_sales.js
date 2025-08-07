@@ -9,7 +9,7 @@ async function sales_three_months() {
         }
 
         // Group data by months and extract store names and total sales
-        const months = [...new Set(data.map(item => item.sale_month))];
+        const months = [...new Set(data.map(item => item.sale_month))].sort((a, b) => new Date(a) - new Date(b));
         const stores = [...new Set(data.map(item => item.store_name))];
         const salesData = months.map(month =>
             stores.map(store => {
