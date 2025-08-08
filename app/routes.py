@@ -2033,26 +2033,36 @@ def get_shipday_report():
 
     query = text("""
             SELECT
-            s.wc_orderid,
-            s.wc_name,
-            s.wc_phone,
-            s.shop_name,
-            s.total_amt as order_amount,
-            s.assigned_time,
-            s.delivery_time,
-            s.shipday_distance_km,
-            ROUND(s.driving_duration / 60, 1) AS driving_minutes,
-            s.status as order_status,
-            s.shipping_status,
-            s.creation_date,
-            d.full_name AS driver_name,
-            s.driver_base_fee,
-            d.phone_number AS driver_phone,
-            s.payment_id
-        FROM toc_shipday s
-        LEFT JOIN toc_shipday_drivers d ON s.driver_id = d.driver_id
-        WHERE DATE(s.creation_date) BETWEEN :from_date AND :to_date
-        ORDER BY s.creation_date DESC;
+                s.wc_orderid,
+                s.wc_name,
+                s.wc_phone,
+                s.shop_name,
+                s.total_amt AS order_amount,
+                s.creation_date,
+                s.assigned_time,
+                s.pickedup_time,
+                s.delivery_time,
+                s.shipday_distance_km,
+                ROUND(s.driving_duration / 60, 1) AS driving_minutes,
+                s.status AS order_status,
+                d.full_name AS driver_name,
+                s.driver_base_fee,
+                d.phone_number AS driver_phone,
+                s.payment_id,
+            
+                -- Driver react time: from assigned to pickup
+                TIMESTAMPDIFF(MINUTE, s.assigned_time, s.pickedup_time) AS driver_react_time,
+            
+                -- Driver travel time: from pickup to delivery
+                TIMESTAMPDIFF(MINUTE, s.pickedup_time, s.delivery_time) AS driver_travel_time,
+            
+                -- Order total time: from creation to delivery
+                TIMESTAMPDIFF(MINUTE, s.creation_date, s.delivery_time) AS order_total_time
+            
+            FROM toc_shipday s
+            LEFT JOIN toc_shipday_drivers d ON s.driver_id = d.driver_id
+            WHERE DATE(s.creation_date) BETWEEN :from_date AND :to_date
+            ORDER BY s.creation_date DESC;
     """)
 
     with db.engine.connect() as conn:

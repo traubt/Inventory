@@ -235,6 +235,19 @@ $(document).ready(function () {
         return `${year}-${month}-${day}`;
     }
 
+    // Format datetime to short format in South Africa time
+    function formatDateTimeSA(dateString) {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        return date.toLocaleString('en-ZA', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
     $("#runReport").on("click", function () {
         const reportType = $("input[name='shopDayReport']:checked").val();
         const fromDate = $("#fromDate").val();
@@ -256,10 +269,7 @@ $(document).ready(function () {
         $.ajax({
             url: "/get_shipday_report",
             method: "GET",
-            data: {
-                fromDate: fromDate,
-                toDate: toDate
-            },
+            data: { fromDate, toDate },
             success: function (response) {
                 if (response.columns && response.data) {
                     if ($.fn.DataTable.isDataTable("#sales_report")) {
@@ -278,43 +288,65 @@ $(document).ready(function () {
                         filterRow.append(`<th><input type="text" placeholder="🔍 Search ${col.title}" data-column="${col.title}" /></th>`);
                     });
 
-                    thead.append(filterRow);
-                    thead.append(headerRow);
-                    table.append(thead);
-                    table.append("<tbody></tbody>");
+                    thead.append(filterRow).append(headerRow);
+                    table.append(thead).append("<tbody></tbody>");
 
-                    table.DataTable({
-                        data: response.data,
-                        columns: response.columns.map(col => ({
-                            title: col.title,
-                            data: col.title
-                        })),
-                        dom: "Bfrtip",
-                        buttons: [
-                            {
-                                extend: "excel",
-                                text: "Download To Excel",
-                                title: `ShipdayReport_${new Date().toISOString().slice(0, 10)}`
-                            }
-                        ],
-                        fixedHeader: true,
-                        lengthMenu: [
-                            [50, 100, 150, 200],
-                            [50, 100, 150, 200]
-                        ],
-                        initComplete: function () {
-                            let api = this.api();
-                            api.columns().every(function () {
-                                let column = this;
-                                $('input[data-column="'+column.header().textContent+'"]').on("keyup change", function () {
-                                    let searchTerm = this.value.trim();
-                                    if (column.search() !== searchTerm) {
-                                        column.search(searchTerm, false, true).draw();
-                                    }
-                                });
-                            });
-                        }
-                    });
+table.DataTable({
+    data: response.data,
+    columns: response.columns.map(col => ({
+        title: col.title,
+        data: col.title,
+        render: function (data, type, row) {
+            // For minute-based columns, return raw integer
+            if (["driver_react_time", "driver_travel_time", "order_total_time"].includes(col.title)) {
+                return data !== null ? data : "";
+            }
+
+            // For datetime columns, format to "YYYY-MM-DD HH:mm:ss"
+            if (["assigned_time", "pickedup_time", "delivery_time", "creation_date"].includes(col.title)) {
+                if (!data) return "";
+                const dateObj = new Date(data);
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const hours = String(dateObj.getHours()).padStart(2, '0');
+                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+
+            // Default: return as-is
+            return data;
+        }
+    })),
+    order: [[0, 'desc']], // Sort by wc_orderid descending
+    dom: "Bfrtip",
+    buttons: [
+        {
+            extend: "excel",
+            text: "Download To Excel",
+            title: `ShipdayReport_${new Date().toISOString().slice(0, 10)}`
+        }
+    ],
+    fixedHeader: true,
+    lengthMenu: [
+        [50, 100, 150, 200],
+        [50, 100, 150, 200]
+    ],
+    initComplete: function () {
+        let api = this.api();
+        api.columns().every(function () {
+            let column = this;
+            $('input[data-column="'+column.header().textContent+'"]').on("keyup change", function () {
+                let searchTerm = this.value.trim();
+                if (column.search() !== searchTerm) {
+                    column.search(searchTerm, false, true).draw();
+                }
+            });
+        });
+    }
+});
+
                 } else {
                     alert("No Shipday data available for the selected date range.");
                 }
@@ -330,6 +362,7 @@ $(document).ready(function () {
     });
 });
 </script>
+
 
 
 
