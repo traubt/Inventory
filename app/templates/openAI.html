@@ -26,26 +26,44 @@
   <link href="static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
   <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- jQuery (needed for DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- DataTables + Buttons (same stack used in Sales report) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 
   <!-- Template Main CSS File -->
   <link href="static/assets/css/style.css" rel="stylesheet">
 
-  <!-- =======================================================
-  * Template Name: NiceAdmin
-  * Template URL: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/
-  * Updated: Apr 20 2024 with Bootstrap v5.3.3
-  * Author: BootstrapMade.com
-  * License: https://bootstrapmade.com/license/
-  ======================================================== -->
+  <style>
+    /* keep tables inside their cards/containers */
+    #resultCard .card-body {
+      overflow-x: auto;
+    }
+    /* tighten the search inputs row */
+    table.dataTable thead tr.dt-filters th {
+      padding: .5rem .5rem !important;
+    }
+    table.dataTable thead tr.dt-filters input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: .85rem;
+      padding: .25rem .5rem;
+    }
+  </style>
 </head>
 
 <body>
 
   <!-- ======= Header ======= -->
-   {% include 'header-bar.html' %}
-
-   {% include 'side-bar.html' %}
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
 
   <main id="main" class="main">
 
@@ -62,127 +80,201 @@
 
     <!-- 360 AI Assistant Page -->
     <div class="container mt-5">
-        <h2 class="mb-4 text-center">360 AI Assistant</h2>
+      <h2 class="mb-4 text-center">360 AI Assistant</h2>
 
-        <div class="card p-4 shadow rounded-3">
+      <div class="card p-4 shadow rounded-3">
 
-                        <!-- Username Input -->
-            <div class="mb-3">
-                <label for="userName" class="form-label">Your Name:</label>
-                <input type="text" class="form-control" id="userName" placeholder="Enter your name">
-            </div>
-
-
-            <!-- Question Input -->
-            <div class="mb-3">
-                <label for="userQuestion" class="form-label">Ask a Question about Your Business:</label>
-                <textarea class="form-control" id="userQuestion" rows="3" placeholder="e.g., Show me the top 10 selling products last month"></textarea>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <button class="btn btn-primary" id="askButton" type="button">
-                    <i class="bi bi-chat-dots"></i> Ask
-                </button>
-                <button class="btn btn-outline-secondary ms-2" id="toggleSQLButton" type="button">
-                    <i class="bi bi-code-square"></i> Toggle SQL Preview
-                </button>
-            </div>
+        <!-- Username Input -->
+        <div class="mb-3">
+          <label for="userName" class="form-label">Your Name:</label>
+          <input type="text" class="form-control" id="userName" placeholder="Enter your name">
         </div>
 
-        <!-- Loading Spinner (hidden by default) -->
-        <div class="text-center my-4" id="loadingSpinner" style="display: none;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+        <!-- Question Input -->
+        <div class="mb-3">
+          <label for="userQuestion" class="form-label">Ask a Question about Your Business:</label>
+          <textarea class="form-control" id="userQuestion" rows="3" placeholder="e.g., Show me the top 10 selling products last month"></textarea>
         </div>
 
-        <!-- SQL Query Preview (Optional) -->
-        <div class="card mt-4 shadow-sm" id="queryPreviewCard" style="display: none;">
-            <div class="card-body">
-                <h5 class="card-title">Generated SQL Query (Preview)</h5>
-                <pre id="generatedSQL" class="bg-light p-3 rounded"></pre>
-            </div>
+        <!-- Submit Button -->
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+          <button class="btn btn-primary" id="askButton" type="button">
+            <i class="bi bi-chat-dots"></i> Ask
+          </button>
+          <button class="btn btn-outline-secondary ms-2" id="toggleSQLButton" type="button">
+            <i class="bi bi-code-square"></i> Toggle SQL Preview
+          </button>
         </div>
+      </div>
 
-        <!-- Result Area -->
-        <div class="card mt-4 shadow-sm" id="resultCard" style="display: none;">
-            <div class="card-body">
-                <h5 class="card-title">Results</h5>
-                <div id="resultArea"></div>
-            </div>
+      <!-- Loading Spinner (hidden by default) -->
+      <div class="text-center my-4" id="loadingSpinner" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
         </div>
+      </div>
+
+      <!-- SQL Query Preview (Optional) -->
+      <div class="card mt-4 shadow-sm" id="queryPreviewCard" style="display: none;">
+        <div class="card-body">
+          <h5 class="card-title">Generated SQL Query (Preview)</h5>
+          <pre id="generatedSQL" class="bg-light p-3 rounded"></pre>
+        </div>
+      </div>
+
+      <!-- Result Area -->
+      <div class="card mt-4 shadow-sm" id="resultCard" style="display: none;">
+        <div class="card-body">
+          <h5 class="card-title">Results</h5>
+          <!-- responsive boundary so the table never bleeds outside -->
+          <div class="table-responsive" id="resultWrapper">
+            <div id="resultArea"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Optional: Toast for Errors -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="errorToast" class="toast text-bg-danger" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <strong class="me-auto">Error</strong>
-                <small>Now</small>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body" id="errorToastBody">
-                An error occurred.
-            </div>
+      <div id="errorToast" class="toast text-bg-danger" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <strong class="me-auto">Error</strong>
+          <small>Now</small>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
+        <div class="toast-body" id="errorToastBody">An error occurred.</div>
+      </div>
     </div>
 
-
     <script>
-        document.getElementById('toggleSQLButton').addEventListener('click', () => {
-            const previewCard = document.getElementById('queryPreviewCard');
-            previewCard.style.display = (previewCard.style.display === 'none') ? 'block' : 'none';
-        });
-        document.getElementById('askButton').addEventListener('click', async () => {
-        const userName = document.getElementById('userName').value.trim();
-        const userQuestion = document.getElementById('userQuestion').value.trim();
+  // Initialize DataTables on the AI results table
+  const initResultTable = () => {
+    // Look inside the wrapper where the table actually lives
+    const $tables = $('#resultWrapper').find('table');
+    if ($tables.length === 0) {
+      console.warn('AI Assistant: no table found to initialize.');
+      return;
+    }
 
-        if (!userName) {
-            alert("Please enter your name before asking a question.");
-            return;
-        }
-        if (!userQuestion) {
-            alert("Please type a question first.");
-            return;
-        }
+    const $tbl = $($tables[0]);
 
-        document.getElementById('loadingSpinner').style.display = 'block';
-        //document.getElementById('queryPreviewCard').style.display = 'none';
-        document.getElementById('resultCard').style.display = 'none';
+    // Add Bootstrap table classes and a stable id
+    $tbl.addClass('table table-striped table-hover table-sm').attr('id', 'aiResultsTable');
 
-        try {
-            const response = await fetch('/api/ask_business', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ question: userQuestion, username: userName })  // Send both username + question
-            });
+    // Destroy prior instance if exists (re-queries)
+    if ($.fn.dataTable.isDataTable('#aiResultsTable')) {
+      $('#aiResultsTable').DataTable().destroy();
+    }
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+    // Ensure THEAD exists (some HTML snippets may come without it)
+    let $thead = $tbl.find('thead');
+    if ($thead.length === 0) {
+      const $firstRow = $tbl.find('tr').first();
+      const headers = $firstRow.find('th,td').map(function () {
+        return `<th>${$(this).text()}</th>`;
+      }).get().join('');
+      $tbl.prepend(`<thead><tr>${headers}</tr></thead>`);
+      $firstRow.remove();
+      $thead = $tbl.find('thead');
+    }
 
-            const data = await response.json();
+    // Add per‑column filter row
+    const $headerClone = $thead.find('tr').first().clone();
+    $headerClone.addClass('dt-filters');
+    $headerClone.find('th').each(function () {
+      const title = $(this).text().trim();
+      $(this).html(`<input type="text" placeholder="Search ${title}">`);
+    });
+    $thead.append($headerClone);
 
-            // Show Generated SQL (Hidden below)
-            document.getElementById('generatedSQL').textContent = data.generated_sql || 'No SQL generated.';
-            // document.getElementById('queryPreviewCard').style.display = 'block';  <--- Remove this line to hide
-
-            // Show Results
-            document.getElementById('resultArea').innerHTML = data.result_html || 'No results.';
-            document.getElementById('resultCard').style.display = 'block';
-        } catch (error) {
-            console.error('Error:', error);
-            const toast = new bootstrap.Toast(document.getElementById('errorToast'));
-            document.getElementById('errorToastBody').innerText = error.message;
-            toast.show();
-        } finally {
-            document.getElementById('loadingSpinner').style.display = 'none';
-        }
+    // DataTable init (matches Sales report features)
+    const dt = $('#aiResultsTable').DataTable({
+      dom: 'Bfrtip',
+      buttons: [
+        { extend: 'copyHtml5',  title: 'AI Assistant Results' },
+        { extend: 'csvHtml5',   title: 'ai_assistant_results' },
+        { extend: 'excelHtml5', title: 'ai_assistant_results' },
+        { extend: 'print',      title: 'AI Assistant Results' }
+      ],
+      orderCellsTop: true,
+      fixedHeader: true,
+      stateSave: true,
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100, 250, 500],
     });
 
-    </script>
+    // Wire up column filters
+    dt.columns().every(function (idx) {
+      $('thead tr.dt-filters th:eq(' + idx + ') input', dt.table().container())
+        .on('keyup change clear', function () {
+          if (dt.column(idx).search() !== this.value) {
+            dt.column(idx).search(this.value).draw();
+          }
+        });
+    });
 
+    console.log('AI Assistant: DataTable initialized.');
+  };
+
+  // Toggle SQL preview card
+  document.getElementById('toggleSQLButton').addEventListener('click', () => {
+    const previewCard = document.getElementById('queryPreviewCard');
+    previewCard.style.display = (previewCard.style.display === 'none') ? 'block' : 'none';
+  });
+
+  // Ask button handler
+  document.getElementById('askButton').addEventListener('click', async () => {
+    const userName = document.getElementById('userName').value.trim();
+    const userQuestion = document.getElementById('userQuestion').value.trim();
+
+    if (!userName) {
+      alert("Please enter your name before asking a question.");
+      return;
+    }
+    if (!userQuestion) {
+      alert("Please type a question first.");
+      return;
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('resultCard').style.display = 'none';
+
+    try {
+      const response = await fetch('/api/ask_business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: userQuestion, username: userName })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      const data = await response.json();
+
+      // Show Generated SQL (kept hidden unless toggled)
+      document.getElementById('generatedSQL').textContent = data.generated_sql || 'No SQL generated.';
+
+      // Inject results straight into the wrapper so the table is inside our boundary
+      const html = data.result_html || 'No results.';
+      $('#resultWrapper').html(html);
+
+      // Initialize DataTable features on the table inside #resultWrapper
+      initResultTable();
+
+      document.getElementById('resultCard').style.display = 'block';
+    } catch (error) {
+      console.error('Error:', error);
+      const toastEl = document.getElementById('errorToast');
+      if (toastEl && window.bootstrap && bootstrap.Toast) {
+        document.getElementById('errorToastBody').innerText = error.message;
+        new bootstrap.Toast(toastEl).show();
+      } else {
+        alert(error.message || 'An error occurred.');
+      }
+    } finally {
+      document.getElementById('loadingSpinner').style.display = 'none';
+    }
+  });
+</script>
 
 
 
@@ -190,18 +282,12 @@
 
   <script src="https://bootstrapmade.com/demo/NiceAdmin/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
-
-
   <!-- ======= Footer ======= -->
   <footer id="footer" class="footer">
     <div class="copyright">
       &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
     </div>
     <div class="credits">
-      <!-- All the links in the footer should remain intact. -->
-      <!-- You can delete the links only if you purchased the pro version. -->
-      <!-- Licensing information: https://bootstrapmade.com/license/ -->
-      <!-- Purchase the pro version with working PHP/AJAX contact form: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/ -->
       Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
     </div>
   </footer><!-- End Footer -->
@@ -222,5 +308,4 @@
   <script src="static/assets/js/main.js"></script>
 
 </body>
-
 </html>
