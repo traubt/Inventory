@@ -176,6 +176,7 @@ class TocStock(db.Model):
     pastel_ind = db.Column(db.Integer, default=0, nullable=True)
     pastel_count = db.Column(db.Float, nullable=True)
     pastel_date =  db.Column(db.DateTime, nullable=True)
+    audit_count = db.Column(db.Float, nullable=True)
 
 class TOCStockVariance(db.Model):
     __tablename__ = 'toc_stock_variance'
@@ -283,6 +284,7 @@ class TocCount(db.Model):
     stock_count = db.Column(db.Integer, default=0)
     damaged_stock = db.Column(db.Integer, default=0)
     comments = db.Column(db.Text)
+    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     last_updated = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
     count_ctrl = db.relationship('TocCountCtrl', backref=db.backref('counts', lazy=True))

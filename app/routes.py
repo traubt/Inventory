@@ -1570,6 +1570,7 @@ def update_count_stock():
                 existing_record.count_by = user_name
                 existing_record.calc_stock_qty = float(calc_stock_qty)
                 existing_record.final_stock_qty = float(stock_count)
+                existing_record.audit_count = float(stock_count)
                 existing_record.shop_name = shop_name
                 existing_record.replenish_id = replenish_order_id
                 existing_record.pastel_ind = 0
@@ -1818,6 +1819,7 @@ def update_count_receive_stock():
             stock_record.rcv_damaged = float(rcv_damaged)
             stock_record.rejects_qty = float(existing_record.rejected_qty or 0)
             stock_record.final_stock_qty = float(stock_count) - float(rcv_damaged)
+            stock_record.audit_count = float(stock_count) - float(rcv_damaged)
 
             # 2. Update sending shop toc_stock
             toc_stock_record = (
