@@ -2999,7 +2999,7 @@ def check_shop_stock():
         params = {'shop_name': shop_name}
         params.update(sku_params)
 
-        logger.warning(f"Check stock sku_params: {sql}")
+        # logger.warning(f"Check stock sku_params: {sql}")
 
         result = db.session.execute(sql, params).mappings().all()
         logger.warning(f"✅ Rows returned from stock check: {len(result)}")
