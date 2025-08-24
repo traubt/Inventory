@@ -17,12 +17,23 @@
   <link href="static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
   <link href="static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
-  <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
   <!-- Template CSS -->
   <link href="static/assets/css/style.css" rel="stylesheet">
+
+  <!-- DataTables + Buttons (Excel) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/fixedHeader/3.4.0/css/fixedHeader.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedHeader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+
 
 
   <style>
@@ -116,8 +127,9 @@
         <div class="card-body">
           <h5 class="card-title mb-2">Results</h5>
           <div class="table-responsive">
-            <table class="table" id="resultsTable">
+            <table class="table table-striped nowrap" id="resultsTable" style="width:100%">
               <thead>
+                <tr class="filter-row"></tr> <!-- per-column search inputs will be injected here -->
                 <tr>
                   <th>Order ID</th>
                   <th>Order Date</th>
@@ -130,12 +142,20 @@
                 </tr>
               </thead>
               <tbody></tbody>
+              <tfoot>
+                <tr>
+                  <th colspan="3" class="text-end">Totals:</th>
+                  <th id="totalSum"></th>
+                  <th colspan="4"></th>
+                </tr>
+              </tfoot>
             </table>
           </div>
-          <div class="small text-muted" id="summaryText"></div>
+          <div class="small text-muted mt-2" id="summaryText"></div>
         </div>
       </div>
     </section>
+
 
   </main>
 
@@ -148,154 +168,169 @@
     src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=visualization&callback=initMap">
   </script>
 
-  <script>
-    // ---------- Utilities ----------
-    const fmtDate = d => d.toISOString().slice(0,10);
+ <script>
+  // ---------- Utilities ----------
+  const fmtDate = d => d.toISOString().slice(0,10);
 
-    function setPreset(preset) {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = today.getMonth(); // 0-based
-      const day = today.getDate();
-      let from, to;
+  function setPreset(preset) {
+    const today = new Date();
+    const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+    let from, to;
+    if (preset === 'today') { from = new Date(y,m,d); to = new Date(y,m,d); }
+    else if (preset === 'wtd') { const dow = today.getDay(); from = new Date(y,m,d - (dow===0?6:(dow-1))); to = new Date(y,m,d); }
+    else if (preset === 'qtd') { const qStart = Math.floor(m/3)*3; from = new Date(y,qStart,1); to = new Date(y,m,d); }
+    else if (preset === 'ytd') { from = new Date(y,0,1); to = new Date(y,m,d); }
+    else { from = new Date(y,m,1); to = new Date(y,m,d); } // mtd default
+    $('#fromDate').val(fmtDate(from)); $('#toDate').val(fmtDate(to));
+  }
 
-      if (preset === 'today') {
-        from = new Date(year, month, day);
-        to = new Date(year, month, day);
-      } else if (preset === 'wtd') {
-        const dow = today.getDay(); // Sun=0
-        from = new Date(year, month, day - (dow === 0 ? 6 : (dow-1))); // Monday
-        to = new Date(year, month, day);
-      } else if (preset === 'mtd' || !preset) {
-        from = new Date(year, month, 1);
-        to = new Date(year, month, day);
-      } else if (preset === 'qtd') {
-        const qStartMonth = Math.floor(month/3)*3;
-        from = new Date(year, qStartMonth, 1);
-        to = new Date(year, month, day);
-      } else if (preset === 'ytd') {
-        from = new Date(year, 0, 1);
-        to = new Date(year, month, day);
-      } else if (preset === 'custom') {
-        // do nothing
-        return;
+  // ---------- Map ----------
+  let map, heatmap;
+
+  // ---------- DataTable ----------
+  let dt;
+  function formatDateTime(s) {
+    if (!s) return '';
+    const d = new Date(s.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleString('en-ZA', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).replace(',', '');
+  }
+
+  const dtColumns = [
+    { title:'Order ID',   data:'order_id' },
+    { title:'Order Date', data:'order_date', render:(v)=> formatDateTime(v) },
+    { title:'Customer',   data:'customer_name' },
+    { title:'Total',      data:'total_amount', render: (v)=> Number(v||0).toFixed(2) },
+    { title:'City',       data:'shipping_city' },
+    { title:'State',      data:'shipping_state' },
+    { title:'Lat',        data:'shipping_latitude' },
+    { title:'Lng',        data:'shipping_longitude' }
+  ];
+
+  function buildFilterRow() {
+    const $row = $('#resultsTable thead tr.filter-row').empty();
+    dtColumns.forEach(col => {
+      $row.append(
+        `<th><input class="form-control form-control-sm" type="text" placeholder="🔍 ${col.title}" /></th>`
+      );
+    });
+  }
+
+  function initDataTable(rows, exportTitle) {
+    buildFilterRow();
+
+    if (dt) {
+      dt.clear().rows.add(rows).draw();
+    } else {
+      dt = new $.fn.dataTable.Api($('#resultsTable').DataTable({
+        data: rows,
+        columns: dtColumns,
+        order: [[1, 'desc']],
+        paging: false,        // no pagination
+        info: true,
+        searching: true,
+        scrollY: 38*25,       // ≈ 50 rows tall
+        scrollCollapse: true,
+        fixedHeader: true,
+        dom: 'Bt',            // buttons only (no global search box!)
+        buttons: [
+          {
+            extend: 'excelHtml5',
+            text: 'Download To Excel',
+            title: exportTitle
+          }
+        ],
+        initComplete: function () {
+          const api = this.api();
+          api.columns().every(function (i) {
+            const that = this;
+            $('thead tr.filter-row th:eq('+i+') input')
+              .on('keyup change', function () {
+                if (that.search() !== this.value) { that.search(this.value).draw(); }
+              });
+          });
+        },
+        footerCallback: function (row, data) {
+          const total = data.reduce((s, r) => s + (parseFloat(r.total_amount)||0), 0);
+          $('#totalSum').text('ZAR ' + total.toFixed(2));
+        }
+      }));
+    }
+
+    dt.on('draw.dt', function () {
+      const data = dt.rows({ filter: 'applied'}).data().toArray();
+      const sum = data.reduce((s, r) => s + (parseFloat(r.total_amount)||0), 0);
+      $('#totalSum').text('ZAR ' + sum.toFixed(2));
+      $('#summaryText').text(`${data.length} orders • Total ZAR ${sum.toFixed(2)}`);
+    });
+  }
+
+  // ---------- Data fetchers ----------
+  function fetchRegions() {
+    $.getJSON("{{ url_for('main.api_online_sales_regions') }}", (rows) => {
+      const $sel = $('#region').empty().append('<option value="">All Regions</option>');
+      rows.forEach(r => $sel.append(`<option value="${r.shipping_state}">${r.shipping_state}</option>`));
+    });
+  }
+
+  function loadData() {
+    const from = $('#fromDate').val();
+    const to   = $('#toDate').val();
+    const region = $('#region').val() || '';
+    const url = "{{ url_for('main.api_online_sales_heatmap') }}" +
+                `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region=${encodeURIComponent(region)}`;
+
+    $.getJSON(url, (rows) => {
+      const points = rows
+        .filter(r => r.shipping_latitude !== null && r.shipping_longitude !== null)
+        .map(r => ({
+          location: new google.maps.LatLng(parseFloat(r.shipping_latitude), parseFloat(r.shipping_longitude)),
+          weight: Math.max(1, parseFloat(r.total_amount) || 1)
+        }));
+      heatmap.setData(points);
+
+      if (points.length) {
+        const bounds = new google.maps.LatLngBounds();
+        points.forEach(p => bounds.extend(p.location));
+        map.fitBounds(bounds);
+      } else {
+        map.setCenter({ lat: -28.4793, lng: 24.6727 }); map.setZoom(5);
       }
-      $('#fromDate').val(fmtDate(from));
-      $('#toDate').val(fmtDate(to));
-    }
 
-    // ---------- Map ----------
-    let map, heatmap, dataTable;
-
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -28.4793, lng: 24.6727 }, // SA centroid-ish
-        zoom: 5,
-        mapTypeControl: false,
-        streetViewControl: false
-      });
-
-      heatmap = new google.maps.visualization.HeatmapLayer({
-        data: [],
-        dissipating: true,
-        radius: 30
-      });
-      heatmap.setMap(map);
-
-      // Init filters
-      setPreset('mtd');
-      $('#presetRange').val('mtd');
-      fetchRegions();
-      loadData();
-    }
-
-    // ---------- Data fetchers ----------
-    function fetchRegions() {
-      $.getJSON("{{ url_for('main.api_online_sales_regions') }}", (rows) => {
-        const $sel = $('#region');
-        $sel.empty().append('<option value="">All Regions</option>');
-        rows.forEach(r => {
-          $sel.append(`<option value="${r.shipping_state}">${r.shipping_state}</option>`);
-        });
-      });
-    }
-
-    function loadData() {
-      const from = $('#fromDate').val();
-      const to = $('#toDate').val();
-      const region = $('#region').val() || '';
-
-      const url = "{{ url_for('main.api_online_sales_heatmap') }}" +
-                  `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region=${encodeURIComponent(region)}`;
-
-      $.getJSON(url, (rows) => {
-        // Heatmap points (weighted by total)
-        const points = rows
-          .filter(r => r.shipping_latitude !== null && r.shipping_longitude !== null)
-          .map(r => ({
-            location: new google.maps.LatLng(parseFloat(r.shipping_latitude), parseFloat(r.shipping_longitude)),
-            weight: Math.max(1, parseFloat(r.total_amount) || 1)
-          }));
-
-        heatmap.setData(points);
-
-        // Fit bounds to points
-        if (points.length) {
-          const bounds = new google.maps.LatLngBounds();
-          points.forEach(p => bounds.extend(p.location));
-          map.fitBounds(bounds);
-        } else {
-          map.setCenter({ lat: -28.4793, lng: 24.6727 });
-          map.setZoom(5);
-        }
-
-        // Table
-        const tbody = $('#resultsTable tbody').empty();
-        rows.forEach(r => {
-          const tr = `
-            <tr>
-              <td>${r.order_id}</td>
-              <td>${(r.order_date || '').replace('T',' ').slice(0,19)}</td>
-              <td>${r.customer_name || ''}</td>
-              <td>${Number(r.total_amount || 0).toFixed(2)}</td>
-              <td>${r.shipping_city || ''}</td>
-              <td>${r.shipping_state || ''}</td>
-              <td>${r.shipping_latitude ?? ''}</td>
-              <td>${r.shipping_longitude ?? ''}</td>
-            </tr>`;
-          tbody.append(tr);
-        });
-
-        if (dataTable) {
-          dataTable.destroy();
-        }
-        dataTable = new simpleDatatables.DataTable('#resultsTable', {
-          searchable: true,
-          fixedHeight: false,
-          perPage: 25
-        });
-
-        // Summary
-        const total = rows.reduce((s, r) => s + (parseFloat(r.total_amount) || 0), 0);
-        $('#summaryText').text(`${rows.length} orders • Total ZAR ${total.toFixed(2)}`);
-      });
-    }
-
-    // ---------- Events ----------
-    $('#presetRange').on('change', function () {
-      setPreset(this.value);
+      const exportTitle = `Online_Sales_${from}_to_${to}${region?('_'+region):''}`;
+      initDataTable(rows, exportTitle);
     });
+  }
 
-    $('#applyFilters').on('click', function () {
-      loadData();
-    });
+  // ---------- Events ----------
+  $('#presetRange').on('change', function () { setPreset(this.value); });
+  $('#applyFilters').on('click', function () { loadData(); });
+  $('#resetFilters').on('click', function () {
+    $('#presetRange').val('mtd'); setPreset('mtd'); $('#region').val(''); loadData();
+  });
 
-    $('#resetFilters').on('click', function () {
-      $('#presetRange').val('mtd');
-      setPreset('mtd');
-      $('#region').val('');
-      loadData();
+  // ---------- Map Boot ----------
+  function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: -28.4793, lng: 24.6727 }, zoom: 5,
+      mapTypeControl: false, streetViewControl: false
     });
-  </script>
+    heatmap = new google.maps.visualization.HeatmapLayer({ data: [], dissipating: true, radius: 30 });
+    heatmap.setMap(map);
+
+    setPreset('mtd'); $('#presetRange').val('mtd');
+    fetchRegions();
+    loadData();
+  }
+  window.initMap = initMap;
+</script>
+
+
 </body>
 </html>
