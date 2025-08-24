@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>TOC 360 — Online Sales Heat Map</title>
+
+  <!-- Favicons -->
+  <link href="static/assets/img/toc_logo.png" rel="icon">
+  <link href="static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700|Nunito:300,400,600,700|Poppins:300,400,500,600,700" rel="stylesheet">
+
+  <!-- Vendor CSS -->
+  <link href="static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- Template CSS -->
+  <link href="static/assets/css/style.css" rel="stylesheet">
+
+
+  <style>
+    #map {
+      width: 100%;
+      height: 520px;
+      border-radius: 12px;
+    }
+    .filter-row .form-select, .filter-row .form-control {
+      min-width: 180px;
+    }
+  </style>
+</head>
+<body>
+
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+    <div class="pagetitle">
+      <h1>Online Sales Heat Map</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Analytics</li>
+          <li class="breadcrumb-item active">Online Sales Heat Map</li>
+        </ol>
+      </nav>
+    </div>
+
+    <!-- Filters -->
+    <section class="section">
+      <div class="card">
+        <div class="card-body pt-3">
+          <div class="row g-3 align-items-end filter-row">
+            <div class="col-auto">
+              <label class="form-label mb-0">Date Range:</label>
+              <select id="presetRange" class="form-select">
+                <option value="" disabled selected>Select date range:</option>
+                <option value="today">Today</option>
+                <option value="wtd">Week to Date</option>
+                <option value="mtd">Month to Date</option>
+                <option value="qtd">Quarter to Date</option>
+                <option value="ytd">Year to Date</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="col-auto">
+              <label for="fromDate" class="form-label mb-0">From</label>
+              <input type="date" id="fromDate" class="form-control">
+            </div>
+
+            <div class="col-auto">
+              <label for="toDate" class="form-label mb-0">To</label>
+              <input type="date" id="toDate" class="form-control">
+            </div>
+
+            <div class="col-auto">
+              <label for="region" class="form-label mb-0">Region (shipping_state)</label>
+              <select id="region" class="form-select">
+                <option value="">All Regions</option>
+              </select>
+            </div>
+
+            <div class="col-auto">
+              <button id="applyFilters" class="btn btn-primary">
+                <i class="bi bi-filter-circle me-1"></i>Apply
+              </button>
+              <button id="resetFilters" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Map -->
+    <section class="section">
+      <div class="card">
+        <div class="card-body pt-3">
+          <div id="map"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Table -->
+    <section class="section">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-2">Results</h5>
+          <div class="table-responsive">
+            <table class="table" id="resultsTable">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Order Date</th>
+                  <th>Customer</th>
+                  <th>Total</th>
+                  <th>City</th>
+                  <th>State</th>
+                  <th>Lat</th>
+                  <th>Lng</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="small text-muted" id="summaryText"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Vendor JS -->
+  <script src="static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="static/assets/vendor/simple-datatables/simple-datatables.js"></script>
+
+  <!-- Google Maps (Visualization library for Heatmap) -->
+  <script async
+    src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=visualization&callback=initMap">
+  </script>
+
+  <script>
+    // ---------- Utilities ----------
+    const fmtDate = d => d.toISOString().slice(0,10);
+
+    function setPreset(preset) {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth(); // 0-based
+      const day = today.getDate();
+      let from, to;
+
+      if (preset === 'today') {
+        from = new Date(year, month, day);
+        to = new Date(year, month, day);
+      } else if (preset === 'wtd') {
+        const dow = today.getDay(); // Sun=0
+        from = new Date(year, month, day - (dow === 0 ? 6 : (dow-1))); // Monday
+        to = new Date(year, month, day);
+      } else if (preset === 'mtd' || !preset) {
+        from = new Date(year, month, 1);
+        to = new Date(year, month, day);
+      } else if (preset === 'qtd') {
+        const qStartMonth = Math.floor(month/3)*3;
+        from = new Date(year, qStartMonth, 1);
+        to = new Date(year, month, day);
+      } else if (preset === 'ytd') {
+        from = new Date(year, 0, 1);
+        to = new Date(year, month, day);
+      } else if (preset === 'custom') {
+        // do nothing
+        return;
+      }
+      $('#fromDate').val(fmtDate(from));
+      $('#toDate').val(fmtDate(to));
+    }
+
+    // ---------- Map ----------
+    let map, heatmap, dataTable;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -28.4793, lng: 24.6727 }, // SA centroid-ish
+        zoom: 5,
+        mapTypeControl: false,
+        streetViewControl: false
+      });
+
+      heatmap = new google.maps.visualization.HeatmapLayer({
+        data: [],
+        dissipating: true,
+        radius: 30
+      });
+      heatmap.setMap(map);
+
+      // Init filters
+      setPreset('mtd');
+      $('#presetRange').val('mtd');
+      fetchRegions();
+      loadData();
+    }
+
+    // ---------- Data fetchers ----------
+    function fetchRegions() {
+      $.getJSON("{{ url_for('main.api_online_sales_regions') }}", (rows) => {
+        const $sel = $('#region');
+        $sel.empty().append('<option value="">All Regions</option>');
+        rows.forEach(r => {
+          $sel.append(`<option value="${r.shipping_state}">${r.shipping_state}</option>`);
+        });
+      });
+    }
+
+    function loadData() {
+      const from = $('#fromDate').val();
+      const to = $('#toDate').val();
+      const region = $('#region').val() || '';
+
+      const url = "{{ url_for('main.api_online_sales_heatmap') }}" +
+                  `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region=${encodeURIComponent(region)}`;
+
+      $.getJSON(url, (rows) => {
+        // Heatmap points (weighted by total)
+        const points = rows
+          .filter(r => r.shipping_latitude !== null && r.shipping_longitude !== null)
+          .map(r => ({
+            location: new google.maps.LatLng(parseFloat(r.shipping_latitude), parseFloat(r.shipping_longitude)),
+            weight: Math.max(1, parseFloat(r.total_amount) || 1)
+          }));
+
+        heatmap.setData(points);
+
+        // Fit bounds to points
+        if (points.length) {
+          const bounds = new google.maps.LatLngBounds();
+          points.forEach(p => bounds.extend(p.location));
+          map.fitBounds(bounds);
+        } else {
+          map.setCenter({ lat: -28.4793, lng: 24.6727 });
+          map.setZoom(5);
+        }
+
+        // Table
+        const tbody = $('#resultsTable tbody').empty();
+        rows.forEach(r => {
+          const tr = `
+            <tr>
+              <td>${r.order_id}</td>
+              <td>${(r.order_date || '').replace('T',' ').slice(0,19)}</td>
+              <td>${r.customer_name || ''}</td>
+              <td>${Number(r.total_amount || 0).toFixed(2)}</td>
+              <td>${r.shipping_city || ''}</td>
+              <td>${r.shipping_state || ''}</td>
+              <td>${r.shipping_latitude ?? ''}</td>
+              <td>${r.shipping_longitude ?? ''}</td>
+            </tr>`;
+          tbody.append(tr);
+        });
+
+        if (dataTable) {
+          dataTable.destroy();
+        }
+        dataTable = new simpleDatatables.DataTable('#resultsTable', {
+          searchable: true,
+          fixedHeight: false,
+          perPage: 25
+        });
+
+        // Summary
+        const total = rows.reduce((s, r) => s + (parseFloat(r.total_amount) || 0), 0);
+        $('#summaryText').text(`${rows.length} orders • Total ZAR ${total.toFixed(2)}`);
+      });
+    }
+
+    // ---------- Events ----------
+    $('#presetRange').on('change', function () {
+      setPreset(this.value);
+    });
+
+    $('#applyFilters').on('click', function () {
+      loadData();
+    });
+
+    $('#resetFilters').on('click', function () {
+      $('#presetRange').val('mtd');
+      setPreset('mtd');
+      $('#region').val('');
+      loadData();
+    });
+  </script>
+</body>
+</html>

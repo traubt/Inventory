@@ -3762,6 +3762,101 @@ SELECT * FROM toc_ls_sales LIMIT 10;
 
 ############################## END OPENAI section######################################
 
+#####  ONLINE SALES WITH GOOGLE API
+# ---------- Online Sales Heat Map ----------
+
+@main.route('/online_sales')
+def online_sales():
+    # Same pattern as your other pages: pass user/roles/shops to template
+    user_data = session.get('user')
+    if not user_data:
+        return redirect(url_for('main.login'))
+    user = json.loads(user_data)
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    # Browser key for JS Maps API (keep this restricted to HTTP referrers)
+    google_maps_key = os.getenv('GOOGLE_MAPS_API_KEY', '')
+
+    return render_template(
+        'online_sales.html',
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        GOOGLE_MAPS_API_KEY=google_maps_key
+    )
+
+
+@main.route('/api_online_sales_regions')
+def api_online_sales_regions():
+    sql = text("""
+        SELECT DISTINCT shipping_state
+        FROM toc_wc_sales_order
+        WHERE shipping_state IS NOT NULL AND shipping_state <> ''
+        ORDER BY shipping_state
+    """)
+    rows = db.session.execute(sql).fetchall()
+    return jsonify([{'shipping_state': r[0]} for r in rows])
+
+
+@main.route('/api_online_sales_heatmap')
+def api_online_sales_heatmap():
+    # expected query params from the page JS
+    from_date = request.args.get('from')  # 'YYYY-MM-DD'
+    to_date   = request.args.get('to')    # 'YYYY-MM-DD'
+    region    = request.args.get('region', '')
+
+    # Default to MTD if dates missing
+    if not from_date or not to_date:
+        today = datetime.utcnow().date()
+        from_date = today.replace(day=1).strftime('%Y-%m-%d')
+        to_date   = today.strftime('%Y-%m-%d')
+
+    sql = text("""
+        SELECT
+          order_id,
+          order_date,
+          customer_name,
+          total_amount,
+          shipping_city,
+          shipping_state,
+          shipping_latitude,
+          shipping_longitude
+        FROM toc_wc_sales_order
+        WHERE order_date >= :from_date
+          AND order_date < DATE_ADD(:to_date, INTERVAL 1 DAY)
+          AND (:region = '' OR shipping_state = :region)
+        ORDER BY order_date DESC
+    """)
+
+    rows = db.session.execute(sql, {
+        'from_date': from_date,
+        'to_date': to_date,
+        'region': region
+    }).mappings().all()
+
+    out = []
+    for r in rows:
+        out.append({
+            'order_id': r['order_id'],
+            'order_date': (r['order_date'].isoformat()
+                           if hasattr(r['order_date'], 'isoformat')
+                           else str(r['order_date'])),
+            'customer_name': r['customer_name'],
+            'total_amount': float(r['total_amount'] or 0),
+            'shipping_city': r['shipping_city'],
+            'shipping_state': r['shipping_state'],
+            'shipping_latitude': (float(r['shipping_latitude'])
+                                  if r['shipping_latitude'] is not None else None),
+            'shipping_longitude': (float(r['shipping_longitude'])
+                                   if r['shipping_longitude'] is not None else None),
+        })
+    return jsonify(out)
+
+############################## END ONLINE SALES GOOGLE API section######################################
 
 if __name__ == '__main__':
     app.run(debug=True)

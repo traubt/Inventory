@@ -142,6 +142,15 @@
     </a>
   </li><!-- End Dashboard Nav -->
 
+  <li class="nav-item" id="online-sales">
+    <a class="nav-link {{ 'active' if request.endpoint=='main.online_sales' else 'collapsed' }}"
+       href="{{ url_for('main.online_sales') }}">
+      <i class="bi bi-geo-alt"></i>
+      <span>Online Sales</span>
+    </a>
+  </li><!-- End Online Sales Nav -->
+
+
     </ul>
 
 <!---->
