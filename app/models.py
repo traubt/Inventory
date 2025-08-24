@@ -101,6 +101,7 @@ class TocStockOrder(db.Model):
     order_status = db.Column(db.String(45))
     order_status_date = db.Column(db.DateTime)
 
+
 class TocReplenishOrder(db.Model):
     __tablename__ = 'toc_replenish_order'
 
@@ -177,6 +178,18 @@ class TocStock(db.Model):
     pastel_count = db.Column(db.Float, nullable=True)
     pastel_date =  db.Column(db.DateTime, nullable=True)
     audit_count = db.Column(db.Float, nullable=True)
+
+class TocStockAudit(db.Model):
+    __tablename__ = 'toc_stock_audit'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    shop_id = db.Column(db.String(20), nullable=False)
+    sku = db.Column(db.String(45), nullable=False)
+    product_name = db.Column(db.String(100))
+    stock_count = db.Column(db.Float)
+    shop_name = db.Column(db.String(45))
+    comments = db.Column(db.String(150))
 
 class TOCStockVariance(db.Model):
     __tablename__ = 'toc_stock_variance'
