@@ -454,7 +454,11 @@
           console.error("Error submitting data:", error);
           dialog("Error", "Failed to save stock data. Please try again.");
         },
-        complete: function () { spinnerWrapper.remove(); }
+        complete: function () {
+                                spinnerWrapper.remove();
+                              // let the DOM paint, then reload
+                                setTimeout(function () { window.location.reload(); }, 100);
+                                }
       });
     });
 

@@ -597,108 +597,220 @@ def get_stock_order_form():
 
     return result
 
+# def get_replenish_order_form(order_id, shop, threshold, replenish):
+#     # Connect to the database
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#
+#     # Query to retrieve the stock order form
+#     query = '''
+#                WITH sales_data AS (
+#                SELECT
+#                 d.item_sku,
+#                 d.item_name,
+#                 b.store_customer,
+#                 c.blName AS shop_name,
+#                 COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
+#                 COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
+#              --    COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
+#                  COALESCE(SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END), 0) AS sales_since_stock_read
+#             FROM
+#                 toc_product d
+#              JOIN
+#                 toc_ls_sales_item a
+#                 ON d.item_sku = a.item_sku
+#              JOIN
+#                 toc_ls_sales b
+#                 ON a.sales_id = b.sales_id
+#              JOIN
+#                 toc_shops c
+#                 ON b.store_customer = c.customer
+#              JOIN
+#                 toc_stock st
+#                 ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+#             WHERE
+#                 d.acct_group <> 'Specials'
+#                 AND c.blName = %s
+#                 AND d.item_sku <> '9568'  -- Refund item
+#             GROUP BY
+#                 d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+#             UNION ALL
+#             SELECT
+#                 st.sku AS item_sku,
+#                 d.item_name,
+#                 st.shop_id AS store_customer,
+#                 c.blName AS shop_name,
+#                 0 AS threshold_sold_qty,
+#                 0 AS replenish_qty,
+#                 0 AS sales_since_stock_read
+#             FROM
+#                 toc_stock st
+#              JOIN
+#                 toc_product d
+#                 ON st.sku = d.item_sku
+#                 AND d.acct_group <> 'Specials'
+#                 AND d.item_sku <> '9568'  -- Exclude refund item
+#              JOIN
+#                 toc_shops c
+#                 ON st.shop_id = c.customer
+#             WHERE
+#                 c.blName = %s
+#                 AND NOT EXISTS (
+#                     SELECT 1
+#                     FROM toc_ls_sales_item a
+#                     JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+#                     WHERE a.item_sku = st.sku
+#                     AND b.store_customer = st.shop_id
+#                 )
+#             )
+#             SELECT
+#                 s.item_sku,
+#                 s.item_name,
+#                 s.store_customer,
+#                 s.shop_name,
+#                 s.threshold_sold_qty,
+#                 s.replenish_qty,
+#                 s.sales_since_stock_read,
+#                 st.final_stock_qty AS last_stock_update,
+#                 st.stock_qty_date AS last_stock_update_date,
+#                 st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer AS current_stock_qty,
+#                 CASE
+#                     WHEN %s IS NOT NULL THEN (
+#                         SELECT replenish_qty FROM toc_replenish_order
+#                         WHERE order_id = %s AND sku = s.item_sku
+#                     )
+#                     WHEN st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer > s.threshold_sold_qty THEN 0
+#                     ELSE s.replenish_qty
+#                 END AS replenish_order
+#             FROM
+#                 sales_data s
+#             LEFT JOIN
+#                 toc_stock st
+#             ON
+#                 s.item_sku = st.sku AND s.store_customer = st.shop_id
+#             ORDER BY s.sales_since_stock_read DESC;
+#     '''
+#
+#
+#     params = (threshold, replenish, shop, shop, order_id, order_id)
+#
+#     # print the final SQL (for debugging only)
+#     try:
+#         sql_preview = cursor.mogrify(query, params)
+#         print(sql_preview.decode() if isinstance(sql_preview, (bytes, bytearray)) else sql_preview)
+#     except AttributeError:
+#         # For mysql-connector-python:
+#         pass
+#
+#     # Execute the query with the parameters
+#     cursor.execute(query, (threshold, replenish, shop, shop, order_id, order_id))
+#     result = cursor.fetchall()
+#
+#     cursor.close()
+#     conn.close()
+#
+#     return result
+
 def get_replenish_order_form(order_id, shop, threshold, replenish):
-    # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Query to retrieve the stock order form
     query = '''
-               WITH sales_data AS (
-               SELECT 
-                d.item_sku,
-                d.item_name,
-                b.store_customer,
-                c.blName AS shop_name,
-                COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
-                COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
-             --    COUNT(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.sales_id END) AS sales_since_stock_read
-                 COALESCE(SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END), 0) AS sales_since_stock_read
-            FROM 
-                toc_product d
-             JOIN 
-                toc_ls_sales_item a
-                ON d.item_sku = a.item_sku
-             JOIN 
-                toc_ls_sales b 
-                ON a.sales_id = b.sales_id
-             JOIN 
-                toc_shops c
-                ON b.store_customer = c.customer
-             JOIN
-                toc_stock st
-                ON d.item_sku = st.sku AND b.store_customer = st.shop_id
-            WHERE 
-                d.acct_group <> 'Specials'
-                AND c.blName = %s
-                AND d.item_sku <> '9568'  -- Refund item
-            GROUP BY 
-                d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
-            UNION ALL
-            SELECT 
-                st.sku AS item_sku,
-                d.item_name,
-                st.shop_id AS store_customer,
-                c.blName AS shop_name,
-                0 AS threshold_sold_qty,
-                0 AS replenish_qty,
-                0 AS sales_since_stock_read
-            FROM 
-                toc_stock st
-             JOIN 
-                toc_product d 
-                ON st.sku = d.item_sku 
-                AND d.acct_group <> 'Specials' 
-                AND d.item_sku <> '9568'  -- Exclude refund item
-             JOIN 
-                toc_shops c 
-                ON st.shop_id = c.customer
-            WHERE 
-                c.blName = %s
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM toc_ls_sales_item a
-                    JOIN toc_ls_sales b ON a.sales_id = b.sales_id
-                    WHERE a.item_sku = st.sku 
-                    AND b.store_customer = st.shop_id
-                )
+    WITH sales_data AS (
+        SELECT 
+            d.item_sku,
+            d.item_name,
+            b.store_customer,
+            c.blName AS shop_name,
+            COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS threshold_sold_qty,
+            COUNT(CASE WHEN a.time_of_sale > CURDATE() - INTERVAL %s DAY THEN a.sales_id END) AS replenish_qty,
+            COALESCE(SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity ELSE 0 END), 0) AS sales_since_stock_read
+        FROM toc_product d
+        JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
+        JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+        JOIN toc_shops c ON b.store_customer = c.customer
+        JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+        WHERE d.acct_group NOT IN ('Specials','Non stock Item')
+          AND c.blName = %s
+          AND d.item_sku <> '9568'  -- Refund item
+        GROUP BY d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+
+        UNION ALL
+
+        SELECT 
+            st.sku AS item_sku,
+            d.item_name,
+            st.shop_id AS store_customer,
+            c.blName AS shop_name,
+            0 AS threshold_sold_qty,
+            0 AS replenish_qty,
+            0 AS sales_since_stock_read
+        FROM toc_stock st
+        JOIN toc_product d 
+             ON st.sku = d.item_sku
+            AND d.acct_group NOT IN ('Specials','Non stock Item')
+            AND d.item_sku <> '9568'
+        JOIN toc_shops c ON st.shop_id = c.customer
+        WHERE c.blName = %s
+          AND NOT EXISTS (
+              SELECT 1
+              FROM toc_ls_sales_item a
+              JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+              WHERE a.item_sku = st.sku
+                AND b.store_customer = st.shop_id
+          )
+    )
+    SELECT 
+        s.item_sku,
+        s.item_name,
+        s.store_customer,
+        s.shop_name,
+        s.threshold_sold_qty,
+        s.replenish_qty,
+        s.sales_since_stock_read,
+        st.final_stock_qty AS last_stock_update,
+        st.stock_qty_date  AS last_stock_update_date,
+
+        /* Current stock = last physical count + transfers since count - sales since count */
+        COALESCE(st.stock_count,0)
+          - COALESCE(s.sales_since_stock_read,0)
+          + COALESCE(st.stock_transfer,0) AS current_stock_qty,
+
+        CASE 
+            /* If we have an existing order_id, pull its per-SKU qty */
+            WHEN %s IS NOT NULL THEN (
+                SELECT ro.replenish_qty
+                FROM toc_replenish_order ro
+                WHERE ro.order_id = %s AND ro.sku = s.item_sku
             )
-            SELECT 
-                s.item_sku,
-                s.item_name,
-                s.store_customer,
-                s.shop_name,
-                s.threshold_sold_qty,
-                s.replenish_qty,
-                s.sales_since_stock_read,
-                st.final_stock_qty AS last_stock_update,
-                st.stock_qty_date AS last_stock_update_date,
-                st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer AS current_stock_qty,
-                CASE 
-                    WHEN %s IS NOT NULL THEN (
-                        SELECT replenish_qty FROM toc_replenish_order 
-                        WHERE order_id = %s AND sku = s.item_sku
-                    )     
-                    WHEN st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer > s.threshold_sold_qty THEN 0              
-                    ELSE s.replenish_qty
-                END AS replenish_order
-            FROM 
-                sales_data s
-            LEFT JOIN 
-                toc_stock st
-            ON 
-                s.item_sku = st.sku AND s.store_customer = st.shop_id
-            ORDER BY s.sales_since_stock_read DESC;
+            /* Otherwise, only recommend replenish if current stock <= threshold */
+            WHEN (COALESCE(st.stock_count,0)
+                  - COALESCE(s.sales_since_stock_read,0)
+                  + COALESCE(st.stock_transfer,0)) > s.threshold_sold_qty THEN 0
+            ELSE s.replenish_qty
+        END AS replenish_order
+    FROM sales_data s
+    LEFT JOIN toc_stock st
+      ON s.item_sku = st.sku AND s.store_customer = st.shop_id
+    ORDER BY s.sales_since_stock_read DESC;
     '''
 
-    # Execute the query with the parameters
-    cursor.execute(query, (threshold, replenish, shop, shop, order_id, order_id))
+    params = (threshold, replenish, shop, shop, order_id, order_id)
+
+    # Optional: preview the final SQL if your driver supports mogrify/statement
+    # try:
+    #     sql_preview = cursor.mogrify(query, params)
+    #     print(sql_preview.decode() if isinstance(sql_preview, (bytes, bytearray)) else sql_preview)
+    # except AttributeError:
+    #     pass
+
+    cursor.execute(query, params)
     result = cursor.fetchall()
 
     cursor.close()
     conn.close()
-
     return result
+
 
 
 # def get_stock_count_per_shop(shop):
@@ -776,62 +888,55 @@ def get_stock_count_per_shop(shop):
     cursor = conn.cursor()
 
     # Query to retrieve the stock order form
-    query = '''
-WITH sales_data AS (
-    SELECT 
-        d.item_sku,
-        d.item_name,
-        b.store_customer,
-        c.blName AS shop_name,
-        st.stock_qty_date,
-        SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END) AS sales_since_stock_read
-    FROM 
-        toc_product d
-    LEFT JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
-    LEFT JOIN toc_ls_sales b ON a.sales_id = b.sales_id
-    LEFT JOIN toc_shops c ON b.store_customer = c.customer
-    LEFT JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
-    WHERE 
-        d.acct_group <> 'Specials'
-        AND c.blName = %s
-    GROUP BY 
-        d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
-),
-damaged_data AS (
-    SELECT 
-        d.sku,
-        d.shop_id,
-        SUM(d.rcv_damaged) AS total_damaged
-    FROM 
-        toc_damaged d
-    INNER JOIN toc_stock st
-        ON d.sku = st.sku AND d.shop_id = st.shop_name
-    WHERE 
-        d.order_open_date > st.stock_qty_date
-        AND d.shop_id = %s
-    GROUP BY 
-        d.sku, d.shop_id
-)
-SELECT DISTINCT
-    st.sku AS item_sku,
-    st.product_name AS item_name,
-    st.shop_id AS store_customer,
-    st.shop_name,
-    st.stock_count AS last_stock_count,
-    st.stock_qty_date AS last_stock_count_date,
-    COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
-    st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
-    st.stock_transfer - COALESCE(dd.total_damaged, 0) AS received_stock
-FROM 
-    toc_stock st
-LEFT JOIN sales_data s
-    ON st.sku = s.item_sku AND st.shop_id = s.store_customer
-LEFT JOIN damaged_data dd
-    ON st.sku = dd.sku AND st.shop_name = dd.shop_id
-WHERE 
-    st.shop_name = %s
-ORDER BY 
-    COALESCE(s.sales_since_stock_read, 0) DESC;
+    query = '''   
+            WITH sales_data AS (
+              SELECT 
+                  d.item_sku,
+                  d.item_name,
+                  b.store_customer,
+                  c.blName AS shop_name,
+                  st.stock_qty_date,
+                  SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity ELSE 0 END) AS sales_since_stock_read
+              FROM toc_product d
+              LEFT JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
+              LEFT JOiN toc_ls_sales b ON a.sales_id = b.sales_id
+              LEFT JOIN toc_shops c ON b.store_customer = c.customer
+              LEFT JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+              WHERE c.blName = %s
+              GROUP BY d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+            ),
+            damaged_data AS (
+              SELECT 
+                  d.sku,
+                  d.shop_id,
+                  SUM(d.rcv_damaged) AS total_damaged
+              FROM toc_damaged d
+              INNER JOIN toc_stock st
+                  ON d.sku = st.sku AND d.shop_id = st.shop_id          -- <-- fix join
+              WHERE d.order_open_date > st.stock_qty_date
+                AND d.shop_id = %s
+              GROUP BY d.sku, d.shop_id
+            )
+            SELECT DISTINCT
+                st.sku AS item_sku,
+                st.product_name AS item_name,
+                st.shop_id AS store_customer,
+                st.shop_name,
+                st.stock_count AS last_stock_count,
+                st.stock_qty_date AS last_stock_count_date,
+                COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
+                st.final_stock_qty - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
+                COALESCE(st.stock_transfer,0) - COALESCE(dd.total_damaged, 0) AS received_stock
+            FROM toc_stock st
+            JOIN toc_product p
+              ON p.item_sku = st.sku
+             AND p.acct_group NOT IN ('Specials', 'Non stock Item')      -- <-- filter applied here
+            LEFT JOIN sales_data s
+              ON st.sku = s.item_sku AND st.shop_id = s.store_customer
+            LEFT JOIN damaged_data dd
+              ON st.sku = dd.sku AND st.shop_id = dd.shop_id
+            WHERE st.shop_name = %s
+            ORDER BY COALESCE(s.sales_since_stock_read, 0) DESC;
     '''
 
     # Execute the query with the shop name as parameter (used 3 times)
@@ -2075,9 +2180,9 @@ def get_stock_value():
                 st.final_stock_qty as gross_stock_qty,
                 st.stock_transfer as stock_movement,
                 COALESCE(sc.count_items, 0) AS sold_items,
-                st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) AS current_stock,
-                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
+                st.final_stock_qty - COALESCE(sc.count_items, 0) AS current_stock,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
@@ -2088,7 +2193,7 @@ def get_stock_value():
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'  
             --  and st.shop_name = 'CC - Menlyn'
-              AND st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) > 0;
+              AND st.final_stock_qty - COALESCE(sc.count_items, 0) > 0;
             '''
 
     # Execute the query with the parameter
@@ -2136,9 +2241,9 @@ def get_stock_value_per_shop():
                 st.final_stock_qty as gross_stock_qty,
                 st.stock_transfer,
                 COALESCE(sc.count_items, 0) AS count_items,
-                (st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) AS current_stock,
-                ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty +st.stock_transfer - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
+                (st.final_stock_qty - COALESCE(sc.count_items, 0)) AS current_stock,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty  - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
@@ -2148,7 +2253,7 @@ def get_stock_value_per_shop():
               AND st.stock_qty_date = sc.stock_qty_date
             WHERE d.acct_group <> 'Specials'
               AND d.item_sku <> '9568'           -- Exclude refund item
-              AND st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) > 0
+              AND st.final_stock_qty - COALESCE(sc.count_items, 0) > 0
         )
         SELECT
             shop_name,
@@ -2257,7 +2362,7 @@ def get_back_order():
                     st.stock_transfer as stock_movement,
                     s.replenish_qty AS 5_weeks_sales,
                 ( 
-                    st.final_stock_qty + st.stock_transfer
+                    st.final_stock_qty
                     - s.sales_since_stock_read 
                --     + COALESCE((
                --         SELECT SUM(tro.received_qty) 
