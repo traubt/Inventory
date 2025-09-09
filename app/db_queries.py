@@ -930,7 +930,8 @@ def get_stock_count_per_shop(shop):
             FROM toc_stock st
             JOIN toc_product p
               ON p.item_sku = st.sku
-             AND p.acct_group NOT IN ('Specials', 'Non stock Item')      -- <-- filter applied here
+          --   AND p.acct_group NOT IN ('Specials', 'Non stock Item')      -- <-- filter applied here
+               AND p.acct_group <> 'Specials'
             LEFT JOIN sales_data s
               ON st.sku = s.item_sku AND st.shop_id = s.store_customer
             LEFT JOIN damaged_data dd
