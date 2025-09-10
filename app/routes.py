@@ -3856,6 +3856,75 @@ def api_online_sales_heatmap():
         })
     return jsonify(out)
 
+####f Audit Stock movement
+@main.route("/stock_movement")
+def stock_movement():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+
+    # Load shops and items
+    shops = db.session.execute(text("SELECT customer, blName FROM toc_shops ORDER BY blName")).fetchall()
+    items = db.session.execute(text("""
+        SELECT item_sku, item_name 
+        FROM toc_product 
+        WHERE acct_group not in ( 'Specials','Non stock Item' )
+        ORDER BY item_name
+    """)).fetchall()
+
+    return render_template(
+        "stock_movement.html",
+        user=user,
+        shop=shop,
+        roles=roles_list,
+        shops=shops,
+        items=items
+    )
+
+
+from sqlalchemy import bindparam
+
+from datetime import datetime, timedelta
+from sqlalchemy import bindparam, text
+
+@main.route("/get_stock_movement")
+def get_stock_movement():
+    shop = request.args.get("shop")
+    items = tuple(request.args.get("items").split(","))
+    fromDate = request.args.get("fromDate")      # 'YYYY-MM-DD'
+    toDate = request.args.get("toDate")          # 'YYYY-MM-DD'
+
+    # Make the "to" date inclusive: use next day as an exclusive upper bound
+    toDate_exclusive = (datetime.strptime(toDate, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    sql = text("""
+        SELECT id, creation_date, shop_id, sku, product_name, stock_count, shop_name, comments
+        FROM toc_stock_audit
+        WHERE shop_id = :shop
+          AND sku IN :items
+          AND creation_date >= :fromDate
+          AND creation_date < :toDateExclusive
+        ORDER BY sku ASC, creation_date DESC
+    """).bindparams(bindparam("items", expanding=True))
+
+    result = db.session.execute(sql, {
+        "shop": shop,
+        "items": items,
+        "fromDate": fromDate,
+        "toDateExclusive": toDate_exclusive
+    }).mappings().all()
+
+    rows = [dict(r) for r in result]
+    if not rows:
+        return jsonify({"columns": [], "data": []})
+
+    columns = [{"title": col} for col in rows[0].keys()]
+    return jsonify({"columns": columns, "data": rows})
+
+
 ############################## END ONLINE SALES GOOGLE API section######################################
 
 if __name__ == '__main__':
