@@ -999,6 +999,42 @@ def get_stock_count_form():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@main.route('/get_stock_order_form', methods=['GET'])
+def get_stock_order_form():
+    try:
+        shop_data = json.loads(session.get('shop'))
+        selected_shop = shop_data['name']
+        # Print the selected shop value
+        print(f"Selected shop from client: {selected_shop}")
+
+        data = get_stock_order_per_shop(selected_shop)
+    #
+        if not data:
+            return jsonify({"message": "Error fetching stock order form data"}), 500
+    #
+        # Format the data for the client
+        formatted_data = [
+            {
+                "sku": row[0],
+                "product_name": row[1],
+                "store_code" :row[2],
+                "last_stock_count": row[4],
+                "last_stock_count_date": row[5],
+                "sold_qty": row[6],
+                "current_qty": row[7],
+                "received_qty" : row[8]
+            }
+            for row in data
+        ]
+
+        return jsonify(formatted_data)
+
+    except Exception as e:
+        # Handle any errors
+        print(f"Error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @main.route('/get_receive_stock_form', methods=['GET'])
 def get_receive_stock_form():
     try:

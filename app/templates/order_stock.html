@@ -149,7 +149,7 @@
         $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}-O`);
 
         // Fetch stock data
-        fetch('/get_stock_count_form')
+        fetch('/get_stock_order_form')
             .then(response => response.json())
             .then(data => {
                 // Pass the fetched data to loadStockData function
