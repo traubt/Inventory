@@ -187,6 +187,24 @@ def index():
         return redirect(url_for('main.login'))
 
 
+@main.route('/b2bIndex')
+def b2bIndex():
+
+    user_data = session.get('user')
+    roles = TocRole.query.all()
+    shops = TOC_SHOPS.query.all()
+
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    list_of_shops = [shop.blName for shop in shops]
+
+    if user_data:
+        user = json.loads(user_data)
+        return render_template('b2bDashboard.html', user=user, roles=roles_list, shops=list_of_shops)  # Pass as JSON
+    else:
+        return redirect(url_for('main.login'))
+
+
 
 @main.route('/login', methods=['POST'])
 def login_post():
@@ -649,6 +667,17 @@ def count_stock():
     # Convert the roles to a list of dictionaries
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('count_stock.html', user=user, shop=shop , roles=roles_list)
+
+@main.route('/spotcheck_count_stock')
+def spotcheck_count_stock():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    # Convert the roles to a list of dictionaries
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('spotcheck_count_stock.html', user=user, shop=shop , roles=roles_list)
 
 @main.route('/user_profile')
 def user_profile():
@@ -2502,6 +2531,8 @@ def get_variance_report():
             data = get_detailed_damaged_return(from_date, to_date)
         elif report_type == "Consolidated Damaged Returns":
             data = get_consolidated_damaged_return(from_date, to_date)
+        elif report_type == "Spotcheck Count Variance":
+            data = get_spotcheck_variance_report(from_date, to_date)
         elif report_type == "Consolidated Variance Report":
             conn = get_db_connection()
 

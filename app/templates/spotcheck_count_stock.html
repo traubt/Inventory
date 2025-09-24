@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>TOC - admin</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
+
+  <!-- Favicons -->
+  <link href="static/assets/img/toc_logo.png" rel="icon">
+  <link href="static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
+
+<!--  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.5.2/bootbox.min.js"></script>
+
+
+  <!-- Vendor CSS Files -->
+  <link href="static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+  <link href="static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+
+  <!-- Template Main CSS File -->
+  <link href="static/assets/css/style.css" rel="stylesheet">
+
+  <script src="static/assets/js/functions.js"></script>
+
+<!--    Datatables-->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.flash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+
+
+
+
+  <!-- =======================================================
+  * Template Name: NiceAdmin
+  * Template URL: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/
+  * Updated: Apr 20 2024 with Bootstrap v5.3.3
+  * Author: BootstrapMade.com
+  * License: https://bootstrapmade.com/license/
+  ======================================================== -->
+</head>
+
+<body>
+
+   {% include 'header-bar.html' %}
+
+   {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+
+    <div class="pagetitle">
+      <h1>Inventory</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Pages</li>
+          <li class="breadcrumb-item active">Spotcheck Count</li>
+        </ol>
+      </nav>
+    </div><!-- End Page Title -->
+
+    <section class="section">
+      <div class="row">
+        <div class="col-lg-12">
+
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+<div class="d-flex align-items-center">
+  <h5 class="card-title mb-0 me-2">Stock Counted By:</h5>
+  <input type="text" id='countBy' class="form-control w-auto" placeholder="Enter name">
+</div>
+
+              <div class="d-flex gap-2">
+                <label for="orderName" class="form-label mb-0">Count ID:</label>
+                <input type="text" id="orderName" class="form-control" >
+              </div>
+            </div>
+            <div class="d-flex gap-1 mt-3">
+              <button class="btn btn-primary" id="newOrder" >New Form</button>
+<!--              <button class="btn btn-primary" id="loadOrder" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Load open order from the database">Load Order</button>-->
+                <button class="btn btn-warning" id="saveDraft" disabled>Save Draft</button>
+                <button class="btn btn-secondary" id="loadDraft">Reload Draft</button>
+              <button class="btn btn-primary" id="saveOrder"   disabled >Confirm Count</button>
+<!--              <button class="btn btn-primary" id="submitOrder" data-bs-placement="bottom" data-bs-original-title="Notify order to head quarter" disabled>Submit Order</button>-->
+              <button class="btn btn-primary" id="closeOrder"   disabled>Close Form</button>
+<!--              <button class="btn btn-danger" id="cancelOrder" data-bs-placement="bottom" data-bs-original-title="Delete current order" disabled>Cancel Order</button>-->
+              <button class="btn btn-danger" id="resetQty"  disabled>Reset Count</button>
+                <button id="saveExcel" class="btn btn-secondary">Save Excel</button>
+                <button id="deleteDraft" class="btn btn-outline-danger">Delete History Draft</button>
+
+
+            </div>
+
+              <!--Handle the csv file -->
+
+                <table id="ProductOrderTemplate" border="1">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+          </div>
+        </div>
+
+              <!-- Confirmation Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cancelModalLabel">Confirm Cancel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to cancel the order?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                <button type="button" class="btn btn-danger" id="confirmCancel">Yes, Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+    function waitForTableReady(selector, timeout = 5000) {
+          return new Promise((resolve, reject) => {
+            const interval = 100;
+            let waited = 0;
+
+            const check = () => {
+              if ($(selector).length > 0) {
+                resolve();
+              } else if (waited >= timeout) {
+                reject("Table did not render in time.");
+              } else {
+                waited += interval;
+                setTimeout(check, interval);
+              }
+            };
+
+            check();
+          });
+        }
+
+
+    function loadStockData(rows) {
+        console.log(rows);
+
+        // Calculate "Current Quantity" for each row before initializing the table
+        rows.forEach(row => {
+            // Perform the calculation for Current Quantity
+            row.current_qty = (row.last_stock_count || 0) - (row.sold_qty || 0) + (row.received_qty || 0);
+        });
+
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+            $('#ProductOrderTemplate').DataTable().destroy();
+        }
+
+        // Initialize DataTable
+        const table = $('#ProductOrderTemplate').DataTable({
+            data: rows,
+            columns: [
+                { title: "SKU", data: "sku" },
+                { title: "Product Name", data: "product_name" },
+                { title: "Last Stock Count", data: "last_stock_count" },
+                { title: "Last Stock Count Date", data: "last_stock_count_date" },
+                { title: "Sold Quantity", data: "sold_qty" },
+                { title: "Stock Movement", data: "received_qty" },
+                {
+                    title: "Current Quantity",
+                    data: "current_qty",
+                    render: function (data, type, row) {
+                        return `<span class="current-qty">${data || 0}</span>`;
+                    }
+                },
+                {
+                    title: "Stock Count",
+                    data: null,
+                    className: 'editable',
+                    render: function (data, type, row) {
+                        const currentStockCount = 0;
+                        return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
+                    }
+                },
+                {
+                    title: "Damaged Stock",
+                    data: null,
+                    className: 'editable',
+                    render: function (data, type, row) {
+                        const currentStockRejected = 0;
+                        return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
+                    }
+                },
+                {
+                  title: "Variance",
+                  data: null,
+                  render: function (data, type, row) {
+                      return `<span class="variance"></span>`;
+                  }
+                },
+    <!--            {-->
+    <!--                title: "Variance Reason",-->
+    <!--                data: null,-->
+    <!--                className: 'editable',-->
+    <!--                render: function (data, type, row) {-->
+    <!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
+    <!--                }-->
+    <!--            },-->
+                {
+                    title: "Comments",
+                    data: null,
+                    className: 'editable',
+                    render: function (data, type, row) {
+                        return `<input type="text" class="comments" value="" />`;
+                    }
+                }
+            ],
+    <!--        pageLength: 300,-->
+            order: [[6, 'desc']],
+            autoWidth: false,
+            paging: false,
+            searching: true,
+            responsive: true,
+            dom: 'frtip',
+        });
+
+        $('#ProductOrderTemplate').show();
+
+        // After table initialization, check variance for each row
+        table.rows().every(function () {
+            const row = this.node();
+            const data = this.data();
+            const currentQty = data.current_qty || 0;
+            const countedQty = parseFloat($(row).find('.current-stock-count').val()) || 0;
+            const rejectedQty = parseFloat($(row).find('.current-stock-rejected').val()) || 0;
+
+            // Calculate the variance
+            const variance = currentQty - countedQty;
+
+            // If variance > 10% of current quantity, set red border
+            //const threshold = 0.1; // 10%
+            const difference = Math.abs(currentQty - countedQty);
+            //if (currentQty > 0 && (difference / currentQty) > threshold) {
+           // if (difference != 0) {
+           //     $(row).find('.current-stock-count').css('border', '5px solid red');
+           // }
+        });
+
+        // Update variance dynamically when the current stock count changes
+        $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
+            const row = $(this).closest('tr');
+            const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
+            const calculatedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
+            const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
+
+            const variance = calculatedQty - countedQty;
+
+            // Update variance
+            row.find('.variance').text(variance);
+
+            // Check if the difference exceeds 10%
+            const threshold = 0.1; // 10%
+            const difference = Math.abs(calculatedQty - countedQty);
+            //if (calculatedQty > 0 && (difference / calculatedQty) > threshold) {
+                // Set border to solid red 1px
+              //  row.find('.current-stock-count').css('border', '5px solid red');
+         //   } else {
+                // Reset border
+            //    row.find('.current-stock-count').css('border', '');
+          //  }
+        });
+    }
+
+
+ $(document).ready(async function() {
+
+    var _t_order_product_template;
+    var _saved = false;
+
+    console.log("shop : {{shop.customer}}");
+    $("#saveOrder").prop("disabled", true);
+
+
+    $("#newOrder").on("click", function (event) {
+      event.preventDefault();
+
+      // 1. Check 'Stock Counted By' is filled
+      if ($("#countBy").val() === '') {
+        alert('Please fill in the "Stock Counted By" field.');
+        return;
+      }
+
+      const shop_id = {{ shop.customer | tojson }};
+
+      // 2. Check for existing drafts
+      fetch('/check_count_draft', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.draft_ids.length > 0) {
+            alert(`There is a draft ${data.draft_ids.join(", ")}. Please reload it or delete it before creating a new form.`);
+            return;
+          }
+
+          // 3. No drafts → proceed with normal logic
+          $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}S`);
+
+          fetch('/get_stock_count_form')
+            .then(response => response.json())
+            .then(data => {
+              $("#loadOrder").prop("disabled", true);
+              $("#saveOrder").prop("disabled", false);
+              $("#resetQty").prop("disabled", false);
+              $("#submitOrder").prop("disabled", false);
+              $("#cancelOrder").prop("disabled", false);
+              $("#closeOrder").prop("disabled", false);
+              $("#newOrder").prop("disabled", true);
+              $("#saveDraft").prop("disabled", false);
+              loadStockData(data);
+            })
+            .catch(error => {
+              console.error('Error fetching stock count form:', error);
+            });
+        })
+        .catch(err => {
+          console.error("Error checking for existing drafts:", err);
+          alert("Failed to verify draft count history.");
+        });
+    });
+
+
+   // Event handler for the "loadOrder" button
+    $("#loadOrder").on("click", function(event) {
+        // Set the order name based on shop customer and current date
+        $("#orderName").val(`{{shop.customer}}_${getCurrentDate()}`);
+
+        // Fetch the product order form data (check for an existing "New" order)
+        fetch('/get_product_order_form')
+            .then(response => response.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length === 0) {
+                    // No existing order found, create a new order template
+                    dialog("Load Order","<p>There is no existing order. <br>Please click on New Order to open a new order form.</p>");
+                } else {
+                    // Existing order found, load the existing order data
+                    loadExistingOrder(data);
+                    $("#newOrder").prop("disabled", true);
+                    $(this).prop("disabled", true);
+
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching the product order form:', error);
+            });
+    });
+
+    // Function to load the new order template data into the table
+    function loadOrderTemplate(rows) {
+        console.log(rows);
+
+        var roles = {{ roles | tojson }};
+        var user_role = "{{user.role}}";
+        disableControlsPerRole(roles,user_role);
+
+        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+            $('#ProductOrderTemplate').DataTable().destroy();
+        }
+
+        const table = $('#ProductOrderTemplate').DataTable({
+            data: rows,
+            columns: [
+                { title: "SKU", data: "sku" },
+                { title: "Product Name", data: "product_name" },
+                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Last Stock Qty", data: "last_stock_qty" },
+                { title: "Calc Stock Qty", data: "calc_stock_qty" },
+                { title: "Variance", data: "variance" },
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
+                    }
+                    return data;
+                }}
+            ],
+<!--            pageLength: 300,-->
+            order: [[1, 'asc']],
+            autoWidth: false,
+            paging: false,
+            searching: true,
+            responsive: true,
+            dom: 'frtip',
+        });
+        $('#ProductOrderTemplate').show();
+    }
+
+    // Function to load the existing order data into the table
+    function loadExistingOrder(data) {
+        console.log(data);
+
+        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+            $('#ProductOrderTemplate').DataTable().destroy();
+        }
+
+        const table = $('#ProductOrderTemplate').DataTable({
+            data: data,
+            columns: [
+                { title: "SKU", data: "sku" },
+                { title: "Product Name", data: "product_name" },
+                { title: "Stock Count", data: "stock_count", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="stock-count-edit" value="${data}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Last Stock Qty", data: "last_stock_qty" },
+                { title: "Calc Stock Qty", data: "calc_stock_qty" },
+                { title: "Variance", data: "variance" },
+<!--                { title: "Variance Reason", data: "variance_rsn", className: 'editable', render: function(data, type, row) {-->
+<!--                    if (type === 'display') {-->
+<!--                        return `<input type="text" class="variance-reason-edit" value="${data || ''}" />`;-->
+<!--                    }-->
+<!--                    return data;-->
+<!--                }},-->
+                { title: "Rejected Qty", data: "stock_recount", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="stock-recount-edit" value="${data || 0}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Order Qty", data: "rejects_qty", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="number" class="rejected-qty-edit" value="${data || 0}" min="0" step="any" />`;
+                    }
+                    return data;
+                }},
+                { title: "Comments", data: "comments", className: 'editable', render: function(data, type, row) {
+                    if (type === 'display') {
+                        return `<input type="text" class="comments-edit" value="${data || ''}" />`;
+                    }
+                    return data;
+                }}
+            ],
+<!--            pageLength: 300,-->
+            order: [[1, 'asc']],
+            autoWidth: false,
+            paging: false,
+            searching: true,
+            responsive: true,
+            dom: 'frtip',
+        });
+
+        $('#ProductOrderTemplate').show();
+
+        // Disable save order button
+        $("#saveOrder").prop("disabled", false);
+        $("#resetQty").prop("disabled", false);
+        $("#cancelOrder").prop("disabled", false);
+        $("#closeOrder").prop("disabled", false);
+        $("#submitOrder").prop("disabled", false);
+    }
+
+$("#saveOrder").off("click").on("click", async function () {
+  // check count by is populated
+  if ($("#countBy").val() === '') {
+    alert('Please fill in the "Stock Counted By" field.');
+    return 0;
+  }
+
+  // Check if the filter is on
+  if ($("#ProductOrderTemplate_filter input").val().length > 0) {
+    dialog("Filter Is On", "Can't submit count stock while filter is on. Please clear the table filter before submit");
+    return;
+  }
+
+  let isValid = true;
+  const tableData = [];   // rows to send to /update_count_stock (ONLY variance != null)
+  const draftRows = [];   // rows to send to /save_count_draft (ALL rows)
+
+  // Iterate rows
+  $("#ProductOrderTemplate tbody tr").each(function () {
+    const row = $(this);
+
+    // read variance safely (blank => null)
+    const varianceText = row.find(".variance").text().trim();
+    const varianceVal = varianceText === "" ? null : parseFloat(varianceText);
+
+    const rowData = {
+      sku: row.find("td:nth-child(1)").text().trim(),
+      product_name: row.find("td:nth-child(2)").text().trim(),
+      last_stock_count: parseFloat(row.find("td:nth-child(3)").text().trim()) || 0,
+      last_stock_count_date: row.find("td:nth-child(4)").text().trim(),
+      sold_qty: parseFloat(row.find("td:nth-child(5)").text().trim()) || 0,
+      current_qty: parseFloat(row.find("td:nth-child(7)").text().trim()) || 0,
+      stock_count: parseFloat(row.find(".current-stock-count").val()) || 0,
+      stock_rejected: parseFloat(row.find(".current-stock-rejected").val()) || 0,
+      variance: varianceVal,
+      comments: (row.find(".comments").val() || "").trim()
+    };
+
+    if (rowData.stock_count < 0 || rowData.stock_rejected < 0) {
+      alert(`Invalid stock values for SKU: ${rowData.sku}. Please enter valid data.`);
+      isValid = false;
+      return false; // break loop
+    }
+
+    // ✅ Only include in confirm payload if variance is NOT null
+    if (varianceVal !== null && !isNaN(varianceVal)) {
+      tableData.push(rowData);
+    }
+
+    // ✅ Draft still keeps ALL rows
+    draftRows.push({
+      sku: rowData.sku,
+      stock_count: rowData.stock_count,
+      stock_rejected: rowData.stock_rejected,
+      comments: rowData.comments
+    });
+  });
+
+  if (!isValid) return;
+
+  // If nothing to confirm, stop here
+  if (tableData.length === 0) {
+    dialog("Nothing to Confirm", "No rows with variance were found. Enter counts to create variance, then try again.");
+    return;
+  }
+
+  // Disable confirmation (PONR)
+  $(this).prop("disabled", true);
+  $("#saveDraft").prop("disabled", true);
+
+  // Common header fields
+  const user_name = $("#countBy").val();
+  const shop = {{shop.customer | tojson}};
+  const date = getCurrentDate();
+  const shop_name = {{shop.name | tojson}};
+  const order_id = $("#orderName").val();
+  const username = {{user.username | tojson}}; // used by /save_count_draft
+
+  const confirmPayload = {
+    table: tableData,
+    shop: shop,
+    user_name: user_name,
+    date: date,
+    shop_name: shop_name,
+    replenish_order_id: order_id
+  };
+
+  const draftPayload = {
+    count_id: order_id,
+    username: username,
+    shop_id: shop,
+    shop_name: shop_name,
+    counted_by: user_name,
+    table: draftRows
+  };
+
+  // Spinner: start with "Saving existing count..."
+  const spinnerWrapper = $(`
+    <div class="spinner-wrapper">
+      <div class="spinner"></div>
+      <p class="spinner-text">Saving existing count…</p>
+    </div>
+  `);
+  $("body").append(spinnerWrapper);
+
+  // --- Silent pre-save to /save_count_draft ---
+  try {
+    await fetch("/save_count_draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draftPayload)
+    });
+  } catch (err) {
+    console.warn("Silent draft save failed (continuing to confirm):", err);
+  }
+
+  // Update spinner message back to your original
+  spinnerWrapper.find(".spinner-text").text("Please wait while stock data is being updated...");
+
+  // --- Confirmation save to /update_count_stock ---
+  $.ajax({
+    url: "/update_count_stock",
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify(confirmPayload),
+    success: function (response) {
+      console.log("Data submitted successfully:", response);
+      dialog("Save Stock Data", "Stock data was saved successfully.");
+    },
+    error: function (error) {
+      console.error("Error submitting data:", error);
+      dialog("Error", "Failed to save stock data. Please try again.");
+    },
+    complete: function () {
+      spinnerWrapper.remove();
+    }
+  });
+});
+
+
+
+<!--$("#saveOrder").on("click", function () {-->
+
+<!--    // check count by is populated-->
+<!--      if ($("#countBy").val() == '') {-->
+<!--        alert('Please fill in the "Stock Counted By" field.');-->
+<!--        return 0;-->
+<!--      }-->
+
+<!--    // Check if the filter is on-->
+<!--    if ($("#ProductOrderTemplate_filter input").val().length > 0) {-->
+<!--        dialog("Filter Is On", "Can't submit count stock while filter is on. Please clear the table filter before submit");-->
+<!--        return;-->
+<!--    }-->
+
+<!--    let isValid = true; // Flag to validate the data-->
+<!--    const tableData = []; // Array to store table data for sending to the server-->
+
+<!--    // Iterate through each row in the `count_stock` table-->
+<!--    $("#ProductOrderTemplate tbody tr").each(function () {-->
+<!--        const row = $(this);-->
+<!--        const rowData = {}; // Object to store data for each row-->
+
+<!--        // Collect data from each cell in the row-->
+<!--        rowData.sku = row.find("td:nth-child(1)").text().trim(); // SKU-->
+<!--        rowData.product_name = row.find("td:nth-child(2)").text().trim(); // Product Name-->
+<!--        rowData.last_stock_count = parseFloat(row.find("td:nth-child(3)").text().trim()) || 0; // Last Stock Count-->
+<!--        rowData.last_stock_count_date = row.find("td:nth-child(4)").text().trim(); // Last Stock Count Date-->
+<!--        rowData.sold_qty = parseFloat(row.find("td:nth-child(5)").text().trim()) || 0; // Sold Quantity-->
+<!--        rowData.current_qty = parseFloat(row.find("td:nth-child(7)").text().trim()) || 0; // Current Quantity-->
+<!--        rowData.stock_count = parseFloat(row.find(".current-stock-count").val()) || 0; // Editable Stock Count-->
+<!--        rowData.stock_rejected = parseFloat(row.find(".current-stock-rejected").val()) || 0; // Editable Stock Rejected-->
+<!--        rowData.variance = parseFloat(row.find(".variance").text().trim()) || 0; // Variance-->
+<!--        //rowData.variance_reason = row.find(".variance-reason").val().trim() || "NA"; // Editable Variance Reason-->
+<!--        rowData.comments = row.find(".comments").val().trim(); // Editable Comments-->
+
+<!--        // Check if the current stock count has a red border and comments are empty-->
+<!--        if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' && rowData.comments === "") {-->
+<!--            alert(`Variance found in count  "${rowData.product_name}". Please enter a comment before confirming count.`);-->
+<!--            isValid = false; // Invalid if the condition is met-->
+<!--            return false; // Exit loop-->
+<!--        }-->
+
+
+
+<!--        // Validate the data (example: stock count and rejected stock cannot be negative)-->
+<!--        if (rowData.stock_count < 0 || rowData.stock_rejected < 0) {-->
+<!--            isValid = false;-->
+<!--            alert(`Invalid stock values for SKU: ${rowData.sku}. Please enter valid data.`);-->
+<!--            return false; // Exit loop if invalid data is found-->
+<!--        }-->
+
+<!--        // Push the row data to `tableData` array-->
+<!--        tableData.push(rowData);-->
+<!--    });-->
+
+<!--    // Stop execution if validation fails-->
+<!--    if (!isValid) {-->
+<!--        return;-->
+<!--    }-->
+
+<!--    // Disable confirmation if all good : PONR-->
+<!--    $(this).prop("disabled", true);-->
+<!--    $("#saveDraft").prop("disabled", true);-->
+
+
+<!--    // Show spinner and text-->
+<!--    const spinnerWrapper = $(`-->
+<!--        <div class="spinner-wrapper">-->
+<!--            <div class="spinner"></div>-->
+<!--            <p class="spinner-text">Please wait while stock data is being updated...</p>-->
+<!--        </div>-->
+<!--    `);-->
+<!--    $("body").append(spinnerWrapper);-->
+
+<!--    // AJAX request to send data to Flask route-->
+<!--    // 11-2-25 change the counted by to name of the person-->
+<!--    //const user_name = {{user.username | tojson}}; // Ensure user_name variable is serialized-->
+<!--    const user_name = $("#countBy").val();-->
+<!--    const shop = {{shop.customer | tojson}}; // Ensure shop variable is serialized-->
+<!--    const date = getCurrentDate(); // Get current date in YYYYMMDD format-->
+<!--    const shop_name = {{shop.name | tojson}};-->
+<!--    const order_id = $("#orderName").val();-->
+
+<!--    $.ajax({-->
+<!--        url: "/update_count_stock", // Flask route for updating stock data-->
+<!--        method: "POST",-->
+<!--        contentType: "application/json",-->
+<!--        data: JSON.stringify({-->
+<!--            table: tableData,-->
+<!--            shop: shop,-->
+<!--            user_name: user_name,-->
+<!--            date: date,-->
+<!--            shop_name: shop_name,-->
+<!--            replenish_order_id: order_id,-->
+<!--        }),-->
+<!--        success: function (response) {-->
+<!--            console.log("Data submitted successfully:", response);-->
+<!--            dialog("Save Stock Data", "Stock data was saved successfully.");-->
+<!--        },-->
+<!--        error: function (error) {-->
+<!--            console.error("Error submitting data:", error);-->
+<!--            dialog("Error", "Failed to save stock data. Please try again.");-->
+<!--        },-->
+<!--        complete: function () {-->
+<!--            // Hide spinner after request completes-->
+<!--            spinnerWrapper.remove();-->
+<!--        }-->
+<!--    });-->
+<!--});-->
+
+
+    $("#submitOrder").on("click", async function(event) {
+
+        // Check if the order is saved (assuming _saved is updated during saveOrder execution)
+        if (_saved) {
+            const now = new Date();
+            const data = {
+                not_date: now,
+                not_address: "Head Office",
+                not_subject: "NEW ORDER",
+                not_body: `New order arrived from {{user.shop}}`,
+                not_status: "unread"
+            };
+
+            // Create a notification via fetch
+            try {
+                const response = await fetch('/create_notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const rows = await response.json();
+                dialog("Order Submit", `<p>Order submitted successfully <br>You may close the order now</p>`);
+            } catch (error) {
+                console.error('Error:', error);
+                dialog("Error", `<p>Error in submitting the order <br> ${error}</p>`);
+            }
+        } else {
+            dialog("Save Order", "Please save the order before submitting.");
+        }
+    });
+
+
+
+
+ });
+  //////// EVENTS //////////
+$("#cancelOrder").on("click", function(event) {
+    if (allOrderQtyZero()) {
+        dialog("Zero Order Quantity" ,"Can't cancel order where all order qty are zero's");
+        return; // Exit the function if all Order Qty values are zero
+    }
+    // Show the confirmation modal
+    $('#cancelModal').modal('show');
+});
+
+// Handle the confirmation action when the user clicks "Yes, Cancel"
+$("#confirmCancel").on("click", function() {
+
+    $.ajax({
+        url: '/delete_order',
+        type: 'POST',
+        success: function(response) {
+            console.log(response.message);  // Success message from Flask
+            dialog("Delete Order","Order was deleted successfully");
+        },
+        error: function(error) {
+            console.error("Error deleting the order:", error.responseText);
+            dialog("Delete Order Error","Order could not be deleted");
+        }
+    });
+
+    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+        $('#ProductOrderTemplate').DataTable().clear().destroy(); // Clear and destroy the DataTable instance
+    }
+
+    // Gradually hide the table and clear its content
+    $('#ProductOrderTemplate').fadeOut(1000, function() {
+        $('#ProductOrderTemplate thead').empty();
+        $('#ProductOrderTemplate tbody').empty();
+        $('#ProductOrderTemplate').hide();  // Hide the table completely
+    });
+
+    // Close the modal after the action is confirmed
+    $('#cancelModal').modal('hide');
+
+   // disable buttons
+        $("#saveOrder").prop("disabled", true);
+        $("#resetQty").prop("disabled", true);
+        $("#submitOrder").prop("disabled", true);
+        $("#cancelOrder").prop("disabled", true);
+        $("#closeOrder").prop("disabled", true);
+        $("#newOrder").prop("disabled", false);
+        $("#orderName").val("");
+});
+
+$("#closeOrder").on("click", function(event) {
+        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+            $('#ProductOrderTemplate').DataTable().destroy();
+        }
+        $('#ProductOrderTemplate').fadeOut(1000, function() {
+        $('#ProductOrderTemplate thead').empty();
+        $('#ProductOrderTemplate tbody').empty();
+        $('#ProductOrderTemplate').hide();  // Hide the table completely
+        $("#saveOrder").prop("disabled", true);
+        $("#resetQty").prop("disabled", true);
+        $("#submitOrder").prop("disabled", true);
+        $("#cancelOrder").prop("disabled", true);
+        $("#closeOrder").prop("disabled", true);
+        $("#newOrder").prop("disabled", false);
+        $("#loadOrder").prop("disabled", false);
+        $("#orderName").val("");
+    });
+});
+
+$("#resetQty").on("click", function() {
+    $("#newOrder").trigger("click");
+});
+
+ // Event listener for the custom tableChanged event
+$(document).on("tableChanged", function() {
+<!--    alert("Change happened");-->
+    _saved = true;
+});
+
+// Monitor changes in the table inputs
+$('#ProductOrderTemplate').on('change', 'input', function() {
+    const input = $(this);
+    const value = input.val();
+
+    // Optionally, add validation or processing logic here
+    if (value !== null && value.trim() !== "") {
+        // Trigger the custom event
+        $(document).trigger("tableChanged");
+    }
+});
+
+//log activity
+    $(".btn").on("click", function () {
+        // Get the text of the clicked button
+        const buttonText = $(this).text().trim();
+
+        // Get the current file name without the ".html" postfix
+        const fileName = window.location.pathname.split("/").pop().replace(".html", "");
+
+        // Create a combined activity description
+        const activityDescription = `${fileName}: ${buttonText}`;
+
+        // Call the logUserActivity function with the combined description
+        logUserActivity(activityDescription);
+    });
+
+
+    $("#saveDraft").on("click", function () {
+    const count_id = $("#orderName").val();
+    const shop_id = {{shop.customer | tojson}};
+    const shop_name = {{shop.name | tojson}};
+    const counted_by = $("#countBy").val();
+    const username = {{user.username | tojson}};
+
+    const tableData = [];
+    $("#ProductOrderTemplate tbody tr").each(function () {
+        const row = $(this);
+        tableData.push({
+            sku: row.find("td:nth-child(1)").text().trim(),
+            stock_count: parseFloat(row.find(".current-stock-count").val()) || 0,
+            stock_rejected: parseFloat(row.find(".current-stock-rejected").val()) || 0,
+            comments: row.find(".comments").val().trim()
+        });
+    });
+
+    $.ajax({
+        url: "/save_count_draft",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            count_id,
+            username,
+            shop_id,
+            shop_name,
+            counted_by,
+            table: tableData
+        }),
+        success: function (res) {
+            dialog("Draft Saved", res.message);
+        },
+        error: function (xhr) {
+            alert("Error saving draft: " + xhr.responseJSON?.error);
+        }
+    });
+
+});
+
+    $("#loadDraft").on("click", async function () {
+      const shop_id = {{ shop.customer | tojson }};
+
+      // Show spinner
+      $("body").append(`
+        <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+          <div class="card p-4">
+            <i class="bi bi-hourglass-split me-2"></i> Loading Form...
+          </div>
+        </div>
+      `);
+
+      function waitForTableReady(selector, maxWait = 7000, interval = 200) {
+        return new Promise((resolve, reject) => {
+          const start = Date.now();
+          const check = () => {
+            if ($(selector).length > 0) {
+              resolve();
+            } else if (Date.now() - start > maxWait) {
+              reject("Timeout waiting for table to render");
+            } else {
+              setTimeout(check, interval);
+            }
+          };
+          check();
+        });
+      }
+
+      try {
+        const response = await fetch("/load_count_draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shop_id })
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            dialog("No Draft Found", "There is no existing saved count. Please click 'New Form' to begin.");
+          } else {
+            dialog("Error", "Failed to load draft.");
+          }
+          throw new Error("Draft load failed");
+        }
+
+        const res = await response.json();
+        console.log("✅ Draft loaded from server:", res);
+
+        // Step 1: Set header fields
+        $("#countBy").val(res.counted_by || "");
+        $("#orderName").val(res.count_id || "");
+
+        // Step 2: Manually fetch and load form
+        const stockResponse = await fetch('/get_stock_count_form');
+        const stockData = await stockResponse.json();
+
+        $("#loadOrder").prop("disabled", true);
+        $("#saveOrder").prop("disabled", false);
+        $("#resetQty").prop("disabled", false);
+        $("#submitOrder").prop("disabled", false);
+        $("#cancelOrder").prop("disabled", false);
+        $("#closeOrder").prop("disabled", false);
+        $("#newOrder").prop("disabled", true);
+        $("#saveDraft").prop("disabled", false);
+
+        loadStockData(stockData);
+
+        // Step 3: Wait for table to render
+        await waitForTableReady("#ProductOrderTemplate tbody tr");
+
+        // Step 4: Map rows by SKU
+        const rowMap = new Map();
+        $("#ProductOrderTemplate tbody tr").each(function () {
+          const sku = $(this).find("td:first").text().trim();
+          rowMap.set(sku, $(this));
+        });
+
+        // Step 5: Patch draft data into table
+        res.table.forEach(savedItem => {
+          const sku = (savedItem.sku || "").toString().trim();
+          const row = rowMap.get(sku);
+
+          if (row && row.length) {
+            console.log(`✅ Found row for SKU ${sku}`, savedItem);
+
+            const stockCountInput = row.find("input.current-stock-count");
+            const stockRejectedInput = row.find("input.current-stock-rejected");
+            const commentsInput = row.find("input.comments");
+
+            stockCountInput.val(savedItem.stock_count || 0);
+            stockRejectedInput.val(savedItem.stock_rejected || 0);
+            commentsInput.val(savedItem.comments || "");
+
+            // Recalculate variance
+            const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
+            const countedQty = parseFloat(stockCountInput.val()) || 0;
+            const variance = currentQty - countedQty;
+            row.find(".variance").text(variance);
+
+          //  if (variance !== 0) {
+          //    stockCountInput.css("border", "5px solid red");
+          //  } else {
+          //    stockCountInput.css("border", "");
+          //  }
+          } else {
+            console.warn(`⚠️ No matching row for SKU: ${sku}`);
+          }
+        });
+
+      } catch (err) {
+        console.error("❌ Draft load failed:", err);
+        alert("Something went wrong loading the draft.");
+      } finally {
+        $("#loadingOverlay").remove();
+      }
+    });
+
+
+
+$("#saveExcel").on("click", function () {
+  const countedBy = $("#countBy").val() || "Unknown";
+  const countId = $("#orderName").val() || "N/A";
+  const now = new Date().toLocaleString();
+
+  // Prepare the data array with headers
+  const data = [];
+
+  // Custom metadata rows
+  data.push(["Counted By", countedBy]);
+  data.push(["Count ID", countId]);
+  data.push(["Exported", now]);
+  data.push([]); // Empty row for spacing
+
+  // Table headers
+  const headers = [];
+  $("#ProductOrderTemplate thead th").each(function () {
+    headers.push($(this).text().trim());
+  });
+  data.push(headers);
+
+  // Table body rows
+  $("#ProductOrderTemplate tbody tr").each(function () {
+    const row = [];
+    $(this).find("td").each(function () {
+      const input = $(this).find("input, select, textarea");
+      if (input.length) {
+        row.push(input.val() || "");
+      } else {
+        row.push($(this).text().trim());
+      }
+    });
+    data.push(row);
+  });
+
+  // Convert to Excel
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Count");
+
+  // Download file
+  XLSX.writeFile(workbook, `Stock_Count_${countId}.xlsx`);
+});
+
+$("#deleteDraft").on("click", function () {
+  const shop_id = {{ shop.customer | tojson }};
+
+  fetch('/check_count_draft', {
+    method: 'POST',
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shop_id })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Network response was not ok");
+    return res.json();
+  })
+  .then(data => {
+    const draft_ids = data?.draft_ids || [];
+
+    if (draft_ids.length === 0) {
+      return alert("No draft counts to delete.");
+    }
+
+    const confirmMsg = `You are about to delete history draft count(s):\n\n${draft_ids.join(", ")}\n\nAre you sure?`;
+    if (!confirm(confirmMsg)) return;
+
+    return fetch('/delete_count_draft', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shop_id })
+    });
+  })
+  .then(res => res ? res.json() : null)
+  .then(data => {
+    if (data?.message) {
+      alert(data.message);
+    }
+  })
+  .catch(err => {
+    console.error("Error deleting drafts:", err);
+    alert("Something went wrong deleting drafts.");
+  });
+});
+
+
+
+    </script>
+
+
+            </div>
+          </div>
+
+        </div>
+
+<!--        <div class="col-lg-6">-->
+
+<!--          <div class="card">-->
+<!--            <div class="card-body">-->
+<!--              <h5 class="card-title">Example Card</h5>-->
+<!--              <p>This is an examle page with no contrnt. You can use it as a starter for your custom pages.</p>-->
+<!--            </div>-->
+<!--          </div>-->
+
+<!--        </div>-->
+      </div>
+    </section>
+  </main><!-- End #main -->
+
+
+    <script src="https://bootstrapmade.com/demo/NiceAdmin/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<div id="spinner" style="display: none; position: fixed; top: 40%; left: 50%;
+     transform: translate(-50%, -50%); background: rgba(255,255,255,0.95);
+     padding: 30px; border-radius: 10px; font-size: 1.5em; z-index: 9999;
+     box-shadow: 0 0 10px #aaa;">
+  🔄 Loading Form...
+</div>
+
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      <!-- All the links in the footer should remain intact. -->
+      <!-- You can delete the links only if you purchased the pro version. -->
+      <!-- Licensing information: https://bootstrapmade.com/license/ -->
+      <!-- Purchase the pro version with working PHP/AJAX contact form: https://bootstrapmade.com/nice-admin-bootstrap-admin-html-template/ -->
+      Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
+    </div>
+  </footer><!-- End Footer -->
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Vendor JS Files -->
+  <script src="static/assets/vendor/apexcharts/apexcharts.min.js"></script>
+  <script src="static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="static/assets/vendor/chart.js/chart.umd.js"></script>
+  <script src="static/assets/vendor/echarts/echarts.min.js"></script>
+  <script src="static/assets/vendor/quill/quill.js"></script>
+  <script src="static/assets/vendor/tinymce/tinymce.min.js"></script>
+  <script src="static/assets/vendor/php-email-form/validate.js"></script>
+
+  <!-- Template Main JS File -->
+  <script src="static/assets/js/main.js"></script>
+
+
+
+</body>
+
+</html>

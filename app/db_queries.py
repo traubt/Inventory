@@ -2780,6 +2780,50 @@ def get_consolidated_damaged_return(from_date, to_date):
 
     return result_as_dicts
 
+def get_spotcheck_variance_report(from_date, to_date):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT 
+            st.replenish_id as count_id,
+            DATE(st.stock_qty_date) as count_date,
+            st.shop_name,
+            st.sku,
+            st.product_name,
+            st.count_by,
+            st.calc_stock_qty,
+            st.stock_count,
+            st.variance,
+            st.variance * p.cost_price AS variance_amount
+        FROM toc_stock st 
+        LEFT JOIN toc_product p ON st.sku = p.item_sku
+        WHERE st.replenish_id LIKE '%%s'
+          AND st.variance <> 0
+          AND st.stock_qty_date BETWEEN %s AND %s
+    '''
+    cursor.execute(query, (from_date, to_date))
+    result = cursor.fetchall()
+
+    # Handle case when no rows are returned
+    if not result or cursor.description is None:
+        cursor.close()
+        conn.close()
+        return []
+
+    # Fetch column names
+    columns = [col[0] for col in cursor.description]
+
+    # Convert result tuples to dictionaries
+    result_as_dicts = [dict(zip(columns, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    return result_as_dicts
+
+
 
 
 

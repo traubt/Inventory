@@ -20,11 +20,13 @@
               <i class="bi bi-circle"></i><span>Stock Count</span>
             </a>
           </li>
+
           <li id="orderStock">
             <a href="{{ url_for('main.order_stock') }}">
               <i class="bi bi-circle"></i><span>Order Stock</span>
             </a>
           </li>
+
           <li id="receiveStock">
             <a href="{{ url_for('main.receive_stock') }}">
               <i class="bi bi-circle"></i><span>Receive Stock</span>
@@ -52,6 +54,12 @@
               <i class="bi bi-circle"></i><span>Stock Movement</span>
             </a>
           </li>
+          <li id="SpotCountStock">
+            <a href="{{ url_for('main.spotcheck_count_stock') }}">
+              <i class="bi bi-circle"></i><span>Spotcheck Count</span>
+            </a>
+          </li>
+
 
         </ul>
       </li><!-- End Forms Nav -->
@@ -156,6 +164,12 @@
     </a>
   </li><!-- End Online Sales Nav -->
 
+      <li class="nav-item" id="b2b">
+        <a class="nav-link collapsed" href="{{ url_for('main.b2bIndex') }}">
+          <i class="bi bi-grid"></i>
+          <span>B2B Dashboard</span>
+        </a>
+      </li><!-- End Dashboard Nav -->
 
     </ul>
 
