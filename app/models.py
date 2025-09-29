@@ -48,7 +48,7 @@ class TOC_SHOPS(db.Model):
     tier =  db.Column(db.String(2))
     longitude = db.Column(db.String(20))
     latitude = db.Column(db.String(20))
-    address = db.Column(db.String(50))
+    address = db.Column(db.String(100))
     phone = db.Column(db.String(15))
     zip = db.Column(db.String(5))
     city  = db.Column(db.String(20))
