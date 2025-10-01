@@ -2540,14 +2540,14 @@ def get_variance_report():
             query = """
           
             SELECT 
-    shop_name, 
-    DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS raw_date,  -- Fetch actual date in yyyy-mm-dd format
-    ROUND(SUM(a.variance * b.cost_price)) AS total_variance
-FROM toc_stock_variance a
-JOIN toc_product b ON a.sku = b.item_sku
-WHERE stock_qty_date > %s
-AND replenish_id LIKE '%%C'
-GROUP BY shop_name, raw_date;
+                shop_name, 
+                DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS raw_date,  -- Fetch actual date in yyyy-mm-dd format
+                ROUND(SUM(a.variance * b.cost_price)) AS total_variance
+            FROM toc_stock_variance a
+            JOIN toc_product b ON a.sku = b.item_sku
+            WHERE stock_qty_date > %s
+            AND replenish_id LIKE '%%C'
+            GROUP BY shop_name, raw_date;
             
             """
 
@@ -2575,6 +2575,47 @@ GROUP BY shop_name, raw_date;
             # Return as JSON
             return jsonify({"columns": columns, "data": result_as_dicts})
 
+        elif report_type == "Consolidated Spotcheck Variance Report":
+            conn = get_db_connection()
+
+            # Run SQL query (return raw date)
+            query = """
+
+            SELECT 
+                shop_name, 
+                DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS raw_date,  -- Fetch actual date in yyyy-mm-dd format
+                ROUND(SUM(a.variance * b.cost_price)) AS total_variance
+            FROM toc_stock a
+            JOIN toc_product b ON a.sku = b.item_sku
+            WHERE stock_qty_date > %s
+            AND replenish_id LIKE '%%S'
+            GROUP BY shop_name, raw_date;
+
+            """
+
+            # Read query into DataFrame, parse raw_date as a datetime column
+            df = pd.read_sql(query, conn, params=[from_date], parse_dates=["raw_date"])
+
+            # Close DB connection
+            conn.close()
+
+            # Pivot DataFrame using raw_date for sorting
+            pivot_table = df.pivot(index='shop_name', columns='raw_date', values='total_variance').fillna(0)
+
+            # Sort columns chronologically
+            pivot_table = pivot_table.reindex(sorted(pivot_table.columns), axis=1)
+
+            # Rename columns to 'DD-MMM' format after sorting
+            pivot_table.rename(columns={col: col.strftime("%d-%b") for col in pivot_table.columns}, inplace=True)
+
+            # Convert to list of dictionaries
+            result_as_dicts = pivot_table.reset_index().to_dict(orient="records")
+
+            # Extract column titles dynamically
+            columns = [{"title": col} for col in pivot_table.reset_index().columns]
+
+            # Return as JSON
+            return jsonify({"columns": columns, "data": result_as_dicts})
 
         else:
             data = get_db_variance_report(report_type,from_date,to_date,group_by)
