@@ -50,6 +50,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 
+<style>
+  /* highlight the row when the user typed a Stock Count */
+  #ProductOrderTemplate tbody tr.counted-row {
+    background: #fff3cd !important; /* like Bootstrap table-warning */
+  }
+</style>
 
 
 
@@ -294,6 +300,26 @@
           //  }
         });
     }
+
+// Highlight the row as soon as the user types in "Stock Count".
+// If the field is cleared, remove the highlight.
+$(document).off('input.counted').on('input.counted', '#ProductOrderTemplate .current-stock-count', function () {
+  const $row = $(this).closest('tr');
+  const val  = $(this).val();
+
+  if (val !== '' && !isNaN(parseFloat(val))) {
+    $row.addClass('counted-row');
+
+    // (optional) also show variance immediately
+    const currentQty = parseFloat($row.find('td:nth-child(7)').text()) || 0;
+    const variance   = currentQty - parseFloat(val || 0);
+    $row.find('.variance').text(variance);
+  } else {
+    $row.removeClass('counted-row');
+    $row.find('.variance').text('');
+  }
+});
+
 
 
  $(document).ready(async function() {
