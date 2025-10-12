@@ -2531,8 +2531,8 @@ def get_variance_report():
             data = get_detailed_damaged_return(from_date, to_date)
         elif report_type == "Consolidated Damaged Returns":
             data = get_consolidated_damaged_return(from_date, to_date)
-        elif report_type == "Spotcheck Count Variance":
-            data = get_spotcheck_variance_report(from_date, to_date)
+        # elif report_type == "Spotcheck Count Variance":
+        #     data = get_spotcheck_variance_report(from_date, to_date)
         elif report_type == "Consolidated Variance Report":
             conn = get_db_connection()
 
@@ -2585,7 +2585,7 @@ def get_variance_report():
                 shop_name, 
                 DATE_FORMAT(stock_qty_date, '%%Y-%%m-%%d') AS raw_date,  -- Fetch actual date in yyyy-mm-dd format
                 ROUND(SUM(a.variance * b.cost_price)) AS total_variance
-            FROM toc_stock a
+            FROM toc_stock_variance a
             JOIN toc_product b ON a.sku = b.item_sku
             WHERE stock_qty_date > %s
             AND replenish_id LIKE '%%S'

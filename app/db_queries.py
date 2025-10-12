@@ -2186,6 +2186,8 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     # Filter by report type
     if report_type == "Stock Count Variance":
         query += " AND a.replenish_id LIKE '%%C'"
+    elif report_type == "Spotcheck Count Variance":
+        query += " AND a.replenish_id LIKE '%%S'"
     elif report_type == "Stock Receive Variance":
         query += " AND a.replenish_id LIKE '%%R' OR a.replenish_id LIKE '%%I'"
 
