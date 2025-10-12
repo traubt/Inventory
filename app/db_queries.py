@@ -2180,7 +2180,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
         JOIN toc_product b on a.sku = b.item_sku
         LEFT JOIN toc_replenish_ctrl trc on a.replenish_id = trc.order_id
         LEFT JOIN toc_shops ts on trc.sent_from = ts.store
-        WHERE a.stock_qty_date >= %s AND a.stock_qty_date <= %s
+        WHERE a.creation_date >= %s AND a.creation_date <= %s
     """
 
     # Filter by report type
@@ -2189,7 +2189,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
     elif report_type == "Spotcheck Count Variance":
         query += " AND a.replenish_id LIKE '%%S'"
     elif report_type == "Stock Receive Variance":
-        query += " AND a.replenish_id LIKE '%%R' OR a.replenish_id LIKE '%%I'"
+        query += " AND (a.replenish_id LIKE '%%R' OR a.replenish_id LIKE '%%I') "
 
     # Add dynamic GROUP BY clause if not `none`
     if group_by == 'day':
@@ -2208,6 +2208,7 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
             query += ", a.stock_qty_date ASC"
 
     # Execute the query with the given parameters
+    print(query)
     cursor.execute(query, (from_date, to_date))
     result = cursor.fetchall()
 
