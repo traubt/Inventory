@@ -2180,14 +2180,14 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
         JOIN toc_product b on a.sku = b.item_sku
         LEFT JOIN toc_replenish_ctrl trc on a.replenish_id = trc.order_id
         LEFT JOIN toc_shops ts on trc.sent_from = ts.store
-        WHERE a.creation_date >= %s AND a.creation_date <= %s
+        WHERE trc.creation_date >= %s AND trc.creation_date <= %s
     """
 
     # Filter by report type
     if report_type == "Stock Count Variance":
         query += " AND a.replenish_id LIKE '%%C'"
-    elif report_type == "Spotcheck Count Variance":
-        query += " AND a.replenish_id LIKE '%%S'"
+    # elif report_type == "Spotcheck Count Variance":
+    #     query += " AND a.replenish_id LIKE '%%S'"
     elif report_type == "Stock Receive Variance":
         query += " AND (a.replenish_id LIKE '%%R' OR a.replenish_id LIKE '%%I') "
 
@@ -2790,22 +2790,28 @@ def get_spotcheck_variance_report(from_date, to_date):
 
     query = '''
         SELECT 
-            st.replenish_id as count_id,
-            DATE(st.stock_qty_date) as count_date,
-            st.shop_name,
-            st.sku,
-            st.product_name,
-            st.count_by,
-            st.calc_stock_qty,
-            st.stock_count,
-            st.variance,
-            st.variance * p.cost_price AS variance_amount
-        FROM toc_stock st 
-        LEFT JOIN toc_product p ON st.sku = p.item_sku
-        WHERE st.replenish_id LIKE '%%s'
-          AND st.variance <> 0
-          AND st.stock_qty_date BETWEEN %s AND %s
+            a.replenish_id as order_id,
+            a.creation_date,
+            a.shop_name,
+            a.sku,
+            a.product_name,
+            a.count_by,
+            round(a.calc_stock_qty,2) as Sent_Calc_Qty,
+            a.final_stock_qty as Received_Counted_Qty,
+            a.rejects_qty as damaged,
+            round(a.variance,2) as variance,
+            round(a.variance * b.cost_price) as variance_amount,  
+            coalesce(ts.blName,"NA") as sent_from,       
+            a.rejects_qty as damaged,                        
+            a.comments
+        FROM toc_stock_variance a
+        JOIN toc_product b on a.sku = b.item_sku
+        LEFT JOIN toc_count_ctrl trc on a.replenish_id = trc.count_id
+        LEFT JOIN toc_shops ts on trc.shop_id = ts.store
+        WHERE trc.creation_date >= %s AND trc.creation_date <= %s
+     AND a.replenish_id LIKE '%%S';
     '''
+    print(query)
     cursor.execute(query, (from_date, to_date))
     result = cursor.fetchall()
 
