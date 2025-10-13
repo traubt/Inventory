@@ -2587,7 +2587,7 @@ def get_variance_report():
                 ROUND(SUM(a.variance * b.cost_price)) AS total_variance
             FROM toc_stock_variance a
             JOIN toc_product b ON a.sku = b.item_sku
-            WHERE creation_date > %s
+            WHERE a.creation_date > %s
             AND replenish_id LIKE '%%S'
             GROUP BY shop_name, raw_date;
 
