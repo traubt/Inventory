@@ -2252,9 +2252,9 @@ def get_stock_value():
                 st.final_stock_qty as gross_stock_qty,
                 st.stock_transfer as stock_movement,
                 COALESCE(sc.count_items, 0) AS sold_items,
-                st.final_stock_qty - COALESCE(sc.count_items, 0) AS current_stock,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0)) * d.retail_price) AS total_retail_price
+                st.final_stock_qty - COALESCE(sc.count_items, 0) + st.stock_transfer AS current_stock,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0) + st.stock_transfer ) * d.cost_price) AS total_cost_price,
+                ROUND((st.final_stock_qty - COALESCE(sc.count_items, 0) + st.stock_transfer ) * d.retail_price) AS total_retail_price
             FROM toc_stock st
             JOIN toc_product d 
               ON st.sku = d.item_sku
