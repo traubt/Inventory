@@ -560,6 +560,17 @@ $("#saveOrder").off("click").on("click", async function () {
     const varianceText = row.find(".variance").text().trim();
     const varianceVal = varianceText === "" ? null : parseFloat(varianceText);
 
+    // Enforce adding comment
+    const commentVal = (row.find(".comments").val() || "").trim();
+    const sku = row.find("td:nth-child(1)").text().trim();
+
+    if (varianceVal !== null && !isNaN(varianceVal) && commentVal === "") {
+      alert(`Please enter a comment for the selected row item: ${sku}`);
+      isValid = false;
+      return false; // stop the .each loop
+    }
+
+
     const rowData = {
       sku: row.find("td:nth-child(1)").text().trim(),
       product_name: row.find("td:nth-child(2)").text().trim(),
