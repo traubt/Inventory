@@ -570,7 +570,6 @@ $("#saveOrder").off("click").on("click", async function () {
       return false; // stop the .each loop
     }
 
-
     const rowData = {
       sku: row.find("td:nth-child(1)").text().trim(),
       product_name: row.find("td:nth-child(2)").text().trim(),
