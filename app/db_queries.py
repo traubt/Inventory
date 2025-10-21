@@ -1315,6 +1315,80 @@ def get_sales_data(shop_name, from_date, to_date):
     return column_names, rows
 
 
+def get_60MIN_Sales(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # print(f"query input sales")
+    # print(f"Shop: {shop_name}")
+    # print(f"from date: {from_date}")
+    # print(f"to date: {to_date}")
+
+    try:
+
+        # Default query for Head Office or non-specific shop
+        if shop_name == "Head Office":
+            query = '''
+                select DATE_FORMAT(creation_date, '%%Y-%%m-%%d') AS date,  round(sum(total_amt)) 
+                 from toc_shipday tsd
+                 where tsd.creation_date >= %s AND tsd.creation_date < %s
+                 group by date
+                 order by date asc;
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        elif shop_name == "Online":
+            query = '''
+                SELECT
+                    DATE_FORMAT(wo.order_date, '%%Y-%%m-%%d') AS date,  
+                    0 AS total_net_amount ,
+                    count(wo.order_id) as count_orders,
+                    round(SUM(wo.total_amount / 1.15)/count(wo.order_id)) as average
+                FROM
+                    toc_wc_sales_order wo
+                WHERE
+                    wo.order_date >= %s and wo.order_date < %s
+                    and wo.status not in ('wc-cancelled','wc-pending')
+                GROUP BY
+                    date
+                ORDER BY
+                    date ASC; 
+            '''
+            cursor.execute(query, (from_date, to_date))
+
+        else:
+            query = '''
+             SELECT
+              DATE_FORMAT(tsd.creation_date, '%%Y-%%m-%%d') AS date,
+                  ROUND(SUM(tsd.total_amt)) AS total_net_amount
+                FROM toc_shipday tsd
+                JOIN toc_shops ts
+                  ON tsd.shop_name COLLATE utf8mb4_0900_ai_ci = ts.blName     COLLATE utf8mb4_0900_ai_ci
+              WHERE
+                    ts.blName = %s
+                    AND tsd.creation_date >= %s AND tsd.creation_date < %s
+                GROUP BY date
+                ORDER BY date ASC;
+            '''
+
+            # Execute the query with parameterized values
+            cursor.execute(query, (shop_name, from_date, to_date))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
+
+
 def get_product_sales_data(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()

@@ -2742,6 +2742,28 @@ def sales():
         "rows": data  # List of row data
     })
 
+@main.route('/shipday_sales', methods=['GET'])
+def shipday_sales():
+    # Retrieve 'from_date' and 'to_date' from request arguments
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Ensure 'to_date' includes the entire day (add 1 day and exclude midnight of the next day)
+    if to_date:
+        to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Get user shop name from session
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Call the updated database query function
+    column_names, data = get_60MIN_Sales(shop_name, from_date, to_date)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
 @main.route('/product_sales', methods=['GET'])
 def product_sales():
     # Retrieve 'from_date' and 'to_date' from request arguments
