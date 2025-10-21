@@ -1511,6 +1511,43 @@ table.dataTable thead {
 }
 
 
+/* ===== KPI cards: consistent layout & centering ===== */
+.kpi-card .card-body{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  min-height:120px;            /* same height = aligned row */
+  padding:16px;
+}
+
+.kpi-title{
+  width:100%;
+  margin:0 0 6px 0;
+  text-align:center;
+  white-space:nowrap;          /* prevent 2-line wrap on small screens */
+  overflow:hidden;
+  text-overflow:ellipsis;      /* ... if too long */
+}
+
+.kpi-value{
+  font-size:28px;
+  font-weight:700;
+  line-height:1;
+  color:#012970;
+  text-align:center;
+}
+
+/* xl+ screens: give numbers a bit more presence */
+@media (min-width:1200px){
+  .kpi-value{ font-size:32px; }
+}
+
+/* Small screens: keep proportions tight but aligned */
+@media (max-width:576px){
+  .kpi-card .card-body{ min-height:90px; }
+  .kpi-title{ font-size:14px; }
+}
 
 
 
