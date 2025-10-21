@@ -22,6 +22,8 @@ import requests
 
 from shipday import Shipday
 from shipday.order import Address, Customer, Pickup, OrderItem, Order
+from flask import g
+from flask_login import current_user
 
 shipday_api = Blueprint('shipday_api', __name__)
 
@@ -147,6 +149,36 @@ def log_stock_audit_entry(*, shop_id, sku, product_name, stock_count, shop_name,
         # raise if you prefer a hard fail.
         logger.exception(f"Stock Audit insert failed for {shop_id}/{sku}: {e}")
 
+@main.app_context_processor
+def inject_360_defaults():
+    """
+    Provide defaults every template expects:
+    - user: object with first_name/last_name
+    - active_menu: for sidebar highlight
+    - page_title: for <title> / breadcrumb
+    """
+    # Resolve user
+    u = None
+    try:
+        if hasattr(current_user, "is_authenticated") and current_user.is_authenticated:
+            u = current_user
+    except Exception:
+        u = None
+
+    if u is None:
+        # Lightweight fallback from session if available
+        class _U: pass
+        u = _U()
+        u.first_name = session.get("first_name", "")
+        u.last_name  = session.get("last_name", "")
+        # Add any other fields your header might touch:
+        # u.avatar_url = session.get("avatar_url", "")
+
+    # Pick up per-request flags if set by a view
+    active_menu = getattr(g, "active_menu", "")
+    page_title  = getattr(g, "page_title", "Inventory")
+
+    return dict(user=u, active_menu=active_menu, page_title=page_title)
 
 @main.route('/')
 def login():
@@ -4097,6 +4129,73 @@ def get_stock_movement():
 
 
 ############################## END ONLINE SALES GOOGLE API section######################################
+
+###########################  System Tables  #####################
+
+
+def _get_toc_tables():
+    sql = text("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name LIKE 'toc%'
+        ORDER BY table_name
+    """)
+    rows = db.session.execute(sql).fetchall()
+    return [r[0] for r in rows]
+
+@main.route("/system_tables")
+def system_tables():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+
+    # Load shops and items
+    shops = db.session.execute(text("SELECT customer, blName FROM toc_shops ORDER BY blName")).fetchall()
+    toc_tables = _get_toc_tables()
+    return render_template("system_tables.html", toc_tables=toc_tables,user=user,
+        shop=shop,
+        roles=roles_list,
+        shops=shops)
+
+@main.route("/api/system_table_data")
+def api_system_table_data():
+    table = request.args.get("table", "", type=str)
+    row_limit = request.args.get("limit", default=5000, type=int)
+    if row_limit <= 0:
+        row_limit = 5000
+
+    # Allow only known toc% tables
+    allowed = set(_get_toc_tables())
+    if table not in allowed:
+        return jsonify({"error": f"Table '{table}' is not allowed."}), 400
+
+    # Run the select
+    sql = text(f"SELECT * FROM `{table}` LIMIT :limit_val")
+    result = db.session.execute(sql, {"limit_val": row_limit})
+
+    # Columns
+    cols = list(result.keys())
+
+    # Rows -> list of dicts; coerce non-JSON types to strings
+    data = []
+    for row in result.mappings():
+        rec = {}
+        for c in cols:
+            v = row[c]
+            if isinstance(v, (bytes, bytearray)):
+                v = f"<{len(v)} bytes>"
+            # Convert unsupported types to string
+            if v is not None and not isinstance(v, (str, int, float, bool)):
+                v = str(v)
+            rec[c] = v
+        data.append(rec)
+
+    return jsonify({"columns": cols, "data": data})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
