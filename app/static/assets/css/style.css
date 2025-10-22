@@ -1549,6 +1549,76 @@ table.dataTable thead {
   .kpi-title{ font-size:14px; }
 }
 
+/* --- Phone-specific overrides (stacked KPIs) --- */
+@media (max-width:576px){
+  .kpi-card .card-body{
+    min-height:90px;      /* tighter cards on phones */
+    padding:12px;
+  }
+  .kpi-title{
+    white-space:normal;   /* allow wrap on phones */
+    min-height:32px;      /* keeps all four cards equal height */
+    font-size:14px;
+    margin-bottom:4px;
+  }
+  .kpi-value{
+    font-size:22px;       /* scale number down a bit */
+  }
+}
+
+/* Center KPI content perfectly inside cards */
+.kpi-card .card-body{
+  min-height:110px;                 /* 90px on phones below */
+  display:flex;
+  flex-direction:column;
+  justify-content:center;           /* vertical center */
+  align-items:center;               /* horizontal center */
+  padding:12px 16px;                /* symmetric padding */
+}
+
+/* Kill theme paddings/margins that push content down */
+.kpi-card .card-body .card-title{
+  padding:0 !important;
+  margin:0 0 6px 0 !important;
+  line-height:1.2;
+}
+.kpi-card h1, .kpi-card h2, .kpi-card h3,
+.kpi-card h4, .kpi-card h5, .kpi-card h6{
+  margin-top:0 !important;          /* bootstrap default can add top margin */
+}
+
+/* Number styling (unchanged) */
+.kpi-value{
+  font-size:28px;
+  font-weight:700;
+  line-height:1;
+  color:#012970;
+  text-align:center;
+}
+
+/* Phones */
+@media (max-width:576px){
+  .kpi-card .card-body{ min-height:90px; padding:12px; }
+  .kpi-card .card-body .card-title{ font-size:14px; margin-bottom:4px !important; }
+  .kpi-value{ font-size:22px; }
+}
+/* Phones: push KPI content closer to the top of each card */
+@media (max-width:576px){
+  .kpi-card .card-body{
+    justify-content:flex-start;   /* instead of center */
+    padding-top:8px;              /* less top padding */
+    padding-bottom:14px;          /* a bit more bottom padding */
+    min-height:90px;              /* keep equal card heights */
+  }
+  .kpi-card .card-body .card-title{
+    margin-top:0 !important;
+    margin-bottom:2px !important; /* tighten gap to the number */
+  }
+  .kpi-value{
+    margin-top:0;                 /* no extra space before number */
+    font-size:22px;               /* (keep from earlier phone rules) */
+  }
+}
 
 
 
