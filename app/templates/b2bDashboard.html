@@ -38,8 +38,10 @@
 
 
 <!--  Include charts javascripts-->
-<script src="static/assets/js/db_sales_chart.js"></script>
+    <script src="static/assets/js/db_sales_chart.js"></script>
+<script src="static/assets/js/db_sales_chart_b2b.js"></script>
   <script src="static/assets/js/three_month_sales.js"></script>
+    <script src="static/assets/js/three_month_sales_b2b.js"></script>
 <!--  <script src="static/assets/js/top_agents_chart.js"></script>-->
 
 
@@ -635,7 +637,7 @@
      await  $('.dynamic-icon[data-id="top_specials"').click();
      await  $('.dynamic-icon[data-id="top_brand"').click();
      //await $(".agent_bar_chart[value='daily']").trigger("click");
-     await sales_three_months()
+     await sales_three_months_b2b()
 
 <!--       // get notifications-->
 <!--            async function fetchNotifications() {-->
@@ -978,7 +980,7 @@ $('#fromDate, #toDate, #dateRangeSelector').on('change', async function () {
   await $('.dynamic-icon[data-id="top_agents"]').click();
   await $('.dynamic-icon[data-id="top_specials"]').click();
   await $('.dynamic-icon[data-id="top_brand"]').click();
-  await sales_three_months();
+  await sales_three_months_b2b();
 });
 
 

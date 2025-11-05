@@ -2752,6 +2752,15 @@ def sales_three_months():
     # print(data)
     return jsonify(data)
 
+@main.route('/sales_three_months_b2b', methods=['GET'])
+def sales_three_months_b2b():
+    user_shop = json.loads(session.get('user'))['shop']
+    data = get_sales_by_shop_last_three_months_b2b(user_shop)
+    # print(data)
+    return jsonify(data)
+
+
+
 @main.route('/sales', methods=['GET'])
 def sales():
     # Retrieve 'from_date' and 'to_date' from request arguments
@@ -2768,6 +2777,28 @@ def sales():
 
     # Call the updated database query function
     column_names, data = get_sales_data(shop_name, from_date, to_date)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
+@main.route('/sales_b2b', methods=['GET'])
+def sales_b2b():
+    # Retrieve 'from_date' and 'to_date' from request arguments
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Ensure 'to_date' includes the entire day (add 1 day and exclude midnight of the next day)
+    if to_date:
+        to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Get user shop name from session
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Call the updated database query function
+    column_names, data = get_b2b_sales_data(shop_name, from_date, to_date)
 
     return jsonify({
         "columns": column_names,  # List of column names

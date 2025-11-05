@@ -1114,6 +1114,48 @@ def get_sales_by_shop_last_three_months(user_shop):
     return result_as_dicts
 
 
+def get_sales_by_shop_last_three_months_b2b(user_shop=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # last 4 calendar months as YYYY-MM
+    sql = """
+    WITH months AS (
+        SELECT DATE_FORMAT(DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 3 MONTH), '%Y-%m') AS sale_month
+        UNION ALL SELECT DATE_FORMAT(DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 2 MONTH), '%Y-%m')
+        UNION ALL SELECT DATE_FORMAT(DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH), '%Y-%m')
+        UNION ALL SELECT DATE_FORMAT(DATE_FORMAT(CURDATE(), '%Y-%m-01'), '%Y-%m')
+    )
+    SELECT
+        /* final name to feed the chart */
+        COALESCE(
+            NULLIF(TRIM(wo.customer_name), ''),
+            NULLIF(TRIM(CONCAT(w.first_name, ' ', w.last_name)), ''),
+            CONCAT('ID ', w.customer_id)
+        ) AS wholesaler,
+        m.sale_month,
+        ROUND(SUM(COALESCE(wo.total_amount, 0)) / 1.15) AS total_sales
+    FROM months m
+    CROSS JOIN toc_wholeseller w
+    LEFT JOIN toc_wc_sales_order wo
+        ON wo.customer_id = w.customer_id
+       AND DATE_FORMAT(wo.order_date, '%Y-%m') = m.sale_month
+       AND (wo.status IS NULL OR wo.status NOT IN ('wc-cancelled','wc-pending'))
+    GROUP BY wholesaler, m.sale_month
+    ORDER BY wholesaler, m.sale_month;
+    """
+
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    cols = [d[0] for d in cursor.description]
+    cursor.close()
+    conn.close()
+    return [dict(zip(cols, r)) for r in rows]
+
+
+
+
+
 
 def get_top_agents (shop_name, timeframe):
     conn = get_db_connection()
@@ -1313,6 +1355,48 @@ def get_sales_data(shop_name, from_date, to_date):
 
     # Return both column names and data
     return column_names, rows
+
+
+def get_b2b_sales_data(shop_name, from_date, to_date):
+    """
+    B2B = Woo orders whose customer_id exists in toc_wholeseller.
+    Same calc as Online: total_amount / 1.15 (includes shipping),
+    grouped daily, returning: date, total_net_amount, count_orders, average.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        query = '''
+            SELECT
+                DATE_FORMAT(wo.order_date, '%%Y-%%m-%%d') AS date,
+                ROUND(SUM(wo.total_amount / 1.15), 2) AS total_net_amount,
+                COUNT(wo.order_id) AS count_orders,
+                ROUND(
+                    SUM(wo.total_amount / 1.15) / NULLIF(COUNT(wo.order_id), 0)
+                ) AS average
+            FROM toc_wc_sales_order wo
+            INNER JOIN toc_wholeseller w
+                    ON w.customer_id = wo.customer_id
+            WHERE wo.order_date >= %s
+              AND wo.order_date <  %s
+              AND (wo.status IS NULL OR wo.status NOT IN ('wc-cancelled','wc-pending'))
+            GROUP BY date
+            ORDER BY date ASC;
+        '''
+        cursor.execute(query, (from_date, to_date))
+        rows = cursor.fetchall()
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing B2B sales query: {e}")
+        column_names, rows = [], []
+    finally:
+        cursor.close()
+        conn.close()
+    return column_names, rows
+
+
+
+
 
 
 def get_60MIN_Sales(shop_name, from_date, to_date):
