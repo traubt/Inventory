@@ -2849,6 +2849,28 @@ def product_sales():
         "rows": data  # List of row data
     })
 
+@main.route('/product_sales_b2b', methods=['GET'])
+def product_sales_b2b():
+    # Retrieve 'from_date' and 'to_date' from request arguments
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    # Ensure 'to_date' includes the entire day (add 1 day and exclude midnight of the next day)
+    if to_date:
+        to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Get user shop name from session
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+
+    # Call the updated database query function
+    column_names, data = get_product_sales_data_b2b("b2b", from_date, to_date)
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
 
 @main.route('/recent_sales', methods=['GET'])
 def recent_sales():
@@ -2860,6 +2882,22 @@ def recent_sales():
 
     # Simulated function to get columns and rows
     column_names, data = get_recent_sales(shop_name,from_date,to_date)  # Adjust to return column names and rows
+
+    return jsonify({
+        "columns": column_names,  # List of column names
+        "rows": data  # List of row data
+    })
+
+@main.route('/recent_sales_b2b', methods=['GET'])
+def recent_sales_b2b():
+    user_data = json.loads(session.get('user'))
+    shop_name = user_data['shop']
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    to_date = (datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Simulated function to get columns and rows
+    column_names, data = get_recent_sales_b2b("b2b",from_date,to_date)  # Adjust to return column names and rows
 
     return jsonify({
         "columns": column_names,  # List of column names

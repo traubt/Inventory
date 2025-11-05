@@ -225,7 +225,7 @@
                  data-id="top_spenders"
                  data-type="table"
                  data-table-id="recentSell"
-                 data-route="/recent_sales"
+                 data-route="/recent_sales_b2b"
                  style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
               </i>
 
@@ -282,7 +282,7 @@
                  data-id="top_products"
                  data-type="table"
                  data-table-id="topSelling"
-                 data-route="/product_sales"
+                 data-route="/product_sales_b2b"
                  style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
               </i>
 
@@ -328,176 +328,176 @@
         </div>
       </div>
 
-  <!-- Top Agents -->
-      <div class="col-12">
-        <div class="card top-selling overflow-auto">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <h5 class="card-title">Top Selling Salespersons</h5>
-            <div class="d-flex align-items-center">
-              <!-- Table Icon -->
-              <i class="bi bi-table dynamic-icon"
-                 data-id="top_agents"
-                 data-type="table"
-                 data-table-id="topAgents"
-                 data-route="/top_sellers"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--  &lt;!&ndash; Top Agents &ndash;&gt;-->
+<!--      <div class="col-12">-->
+<!--        <div class="card top-selling overflow-auto">-->
+<!--          <div class="card-body d-flex justify-content-between align-items-center">-->
+<!--            <h5 class="card-title">Top Selling Salespersons</h5>-->
+<!--            <div class="d-flex align-items-center">-->
+<!--              &lt;!&ndash; Table Icon &ndash;&gt;-->
+<!--              <i class="bi bi-table dynamic-icon"-->
+<!--                 data-id="top_agents"-->
+<!--                 data-type="table"-->
+<!--                 data-table-id="topAgents"-->
+<!--                 data-route="/top_sellers"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Pie Chart Icon -->
-              <i class="bi bi-pie-chart dynamic-icon"
-                 data-type="pie"
-                 data-table-id="topAgents"
-                 data-chart-container="pie-chart-container"
-                 data-route="/top_sellers"
-                 data-title="Top Agents (Top 10)"
-                 data-yAxis="Top Agents"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Pie Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-pie-chart dynamic-icon"-->
+<!--                 data-type="pie"-->
+<!--                 data-table-id="topAgents"-->
+<!--                 data-chart-container="pie-chart-container"-->
+<!--                 data-route="/top_sellers"-->
+<!--                 data-title="Top Agents (Top 10)"-->
+<!--                 data-yAxis="Top Agents"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Bar Chart Icon -->
-              <i class="bi bi-bar-chart dynamic-icon"
-                 data-type="bar"
-                 data-table-id="topAgents"
-                 data-chart-container="bar-chart-container"
-                 data-route="/top_sellers"
-                 data-title="Top Agents (Top 10)"
-                 data-yAxis="Top Agents"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Bar Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-bar-chart dynamic-icon"-->
+<!--                 data-type="bar"-->
+<!--                 data-table-id="topAgents"-->
+<!--                 data-chart-container="bar-chart-container"-->
+<!--                 data-route="/top_sellers"-->
+<!--                 data-title="Top Agents (Top 10)"-->
+<!--                 data-yAxis="Top Agents"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Refresh Button -->
-              <button class="btn btn-primary" id="refresh_agents_sell" hidden="true">Refresh Data</button>
-            </div>
-          </div>
+<!--              &lt;!&ndash; Refresh Button &ndash;&gt;-->
+<!--              <button class="btn btn-primary" id="refresh_agents_sell" hidden="true">Refresh Data</button>-->
+<!--            </div>-->
+<!--          </div>-->
 
-          <!-- Table for Recent Sales -->
-          <table id="topAgents" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>
+<!--          &lt;!&ndash; Table for Recent Sales &ndash;&gt;-->
+<!--          <table id="topAgents" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>-->
 
-          <!-- Pie Chart Container (Initially hidden) -->
-          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
-          </div>
+<!--          &lt;!&ndash; Pie Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> &lt;!&ndash; ECharts pie chart &ndash;&gt;-->
+<!--          </div>-->
 
-          <!-- Bar Chart Container (Initially hidden) -->
-          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
-          </div>
-        </div>
-      </div>
+<!--          &lt;!&ndash; Bar Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="bar-chart" style="width: 100%; height: 350px;"></div> &lt;!&ndash; ECharts bar chart &ndash;&gt;-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
 
-     <!-- Top Specials -->
-      <div class="col-12">
-        <div class="card top-selling overflow-auto">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <h5 class="card-title">Top Selling Specials</h5>
-            <div class="d-flex align-items-center">
-              <!-- Table Icon -->
-              <i class="bi bi-table dynamic-icon"
-                 data-id="top_specials"
-                 data-type="table"
-                 data-table-id="topSpecials"
-                 data-route="/top_specials"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--     &lt;!&ndash; Top Specials &ndash;&gt;-->
+<!--      <div class="col-12">-->
+<!--        <div class="card top-selling overflow-auto">-->
+<!--          <div class="card-body d-flex justify-content-between align-items-center">-->
+<!--            <h5 class="card-title">Top Selling Specials</h5>-->
+<!--            <div class="d-flex align-items-center">-->
+<!--              &lt;!&ndash; Table Icon &ndash;&gt;-->
+<!--              <i class="bi bi-table dynamic-icon"-->
+<!--                 data-id="top_specials"-->
+<!--                 data-type="table"-->
+<!--                 data-table-id="topSpecials"-->
+<!--                 data-route="/top_specials"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Pie Chart Icon -->
-              <i class="bi bi-pie-chart dynamic-icon"
-                 data-type="pie"
-                 data-table-id="topSpecials"
-                 data-chart-container="pie-chart-container"
-                 data-route="/top_specials"
-                 data-title="Top Specials (Top 10)"
-                 data-yAxis="Top Specials"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Pie Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-pie-chart dynamic-icon"-->
+<!--                 data-type="pie"-->
+<!--                 data-table-id="topSpecials"-->
+<!--                 data-chart-container="pie-chart-container"-->
+<!--                 data-route="/top_specials"-->
+<!--                 data-title="Top Specials (Top 10)"-->
+<!--                 data-yAxis="Top Specials"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Bar Chart Icon -->
-              <i class="bi bi-bar-chart dynamic-icon"
-                 data-type="bar"
-                 data-table-id="topSpecials"
-                 data-chart-container="bar-chart-container"
-                 data-route="/top_specials"
-                 data-title="Top Specials (Top 10)"
-                 data-yAxis="Top Specials"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Bar Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-bar-chart dynamic-icon"-->
+<!--                 data-type="bar"-->
+<!--                 data-table-id="topSpecials"-->
+<!--                 data-chart-container="bar-chart-container"-->
+<!--                 data-route="/top_specials"-->
+<!--                 data-title="Top Specials (Top 10)"-->
+<!--                 data-yAxis="Top Specials"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Refresh Button -->
-              <button class="btn btn-primary" id="refresh_specials_sell" hidden="true">Refresh Data</button>
-            </div>
-          </div>
+<!--              &lt;!&ndash; Refresh Button &ndash;&gt;-->
+<!--              <button class="btn btn-primary" id="refresh_specials_sell" hidden="true">Refresh Data</button>-->
+<!--            </div>-->
+<!--          </div>-->
 
-          <!-- Table for Recent Sales -->
-          <table id="topSpecials" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>
+<!--          &lt;!&ndash; Table for Recent Sales &ndash;&gt;-->
+<!--          <table id="topSpecials" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>-->
 
-          <!-- Pie Chart Container (Initially hidden) -->
-          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
-          </div>
+<!--          &lt;!&ndash; Pie Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> &lt;!&ndash; ECharts pie chart &ndash;&gt;-->
+<!--          </div>-->
 
-          <!-- Bar Chart Container (Initially hidden) -->
-          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
-          </div>
-        </div>
-      </div>
+<!--          &lt;!&ndash; Bar Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="bar-chart" style="width: 100%; height: 350px;"></div> &lt;!&ndash; ECharts bar chart &ndash;&gt;-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
 
-           <!-- Top Specials -->
-      <div class="col-12">
-        <div class="card top-selling overflow-auto">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <h5 class="card-title">Top Selling Categories</h5>
-            <div class="d-flex align-items-center">
-              <!-- Table Icon -->
-              <i class="bi bi-table dynamic-icon"
-                 data-id="top_brand"
-                 data-type="table"
-                 data-table-id="topbrand"
-                 data-route="/top_brand"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--           &lt;!&ndash; Top Specials &ndash;&gt;-->
+<!--      <div class="col-12">-->
+<!--        <div class="card top-selling overflow-auto">-->
+<!--          <div class="card-body d-flex justify-content-between align-items-center">-->
+<!--            <h5 class="card-title">Top Selling Categories</h5>-->
+<!--            <div class="d-flex align-items-center">-->
+<!--              &lt;!&ndash; Table Icon &ndash;&gt;-->
+<!--              <i class="bi bi-table dynamic-icon"-->
+<!--                 data-id="top_brand"-->
+<!--                 data-type="table"-->
+<!--                 data-table-id="topbrand"-->
+<!--                 data-route="/top_brand"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Pie Chart Icon -->
-              <i class="bi bi-pie-chart dynamic-icon"
-                 data-type="pie"
-                 data-table-id="topbrand"
-                 data-chart-container="pie-chart-container"
-                 data-route="/top_brand"
-                 data-title="Top brand (Top 10)"
-                 data-yAxis="Top brand"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Pie Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-pie-chart dynamic-icon"-->
+<!--                 data-type="pie"-->
+<!--                 data-table-id="topbrand"-->
+<!--                 data-chart-container="pie-chart-container"-->
+<!--                 data-route="/top_brand"-->
+<!--                 data-title="Top brand (Top 10)"-->
+<!--                 data-yAxis="Top brand"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Bar Chart Icon -->
-              <i class="bi bi-bar-chart dynamic-icon"
-                 data-type="bar"
-                 data-table-id="topbrand"
-                 data-chart-container="bar-chart-container"
-                 data-route="/top_brand"
-                 data-title="Top brand (Top 10)"
-                 data-yAxis="Top brand"
-                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">
-              </i>
+<!--              &lt;!&ndash; Bar Chart Icon &ndash;&gt;-->
+<!--              <i class="bi bi-bar-chart dynamic-icon"-->
+<!--                 data-type="bar"-->
+<!--                 data-table-id="topbrand"-->
+<!--                 data-chart-container="bar-chart-container"-->
+<!--                 data-route="/top_brand"-->
+<!--                 data-title="Top brand (Top 10)"-->
+<!--                 data-yAxis="Top brand"-->
+<!--                 style="font-size: 1.5rem; margin-right: 10px; color: #007bff; cursor: pointer;">-->
+<!--              </i>-->
 
-              <!-- Refresh Button -->
-              <button class="btn btn-primary" id="refresh_brand_sell" hidden="true">Refresh Data</button>
-            </div>
-          </div>
+<!--              &lt;!&ndash; Refresh Button &ndash;&gt;-->
+<!--              <button class="btn btn-primary" id="refresh_brand_sell" hidden="true">Refresh Data</button>-->
+<!--            </div>-->
+<!--          </div>-->
 
-          <!-- Table for Recent Sales -->
-          <table id="topbrand" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>
+<!--          &lt;!&ndash; Table for Recent Sales &ndash;&gt;-->
+<!--          <table id="topbrand" class="table table-striped table-hover table-bordered w-100" style="margin: 15px;"></table>-->
 
-          <!-- Pie Chart Container (Initially hidden) -->
-          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> <!-- ECharts pie chart -->
-          </div>
+<!--          &lt;!&ndash; Pie Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container pie-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="pie-chart" style="width: 80%; height: 500px; margin: 0 auto;"></div> &lt;!&ndash; ECharts pie chart &ndash;&gt;-->
+<!--          </div>-->
 
-          <!-- Bar Chart Container (Initially hidden) -->
-          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">
-            <div class="bar-chart" style="width: 100%; height: 350px;"></div> <!-- ECharts bar chart -->
-          </div>
-        </div>
-      </div>
+<!--          &lt;!&ndash; Bar Chart Container (Initially hidden) &ndash;&gt;-->
+<!--          <div class="chart-container bar-chart-container" style="display: none; margin: 15px; text-align: center;">-->
+<!--            <div class="bar-chart" style="width: 100%; height: 350px;"></div> &lt;!&ndash; ECharts bar chart &ndash;&gt;-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </div>-->
 
 
     </section>

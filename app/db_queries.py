@@ -189,7 +189,45 @@ def get_recent_sales(shop_name, from_date, to_date):
     return column_names, rows
 
 
+def get_recent_sales_b2b(shop_name, from_date, to_date):
+    # Connect to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    query = '''
+            SELECT
+                COALESCE(NULLIF(TRIM(wo.customer_name), ''), CONCAT('ID ', wo.customer_id)) AS customer_name,
+                wo.customer_email,
+                ROUND(SUM(wi.total_amount) / 1.15, 2) AS total_spent_excl_vat,
+                COUNT(DISTINCT wo.order_id) AS total_orders,
+                MAX(wo.order_date) AS last_order_date
+            FROM toc_wc_sales_order wo
+            INNER JOIN toc_wholeseller w
+                    ON w.customer_id = wo.customer_id
+            INNER JOIN toc_wc_sales_items wi
+                    ON wi.order_id = wo.order_id
+            WHERE wo.order_date >= %s
+              AND wo.order_date <  %s
+              AND wo.status NOT IN ('wc-cancelled','wc-pending')
+            GROUP BY customer_name, wo.customer_email
+            ORDER BY total_spent_excl_vat DESC
+            LIMIT 30;
+    '''
+    cursor.execute(query, (from_date, to_date))  # No placeholders, so no additional parameters
+
+
+
+    # Fetch all rows from the query result
+    rows = cursor.fetchall()
+
+    # Get column names from the cursor description
+    column_names = [desc[0] for desc in cursor.description]
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
 
 # db_queries.py
 def get_product_sales(timeframe, shop_name):
@@ -1562,6 +1600,51 @@ def get_product_sales_data(shop_name, from_date, to_date):
 
             # Execute the query with parameterized values
             cursor.execute(query, (shop_name, from_date, to_date))
+
+        rows = cursor.fetchall()
+
+        # Get column names from the cursor description
+        column_names = [desc[0] for desc in cursor.description]
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        column_names = []
+        rows = []
+
+    cursor.close()
+    conn.close()
+
+    # Return both column names and data
+    return column_names, rows
+
+
+def get_product_sales_data_b2b(shop_name, from_date, to_date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        query = '''
+            SELECT
+                a.product_name,
+                ROUND(SUM(a.quantity), 2)                 AS count,
+                ROUND(SUM(a.total_amount) / 1.15, 2)      AS total_net_amount,
+                ROUND(SUM(p.cost_price), 2)               AS total_cost_price,
+                ROUND(
+                    (SUM(a.total_amount) / 1.15 - SUM(p.cost_price)) /
+                    NULLIF(SUM(a.total_amount) / 1.15, 0) * 100, 2
+                ) AS gross_profit_percentage
+            FROM toc_wc_sales_items a
+            JOIN toc_wc_sales_order wo
+              ON wo.order_id = a.order_id
+            JOIN toc_wholeseller w
+              ON w.customer_id = wo.customer_id
+            JOIN toc_product p
+              ON a.sku = p.item_sku
+            WHERE wo.order_date >= %s
+              AND wo.order_date <  %s
+              AND (wo.status IS NULL OR wo.status NOT IN ('wc-cancelled','wc-pending'))
+            GROUP BY a.product_name
+            ORDER BY total_net_amount DESC;
+        '''
+        cursor.execute(query, (from_date, to_date))
 
         rows = cursor.fetchall()
 
