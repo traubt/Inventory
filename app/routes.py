@@ -3510,8 +3510,8 @@ def check_shop_stock():
         placeholders = ','.join([f":sku_{i}" for i in range(len(skus))])
         sku_params = {f'sku_{i}': sku for i, sku in enumerate(skus)}
 
-        logger.warning(f"Check stock skus: {placeholders}")
-        logger.warning(f"Check stock sku_params: {sku_params}")
+        # logger.warning(f"Check stock skus: {placeholders}")
+        # logger.warning(f"Check stock sku_params: {sku_params}")
 
         sql = text(f"""
             WITH sales_data AS (
@@ -3568,7 +3568,7 @@ def check_shop_stock():
         # logger.warning(f"Check stock sku_params: {sql}")
 
         result = db.session.execute(sql, params).mappings().all()
-        logger.warning(f"✅ Rows returned from stock check: {len(result)}")
+        # logger.warning(f"✅ Rows returned from stock check: {len(result)}")
 
         if not result:
             return jsonify({
@@ -3580,7 +3580,7 @@ def check_shop_stock():
         # Check if any item is out of stock
         for row in result:
             current_stock = row['current_stock_qty']
-            logger.warning(f"Check stock current stock: {current_stock}")
+            # logger.warning(f"Check stock current stock: {current_stock}")
             if current_stock is None or current_stock <= 0:
                 return jsonify({
                     "available": False,
@@ -3907,13 +3907,13 @@ def pay_driver(driver_id):
 @main.route('/get_shop_hours', methods=['GET'])
 def get_shop_hours():
     shop_name = request.args.get('shop_name')
-    logger.warning(f"👤 In get shop hours for shop:  {shop_name}")
+    # logger.warning(f"👤 In get shop hours for shop:  {shop_name}")
     if not shop_name:
         return jsonify({'error': 'Missing shop_name parameter'}), 400
 
     today = datetime.now()
     day_of_week = today.strftime('%A')  # e.g., 'Monday'
-    logger.warning(f"Today's day of the week is:  {day_of_week}")
+    # logger.warning(f"Today's day of the week is:  {day_of_week}")
 
     try:
         record = TocShopsHours.query.filter_by(
@@ -3921,7 +3921,7 @@ def get_shop_hours():
             day_of_week=day_of_week
         ).first()
 
-        logger.warning(f"Return to client: {shop_name}, {day_of_week}, open hour: {record.open_hour.strftime('%H:%M')}, closing hour: {record.closing_hour.strftime('%H:%M')}")
+        # logger.warning(f"Return to client: {shop_name}, {day_of_week}, open hour: {record.open_hour.strftime('%H:%M')}, closing hour: {record.closing_hour.strftime('%H:%M')}")
 
         if not record:
             return jsonify({'error': 'Shop hours not found'}), 404
