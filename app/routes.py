@@ -3333,7 +3333,7 @@ def get_closest_shop():
 
             # Calculate the distance using the haversine function
             distance = haversine(customer_lat, customer_lng, shop_lat, shop_lng)
-            print(f"Shop: {shop_name}, distance from customer address: {distance:.2f} Km")
+            # print(f"Shop: {shop_name}, distance from customer address: {distance:.2f} Km")
 
             # Update the closest shop if this one is closer
             if distance < min_distance:
@@ -3479,21 +3479,21 @@ def save_closest_shop():
         return jsonify({'error': str(e)}), 500
 
 
-# @main.route('/check_shop_stock', methods=['POST'])
-# def check_shop_stock():
-#     try:
-#         data = request.get_json()
-#         shop_id = data.get('shop_id')
-#         skus = data.get('skus')
-#
-#         print(f"📦 Checking stock for shop: {shop_id}, SKUs: {skus}")
-#
-#         # TEMP: Always return available = true
-#         return jsonify({ "available": True })
-#
-#     except Exception as e:
-#         print(f"❌ Error in check_shop_stock: {e}")
-#         return jsonify({ "available": False, "error": str(e) }), 500
+@main.route('/check_shop_stock', methods=['POST'])
+def check_shop_stock():
+    try:
+        data = request.get_json()
+        shop_id = data.get('shop_id')
+        skus = data.get('skus')
+
+        print(f"📦 Checking stock for shop: {shop_id}, SKUs: {skus}")
+
+        # TEMP: Always return available = true
+        return jsonify({ "available": True })
+
+    except Exception as e:
+        print(f"❌ Error in check_shop_stock: {e}")
+        return jsonify({ "available": False, "error": str(e) }), 500
 
 @main.route('/check_shop_stock', methods=['POST'])
 def check_shop_stock():
@@ -3515,7 +3515,7 @@ def check_shop_stock():
 
         sql = text(f"""
             WITH sales_data AS (
-                SELECT 
+                SELECT
                     d.item_sku,
                     d.item_name,
                     b.store_customer,
@@ -3534,7 +3534,7 @@ def check_shop_stock():
 
                 UNION ALL
 
-                SELECT 
+                SELECT
                     st.sku AS item_sku,
                     d.item_name,
                     st.shop_id AS store_customer,
@@ -3552,10 +3552,10 @@ def check_shop_stock():
                         WHERE a.item_sku = st.sku AND b.store_customer = st.shop_id
                     )
             )
-            SELECT 
+            SELECT
                 s.item_sku,
                 st.final_stock_qty,
-                s.sales_since_stock_read,                
+                s.sales_since_stock_read,
                 st.stock_transfer,
                 (st.final_stock_qty - s.sales_since_stock_read + st.stock_transfer) AS current_stock_qty
             FROM sales_data s
@@ -3595,6 +3595,107 @@ def check_shop_stock():
         print(f"❌ Error in check_shop_stock: {e}")
         return jsonify({ "available": False, "error": str(e) }), 500
 
+@main.route('/check_shop_stock_test', methods=['POST'])
+def check_shop_stock_test():
+    try:
+        from sqlalchemy.sql import text
+        data = request.get_json() or {}
+        shop_name = data.get('shop_name')
+        skus = data.get('skus')
+
+        if not shop_name or not skus or not isinstance(skus, list):
+            return jsonify({
+                "error": "Missing or invalid payload. Expecting {shop_name: str, skus: [..]}."
+            }), 400
+
+        # Build placeholders for IN (...)
+        placeholders = ','.join([f":sku_{i}" for i in range(len(skus))])
+        sku_params = {f'sku_{i}': sku for i, sku in enumerate(skus)}
+
+        sql = text(f"""
+            WITH sales_data AS (
+                SELECT 
+                    d.item_sku,
+                    d.item_name,
+                    b.store_customer,
+                    c.blName AS shop_name,
+                    COALESCE(SUM(CASE WHEN a.time_of_sale > st.stock_qty_date THEN a.quantity END), 0) AS sales_since_stock_read
+                FROM toc_product d
+                JOIN toc_ls_sales_item a ON d.item_sku = a.item_sku
+                JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+                JOIN toc_shops c ON b.store_customer = c.customer
+                JOIN toc_stock st ON d.item_sku = st.sku AND b.store_customer = st.shop_id
+                WHERE d.acct_group <> 'Specials'
+                  AND c.blName = :shop_name
+                  AND d.item_sku <> '9568'
+                  AND d.item_sku IN ({placeholders})
+                GROUP BY d.item_sku, d.item_name, b.store_customer, c.blName, st.stock_qty_date
+
+                UNION ALL
+
+                SELECT 
+                    st.sku AS item_sku,
+                    d.item_name,
+                    st.shop_id AS store_customer,
+                    c.blName AS shop_name,
+                    0 AS sales_since_stock_read
+                FROM toc_stock st
+                JOIN toc_product d 
+                  ON st.sku = d.item_sku 
+                 AND d.acct_group <> 'Specials' 
+                 AND d.item_sku <> '9568'
+                JOIN toc_shops c ON st.shop_id = c.customer
+                WHERE c.blName = :shop_name
+                  AND st.sku IN ({placeholders})
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM toc_ls_sales_item a
+                      JOIN toc_ls_sales b ON a.sales_id = b.sales_id
+                      WHERE a.item_sku = st.sku AND b.store_customer = st.shop_id
+                  )
+            )
+            SELECT 
+                s.item_sku,
+                COALESCE(st.final_stock_qty, 0)            AS final_stock_qty,
+                COALESCE(s.sales_since_stock_read, 0)      AS sales_since_stock_read,                
+                COALESCE(st.stock_transfer, 0)             AS stock_transfer,
+                (COALESCE(st.final_stock_qty, 0)
+                 - COALESCE(s.sales_since_stock_read, 0)
+                 + COALESCE(st.stock_transfer, 0))         AS current_stock_qty
+            FROM sales_data s
+            LEFT JOIN toc_stock st 
+              ON s.item_sku = st.sku 
+             AND s.store_customer = st.shop_id
+        """)
+
+        params = {'shop_name': shop_name}
+        params.update(sku_params)
+
+        rows = db.session.execute(sql, params).mappings().all()
+
+        # Build mapping from requested SKUs → current_stock_qty (default 0 if not returned)
+        stocks = {sku: 0 for sku in skus}
+        for r in rows:
+            sku = r['item_sku']
+            if sku in stocks:
+                # If duplicates ever occur, last one wins (they should be identical for a given sku/shop)
+                stocks[sku] = int(r.get('current_stock_qty') or 0)
+
+        # Which SKUs didn’t show up in the result set at all? (Still report them as 0, but call them out)
+        returned_skus = {r['item_sku'] for r in rows}
+        not_found = [sku for sku in skus if sku not in returned_skus]
+
+        logger.warning(f"check_shop_stock | shop='{shop_name}' | stocks={stocks} | not_found={not_found}")
+
+        return jsonify({
+            "shop_name": shop_name,
+            "stocks": stocks,
+            "not_found": not_found
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Error in check_shop_stock: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @main.route('/create_lightspeed_order', methods=['POST'])
