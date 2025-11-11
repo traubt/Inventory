@@ -3479,21 +3479,6 @@ def save_closest_shop():
         return jsonify({'error': str(e)}), 500
 
 
-@main.route('/check_shop_stock', methods=['POST'])
-def check_shop_stock():
-    try:
-        data = request.get_json()
-        shop_id = data.get('shop_id')
-        skus = data.get('skus')
-
-        print(f"📦 Checking stock for shop: {shop_id}, SKUs: {skus}")
-
-        # TEMP: Always return available = true
-        return jsonify({ "available": True })
-
-    except Exception as e:
-        print(f"❌ Error in check_shop_stock: {e}")
-        return jsonify({ "available": False, "error": str(e) }), 500
 
 @main.route('/check_shop_stock', methods=['POST'])
 def check_shop_stock():
