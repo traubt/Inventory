@@ -328,20 +328,20 @@
                                 };
 
                                 // Send the email request
-                                fetch('/send_email', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify(emailData)
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    console.log('Email sent successfully:', data);
-                                })
-                                .catch(error => {
-                                    console.error('Error sending email:', error);
-                                });
+                          //      fetch('/send_email', {
+                          //          method: 'POST',
+                          //          headers: {
+                          //              'Content-Type': 'application/json'
+                          //          },
+                          //          body: JSON.stringify(emailData)
+                          //      })
+                          //      .then(response => response.json())
+                          //      .then(data => {
+                          //          console.log('Email sent successfully:', data);
+                          //      })
+                          //      .catch(error => {
+                          //          console.error('Error sending email:', error);
+                          //      });
 
                                 break; // Stop after finding the first "error" comment
                             }
