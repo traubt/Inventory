@@ -1109,7 +1109,7 @@ def get_sales_by_shop_last_three_months(user_shop):
                 WHERE 
                     order_date >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
                     AND status NOT IN ('wc-cancelled','wc-pending')
-                     and order_id not in (select wc_orderid from toc_shipday)
+               --      and order_id not in (select wc_orderid from toc_shipday)
                 GROUP BY 
                     store_name, sale_month;
                 '''
@@ -1348,7 +1348,7 @@ def get_sales_data(shop_name, from_date, to_date):
                 WHERE
                     wo.order_date >= %s and wo.order_date < %s
                     and wo.status not in ('wc-cancelled','wc-pending')
-                     and order_id not in (select wc_orderid from toc_shipday)
+                --     and order_id not in (select wc_orderid from toc_shipday)
                 GROUP BY
                     date
                 ORDER BY
@@ -1452,7 +1452,7 @@ def get_60MIN_Sales(shop_name, from_date, to_date):
         # Default query for Head Office or non-specific shop
         if shop_name == "Head Office":
             query = '''
-                select DATE_FORMAT(creation_date, '%%Y-%%m-%%d') AS date,  round(sum(total_amt)) 
+                select DATE_FORMAT(creation_date, '%%Y-%%m-%%d') AS date,  round(sum(total_amt/1.15)) 
                  from toc_shipday tsd
                  where tsd.creation_date >= %s AND tsd.creation_date < %s
                  group by date

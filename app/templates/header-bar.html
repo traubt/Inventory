@@ -310,7 +310,7 @@
                     .then(response => response.json())
                     .then(data => {
                         // Check the first 3 logs for "error" in the comment
-                        for (let i = 0; i < Math.min(3, data.length); i++) {
+                        for (let i = 0; i < Math.min(2, data.length); i++) {
                             const log = data[i];
                             const comment = log.comment;
                             if (comment && comment.toLowerCase().includes("error") &&
@@ -320,7 +320,6 @@
                                 const emailData = {
                                     recipients: [
                                         "tomer.traub@gmail.com",
-                                        "itsik@shiroko.co.za",
                                         "itsik@tasteofcannabis.co.za",
                                         "orders@tasteofcannabis.co.za"
                                     ],
@@ -357,7 +356,7 @@
             fetchLogs();
 
             // Set interval to fetch logs every 20 seconds
-            setInterval(fetchLogs, 300000);
+            setInterval(fetchLogs, 600000);
 
     }); // end ready
 

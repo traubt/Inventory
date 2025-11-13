@@ -59,8 +59,8 @@
     <style>
         /* Set a max height and allow vertical scrolling */
         .dataTables_wrapper {
-            max-height: 500px;
-            overflow-y: auto;
+      max-height: 65vh;   /* or 900px, etc. */
+      overflow-y: auto;
         }
     </style>
 
@@ -329,6 +329,7 @@ table.DataTable({
         }
     ],
     fixedHeader: true,
+    pageLength: 30,
     lengthMenu: [
         [50, 100, 150, 200],
         [50, 100, 150, 200]
