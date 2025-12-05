@@ -19,6 +19,10 @@ import openai
 import re
 from app.tables_for_openAI import DATABASE_SCHEMA
 import requests
+from sqlalchemy.exc import IntegrityError
+import unicodedata
+from pdf2image import convert_from_path
+import uuid
 
 from shipday import Shipday
 from shipday.order import Address, Customer, Pickup, OrderItem, Order
@@ -26,6 +30,18 @@ from flask import g
 from flask_login import current_user
 
 shipday_api = Blueprint('shipday_api', __name__)
+
+_entity_re = re.compile(r"&([^;]+);")
+_filename_ascii_strip_re = re.compile(r"[^A-Za-z0-9_.-]")
+_windows_device_files = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{i}" for i in range(10)),
+    *(f"LPT{i}" for i in range(10)),
+}
+
 
 # Set your Shipday API key
 API_KEY = 'VXveiHsYGE.eLK6vIxvz1gQixI9tOvm'
@@ -59,6 +75,72 @@ DB_CONFIG = {
     'cursorclass': pymysql.cursors.DictCursor  # Return rows as dictionaries
 }
 
+def secure_filename(filename: str) -> str:
+    r"""Pass it a filename and it will return a secure version of it.  This
+    filename can then safely be stored on a regular file system and passed
+    to :func:`os.path.join`.  The filename returned is an ASCII only string
+    for maximum portability.
+
+    On windows systems the function also makes sure that the file is not
+    named after one of the special device files.
+
+    >>> secure_filename("My cool movie.mov")
+    'My_cool_movie.mov'
+    >>> secure_filename("../../../etc/passwd")
+    'etc_passwd'
+    >>> secure_filename('i contain cool \xfcml\xe4uts.txt')
+    'i_contain_cool_umlauts.txt'
+
+    The function might return an empty filename.  It's your responsibility
+    to ensure that the filename is unique and that you abort or
+    generate a random filename if the function returned an empty one.
+
+    .. versionadded:: 0.5
+
+    :param filename: the filename to secure
+    """
+    filename = unicodedata.normalize("NFKD", filename)
+    filename = filename.encode("ascii", "ignore").decode("ascii")
+
+    for sep in os.sep, os.path.altsep:
+        if sep:
+            filename = filename.replace(sep, " ")
+    filename = str(_filename_ascii_strip_re.sub("", "_".join(filename.split()))).strip(
+        "._"
+    )
+
+    # on nt a couple of special files are present in each folder.  We
+    # have to ensure that the target file is not such a filename.  In
+    # this case we prepend an underline
+    if (
+        os.name == "nt"
+        and filename
+        and filename.split(".")[0].upper() in _windows_device_files
+    ):
+        filename = f"_{filename}"
+
+    return filename
+
+def update_grv_flags(po_id):
+    grv = BbGrv.query.filter_by(po_id=po_id).first()
+    if not grv:
+        return
+
+    grv_items = BbGrvItem.query.join(BbPurchaseOrderItem, BbGrvItem.po_item_id == BbPurchaseOrderItem.id)\
+                               .filter(BbPurchaseOrderItem.po_id == po_id).all()
+
+    # Damage flag: any damaged qty > 0
+    grv.damage_ind = any(item.damaged_quantity and item.damaged_quantity > 0 for item in grv_items)
+
+    # Mismatch flag: check amount differences
+    po_total = grv.po_total_amount or 0
+    invoice_total = grv.invoice_total_amount or 0
+
+    grv.mismatch_ind = round(po_total - invoice_total, 2) != 0
+
+    grv.update_date = datetime.utcnow()
+    db.session.commit()
+
 
 # Function to send email
 def send_email(recipients, subject, body):
@@ -80,6 +162,25 @@ def send_email(recipients, subject, body):
         print("Email sent successfully!")
     except Exception as e:
         print(f"Error sending email: {e}")
+
+def generate_vendor_specific_po_number(supplier_id):
+    from app.models import BbSupplier, BbPurchaseOrder  # adjust import path if needed
+    supplier = BbSupplier.query.get(supplier_id)
+    vendor_code = supplier.vendor_code or f"SUP{supplier_id}"
+
+    last_po = BbPurchaseOrder.query.filter_by(supplier_id=supplier_id) \
+        .filter(BbPurchaseOrder.po_number.like(f"PO-{vendor_code}%")) \
+        .order_by(BbPurchaseOrder.id.desc()).first()
+
+    next_count = 1
+    if last_po and last_po.po_number.startswith(f"PO-{vendor_code}"):
+        try:
+            number_part = last_po.po_number.replace(f"PO-{vendor_code}", "")
+            next_count = int(number_part) + 1
+        except ValueError:
+            pass  # fallback to 1
+
+    return f"PO-{vendor_code}{next_count:03d}"
 
 def is_safe_sql(sql):
     """
@@ -520,14 +621,13 @@ def admin_products():
 
 @main.route('/api/products', methods=['GET'])
 def get_products():
-    # Query all products from the database
     products = TocProduct.query.all()
 
-    # Serialize the data
     products_data = [
         {
             "item_sku": product.item_sku,
             "item_name": product.item_name,
+            "item_type": product.item_type,   # NEW
             "stat_group": product.stat_group,
             "acct_group": product.acct_group,
             "retail_price": product.retail_price,
@@ -537,27 +637,33 @@ def get_products():
             "product_url": product.product_url,
             "image_url": product.image_url,
             "stock_ord_ind": product.stock_ord_ind,
+            "is_component": product.is_component,
+            "is_manufacturable": product.is_manufacturable
         }
         for product in products
     ]
 
-    # Return the serialized data as JSON
     return jsonify(products_data)
+
 
 @main.route('/api/products', methods=['POST'])
 def create_product():
-    # Get data from the request (assuming JSON format)
     data = request.get_json()
 
-    # Ensure all required fields are in the request
     if not data or not data.get('item_sku') or not data.get('item_name'):
         return jsonify({"message": "Missing required fields: item_sku or item_name"}), 400
 
     try:
-        # Create a new product instance
+        item_type = data.get("item_type", "PR")  # default = Product
+
+        # Auto assignment rules
+        is_component = (item_type == "CO")
+        is_manufacturable = (item_type == "PR")
+
         new_product = TocProduct(
             item_sku=data.get('item_sku'),
             item_name=data.get('item_name'),
+            item_type=item_type,
             stat_group=data.get('stat_group'),
             acct_group=data.get('acct_group'),
             retail_price=data.get('retail_price'),
@@ -566,38 +672,70 @@ def create_product():
             cann_cost_price=data.get('cann_cost_price'),
             product_url=data.get('product_url'),
             image_url=data.get('image_url'),
-            stock_ord_ind=data.get('stock_ord_ind')
+            stock_ord_ind=data.get('stock_ord_ind'),
+
+            # Auto fields
+            is_component=is_component,
+            is_manufacturable=is_manufacturable
         )
 
-        # Add the new product to the session and commit to the database
         db.session.add(new_product)
         db.session.commit()
 
-        # Call the function to distribute the product to all shops
-        distribute_product_to_shops(new_product.item_sku)
+        # Insert into toc_stock for all shops only product
+        if item_type == "PR":
+            distribute_product_to_shops(new_product.item_sku)
 
-        # Return a success message
-        return jsonify({"message": "Product created and distributed to shops successfully", "product": new_product.item_sku}), 201
+        return jsonify({
+            "message": "Product created successfully",
+            "product": new_product.item_sku
+        }), 201
 
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": f"Error creating product: {str(e)}"}), 500
 
 
+@main.route('/api/products/<string:item_sku>', methods=['PUT'])
+def update_product(item_sku):
+    data = request.get_json()
 
-# @main.route('/api/products/<string:item_sku>', methods=['DELETE'])
-# def delete_product(item_sku):
-#     product = TocProduct.query.get(item_sku)
-#     if not product:
-#         return jsonify({"error": "Product not found"}), 404
-#
-#     try:
-#         db.session.delete(product)
-#         db.session.commit()
-#         return jsonify({"message": "Product deleted successfully"}), 200
-#     except Exception as e:
-#         db.session.rollback()
-#         return jsonify({"error": str(e)}), 500
+    try:
+        product = TocProduct.query.get(item_sku)
+        if not product:
+            return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
+
+        # If item_type is updated → enforce auto rules
+        if "item_type" in data:
+            product.item_type = data["item_type"]
+            product.is_component = (product.item_type == "CO")
+            product.is_manufacturable = (product.item_type == "PR")
+
+        # Update other fields
+        product.item_name = data.get('item_name', product.item_name)
+        product.stat_group = data.get('stat_group', product.stat_group)
+        product.acct_group = data.get('acct_group', product.acct_group)
+        product.retail_price = data.get('retail_price', product.retail_price)
+        product.cost_price = data.get('cost_price', product.cost_price)
+        product.wh_price = data.get('wh_price', product.wh_price)
+        product.cann_cost_price = data.get('cann_cost_price', product.cann_cost_price)
+        product.product_url = data.get('product_url', product.product_url)
+        product.image_url = data.get('image_url', product.image_url)
+        product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
+
+        # Sync product_name in toc_stock
+        TocStock.query.filter_by(sku=item_sku).update({
+            "product_name": product.item_name
+        })
+
+        db.session.commit()
+
+        return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 
 @main.route('/api/products/<string:item_sku>', methods=['DELETE'])
 def delete_product(item_sku):
@@ -621,67 +759,6 @@ def delete_product(item_sku):
         return jsonify({"error": str(e)}), 500
 
 
-# @main.route('/api/products/<string:item_sku>', methods=['PUT'])
-# def update_product(item_sku):
-#     data = request.get_json()
-#
-#     try:
-#         # Find the product by item_sku
-#         product = TocProduct.query.get(item_sku)
-#         if not product:
-#             return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
-#
-#         # Update fields
-#         product.item_name = data.get('item_name', product.item_name)
-#         product.stat_group = data.get('stat_group', product.stat_group)
-#         product.acct_group = data.get('acct_group', product.acct_group)
-#         product.retail_price = data.get('retail_price', product.retail_price)
-#         product.cost_price = data.get('cost_price', product.cost_price)
-#         product.wh_price = data.get('wh_price', product.wh_price)
-#         product.cann_cost_price = data.get('cann_cost_price', product.cann_cost_price)
-#         product.product_url = data.get('product_url', product.product_url)
-#         product.image_url = data.get('image_url', product.image_url)
-#         product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
-#
-#         # Commit changes
-#         db.session.commit()
-#         return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
-#     except Exception as e:
-#         db.session.rollback()
-#         return jsonify({"error": str(e)}), 500
-
-@main.route('/api/products/<string:item_sku>', methods=['PUT'])
-def update_product(item_sku):
-    data = request.get_json()
-
-    try:
-        # Find the product by item_sku
-        product = TocProduct.query.get(item_sku)
-        if not product:
-            return jsonify({"error": f"Product with ID {item_sku} not found"}), 404
-
-        # Update fields in toc_product
-        product.item_name = data.get('item_name', product.item_name)
-        product.stat_group = data.get('stat_group', product.stat_group)
-        product.acct_group = data.get('acct_group', product.acct_group)
-        product.retail_price = data.get('retail_price', product.retail_price)
-        product.cost_price = data.get('cost_price', product.cost_price)
-        product.wh_price = data.get('wh_price', product.wh_price)
-        product.cann_cost_price = data.get('cann_cost_price', product.cann_cost_price)
-        product.product_url = data.get('product_url', product.product_url)
-        product.image_url = data.get('image_url', product.image_url)
-        product.stock_ord_ind = data.get('stock_ord_ind', product.stock_ord_ind)
-
-        # Update toc_stock where sku = item_sku
-        TocStock.query.filter_by(sku=item_sku).update({"product_name": product.item_name})
-
-        # Commit changes
-        db.session.commit()
-
-        return jsonify({"message": f"Product {item_sku} updated successfully"}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
 
 
 
@@ -4350,6 +4427,1547 @@ def api_system_table_data():
         data.append(rec)
 
     return jsonify({"columns": cols, "data": data})
+
+
+#############################  Best Before Customization ##############################
+
+#### Handle Suppliers
+
+def supplier_to_dict(s):
+    return {
+        'id': s.id,
+        'name': s.name,
+        'vendor_code': s.vendor_code,
+        'vat_registered': s.vat_registered,
+        'vat_number': s.vat_number,
+        'contact_person': s.contact_person,
+        'contact_email': s.contact_email,
+        'contact_phone': s.contact_phone,
+        'address': s.address,
+        'status': s.status,
+        'payment_terms': s.payment_terms,
+        'default_ship_to_store': s.default_ship_to_store,
+        'document_received': s.document_received,
+        'document_notes': s.document_notes,
+    }
+
+
+@main.route('/suppliers', methods=['GET', 'POST'])
+def suppliers():
+    if request.method == 'POST':
+        mode = request.form.get('form_mode')
+        supplier_id = request.form.get('supplier_id')
+
+        if mode == 'add':
+            supplier = BbSupplier()
+            db.session.add(supplier)
+            flash('Supplier added successfully.', 'success')
+        else:
+            supplier = BbSupplier.query.get_or_404(supplier_id)
+            flash('Supplier updated successfully.', 'success')
+
+        supplier.name = request.form['name']
+        supplier.vendor_code = request.form.get('vendor_code')
+        supplier.vat_registered = 'vat_registered' in request.form
+        supplier.vat_number = request.form.get('vat_number')
+        supplier.contact_person = request.form.get('contact_person')
+        supplier.contact_email = request.form.get('contact_email')
+        supplier.contact_phone = request.form.get('contact_phone')
+        supplier.address = request.form.get('address')
+        supplier.status = request.form.get('status', 'Active')
+        supplier.payment_terms = request.form.get('payment_terms')
+        supplier.default_ship_to_store = request.form.get('default_ship_to_store')
+        supplier.document_received = 'document_received' in request.form
+        supplier.document_notes = request.form.get('document_notes')
+        supplier.updated_at = datetime.utcnow()
+
+        db.session.commit()
+        return redirect(url_for('main.suppliers'))
+
+    # --------------------------
+    # Restore application context
+    # --------------------------
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    products = TocProduct.query.all()
+
+    supplier_list = BbSupplier.query.order_by(BbSupplier.name).all()
+    suppliers_dicts = [supplier_to_dict(s) for s in supplier_list]
+
+    return render_template('supplier_list.html',
+        suppliers=supplier_list,
+        suppliers_dicts=suppliers_dicts,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        products=products
+    )
+
+
+
+@main.route('/suppliers/delete/<int:supplier_id>', methods=['POST'])
+def delete_supplier(supplier_id):
+    supplier = BbSupplier.query.get_or_404(supplier_id)
+    db.session.delete(supplier)
+    db.session.commit()
+    flash('Supplier deleted.', 'warning')
+    return redirect(url_for('main.suppliers'))
+
+#############  Handle product
+
+def product_to_dict(product):
+    return {
+        'item_sku': product.item_sku,
+        'item_name': product.item_name,
+        'supplier_id': product.supplier_id,
+        'cost_price': str(product.cost_price or ''),
+        'retail_price': str(product.retail_price or ''),
+        'uom': product.uom or '',
+        'size': product.size or '',
+        'is_active': product.is_active,
+        'vat_exempt_ind': product.vat_exempt_ind  # NEW
+    }
+
+
+@main.route('/products', methods=['GET', 'POST'])
+def admin_products_po():
+    if request.method == 'POST':
+        form_mode = request.form.get('form_mode')
+        sku = request.form.get('item_sku')
+        vat_exempt = 'vat_exempt_ind' in request.form  # NEW
+
+        if form_mode == 'add':
+            product = TocProduct(
+                item_sku=sku,
+                item_name=request.form.get('item_name'),
+                supplier_id=request.form.get('supplier_id'),
+                cost_price=request.form.get('cost_price'),
+                retail_price=request.form.get('retail_price'),
+                uom=request.form.get('uom'),
+                size=request.form.get('size'),
+                is_active='is_active' in request.form,
+                vat_exempt_ind=vat_exempt  # NEW
+            )
+            db.session.add(product)
+            flash('Product added successfully.', 'success')
+
+        elif form_mode == 'edit':
+            product = TocProduct.query.get(sku)
+            if product:
+                product.item_name = request.form.get('item_name')
+                product.supplier_id = request.form.get('supplier_id')
+                product.cost_price = request.form.get('cost_price')
+                product.retail_price = request.form.get('retail_price')
+                product.uom = request.form.get('uom')
+                product.size = request.form.get('size')
+                product.is_active = 'is_active' in request.form
+                product.vat_exempt_ind = vat_exempt  # NEW
+                flash('Product updated successfully.', 'success')
+            else:
+                flash('Product not found.', 'danger')
+
+        db.session.commit()
+        return redirect(url_for('main.admin_products'))
+
+    # GET request handling
+    products_raw = TocProduct.query.order_by(TocProduct.item_name).all()
+    product_dicts = [product_to_dict(p) for p in products_raw]
+    suppliers = BbSupplier.query.filter_by(status='Active').order_by(BbSupplier.name).all()
+    suppliers_dicts = [supplier_to_dict(s) for s in suppliers]
+
+    # Restore session context
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+
+    return render_template(
+        'product_list.html',
+        products=products_raw,
+        product_dicts=product_dicts,
+        suppliers=suppliers,
+        suppliers_dicts=suppliers_dicts,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list
+    )
+
+@main.route('/products/delete/<string:sku>', methods=['POST'])
+def delete_product_po(sku):
+    product = TocProduct.query.get_or_404(sku)
+    db.session.delete(product)
+    db.session.commit()
+    flash('Product deleted.', 'warning')
+    return redirect(url_for('main.admin_products'))
+
+###### Handle Purchase Order ######
+
+def status_color(status):
+    return {
+        'Draft': 'secondary',
+        'Submitted': 'primary',
+        'Approved': 'success',
+        'Sent': 'info',
+        'Partially Received': 'warning',
+        'Completed': 'dark',
+        'Short Closed': 'warning',
+        'Cancelled': 'danger',
+    }.get(status, 'secondary')
+
+
+@main.route('/purchase_orders', methods=['GET', 'POST'])
+def purchase_orders():
+    from .models import BbPurchaseOrder, BbSupplier, TocProduct, TocRole, TOC_SHOPS, User
+
+    if request.method == 'POST':
+        form = request.form
+        supplier_id = form.get('supplier_id')
+        approved_by = form.get('approved_by')
+        ship_to_store = form.get('ship_to_store')
+        expected_delivery_date = form.get('expected_delivery_date')
+        po_terms = form.get('po_terms')
+        notes = form.get('notes')
+
+        if not approved_by:
+            flash("Approval is required to create a PO.", "danger")
+            return redirect(url_for('main.purchase_orders'))
+
+        # Generate PO number: <YEAR><MONTH><DAY><HOUR><MIN><Supplier Code>
+        now = datetime.utcnow()
+        timestamp = now.strftime("%Y%m%d%H%M")
+        supplier = BbSupplier.query.get(supplier_id)
+        vendor_code = supplier.vendor_code or f"S{supplier_id}"
+        po_number = generate_vendor_specific_po_number(supplier_id)
+
+        po = BbPurchaseOrder(
+            po_number=po_number,
+            supplier_id=supplier_id,
+            ship_to_store=ship_to_store,
+            created_by=session.get('user_id'),  # assumed to be saved on login
+            approved_by=approved_by,
+            expected_delivery_date=expected_delivery_date,
+            order_date=now,
+            po_terms=po_terms,
+            notes=notes,
+            status='Approved',  # Defaulting to Approved after form submission
+            approved_at=now
+        )
+        db.session.add(po)
+        db.session.commit()
+
+        flash(f"PO {po_number} created successfully.", "success")
+        return redirect(url_for('main.purchase_orders'))
+
+    # --------------------------
+    # Restore application context
+    # --------------------------
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    products = TocProduct.query.all()
+    supplier_list = BbSupplier.query.order_by(BbSupplier.name).all()
+
+    pos = BbPurchaseOrder.query.order_by(BbPurchaseOrder.created_at.desc()).all()
+
+    for po in pos:
+        po.items = BbPurchaseOrderItem.query.filter_by(po_id=po.id).all()
+        po.supplier = BbSupplier.query.get(po.supplier_id)
+        po.created_by_user = User.query.get(po.created_by)
+        po.approved_by_user = User.query.get(po.approved_by) if po.approved_by else None
+
+    return render_template('po_list.html',
+        pos=pos,
+        suppliers=supplier_list,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        products=products,
+        status_color=status_color
+    )
+
+
+
+@main.route('/po_create', methods=['GET', 'POST'])
+def po_create():
+    if request.method == 'POST':
+        try:
+            po_id = request.form.get('po_id')
+            supplier_id = request.form['supplier_id']
+            approved_by = session.get('user_id') or 1
+            note = request.form.get('note') or ''
+            status = request.form.get('status', 'Draft')
+            status_date = datetime.now(timezone.utc)
+            vat_amount = float(request.form.get('vat_amount', 0))
+
+            now = datetime.now()
+
+            if po_id:
+                po = BbPurchaseOrder.query.get(po_id)
+                po.supplier_id = supplier_id
+                po.status = status
+                po.status_date = status_date
+                po.notes = note
+                po.approved_by = approved_by
+                po.approved_at = now
+                po.subtotal = 0
+                po.vat_amount = vat_amount
+                BbPurchaseOrderItem.query.filter_by(po_id=po.id).delete()
+            else:
+                supplier = BbSupplier.query.get(supplier_id)
+                supplier_code = supplier.vendor_code or f"SUP{supplier_id}"
+                po_number = generate_vendor_specific_po_number(supplier_id)
+
+                po = BbPurchaseOrder(
+                    po_number=po_number,
+                    supplier_id=supplier_id,
+                    created_by=approved_by,
+                    approved_by=approved_by,
+                    status=status,
+                    status_date=status_date,
+                    order_date=now,
+                    created_at=now,
+                    approved_at=now,
+                    notes=note
+                )
+                db.session.add(po)
+                db.session.flush()
+
+            # Extract item fields
+            skus = request.form.getlist('sku[]')
+            quantities = request.form.getlist('quantity[]')
+            unit_prices = request.form.getlist('unit_price[]')
+            raw_dates = request.form.getlist('best_before[]')
+            tax_amounts = request.form.getlist('vat[]')
+            line_totals = request.form.getlist('line_total[]')
+
+            best_before_dates = [
+                datetime.strptime(d, '%Y-%m-%d').date() if d else None for d in raw_dates
+            ]
+
+            subtotal = 0
+            for i in range(len(skus)):
+                if skus[i] and quantities[i]:
+                    qty = float(quantities[i])
+                    price = float(unit_prices[i])
+                    tax = float(tax_amounts[i]) if i < len(tax_amounts) else 0
+                    total = float(line_totals[i]) if i < len(line_totals) else qty * price
+
+                    subtotal += qty * price
+
+                    item = BbPurchaseOrderItem(
+                        po_id=po.id,
+                        sku=skus[i],
+                        quantity_ordered=qty,
+                        unit_price=price,
+                        best_before_date=best_before_dates[i],
+                        tax_amount=tax,
+                        total_amount=total
+                    )
+                    db.session.add(item)
+
+            po.subtotal = subtotal
+            po.vat_amount = vat_amount
+
+            db.session.commit()
+            flash(f"PO {'updated' if po_id else 'created'} successfully as {status}.", 'success')
+            return redirect(url_for('main.purchase_orders'))
+
+        except IntegrityError as e:
+            db.session.rollback()
+            flash(f'Database integrity error: {e}', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Unexpected error: {e}', 'danger')
+
+    # ---- GET context ----
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    supplier_models = BbSupplier.query.filter_by(status='Active').order_by(BbSupplier.name).all()
+    suppliers = [{
+        'id': s.id,
+        'name': s.name,
+        'vendor_code': s.vendor_code,
+        'vat_registered': s.vat_registered
+    } for s in supplier_models]
+
+    users = User.query.order_by(User.first_name).all()
+    products_raw = TocProduct.query.order_by(TocProduct.item_name).all()
+    products_dicts = [product_to_dict(p) for p in products_raw]
+
+    return render_template('po_create.html',
+        suppliers=suppliers,
+        users=users,
+        products=products_dicts,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list
+    )
+
+# @main.route('/purchase_orders/create', methods=['GET', 'POST'])
+# def po_create():
+#     if request.method == 'POST':
+#         try:
+#             po_id = request.form.get('po_id')
+#             supplier_id = request.form['supplier_id']
+#             approved_by = session.get('user_id') or 1
+#             expected_delivery_date = request.form.get('expected_delivery_date')
+#             note = request.form.get('note') or ''
+#             status = request.form.get('status', 'Draft')
+#             status_date = datetime.now(timezone.utc)
+#             vat_amount = float(request.form.get('vat_amount', 0))
+#
+#
+#             now = datetime.now()
+#             if po_id:  # Edit Mode
+#                 po = BbPurchaseOrder.query.get(po_id)
+#                 po.supplier_id = supplier_id
+#                 po.status = status
+#                 po.status_date = status_date
+#                 po.notes = note
+#                 po.expected_delivery_date = expected_delivery_date
+#                 # po.order_date = now
+#                 po.approved_by = approved_by
+#                 po.approved_at = now
+#                 po.subtotal = 0  # will recalculate below
+#                 po.vat_amount = vat_amount
+#
+#                 BbPurchaseOrderItem.query.filter_by(po_id=po.id).delete()
+#             else:
+#                 supplier = BbSupplier.query.get(supplier_id)
+#                 supplier_code = supplier.vendor_code or f"SUP{supplier_id}"
+#                 po_number = generate_vendor_specific_po_number(supplier_id)
+#
+#                 po = BbPurchaseOrder(
+#                     po_number=po_number,
+#                     supplier_id=supplier_id,
+#                     created_by=approved_by,
+#                     approved_by=approved_by,
+#                     status=status,
+#                     status_date=status_date,
+#                     expected_delivery_date=expected_delivery_date,
+#                     order_date=now,
+#                     created_at=now,
+#                     approved_at=now,
+#                     notes=note
+#                 )
+#                 db.session.add(po)
+#                 db.session.flush()
+#
+#             skus = request.form.getlist('sku[]')
+#             quantities = request.form.getlist('quantity[]')
+#             unit_prices = request.form.getlist('unit_price[]')
+#             raw_dates = request.form.getlist('best_before[]')
+#             best_before_dates = [datetime.strptime(d, '%Y-%m-%d').date() if d else None for d in raw_dates]
+#
+#             subtotal = 0
+#             for i in range(len(skus)):
+#                 if skus[i] and quantities[i]:
+#                     quantity = float(quantities[i])
+#                     price = float(unit_prices[i])
+#                     subtotal += quantity * price
+#
+#                     item = BbPurchaseOrderItem(
+#                         po_id=po.id,
+#                         sku=skus[i],
+#                         quantity_ordered=quantity,
+#                         unit_price=price,
+#                         best_before_date=best_before_dates[i]
+#                     )
+#                     db.session.add(item)
+#
+#             po.subtotal = subtotal
+#
+#             db.session.commit()
+#
+#             flash(f"PO {'updated' if po_id else 'created'} successfully as {status}.", 'success')
+#             return redirect(url_for('main.purchase_orders'))
+#
+#         except IntegrityError as e:
+#             db.session.rollback()
+#             flash(f'Database integrity error: {e}', 'danger')
+#         except Exception as e:
+#             db.session.rollback()
+#             flash(f'Unexpected error: {e}', 'danger')
+#
+#     # ---- Context for GET ----
+#     user_data = session.get('user')
+#     user = json.loads(user_data) if user_data else {}
+#     shop_data = session.get('shop')
+#     shop = json.loads(shop_data) if shop_data else {}
+#     roles = TocRole.query.all()
+#     roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+#     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+#     list_of_shops = [s.blName for s in shops]
+#
+#     supplier_models = BbSupplier.query.filter_by(status='Active').order_by(BbSupplier.name).all()
+#     suppliers = [{
+#         'id': s.id,
+#         'name': s.name,
+#         'vendor_code': s.vendor_code,
+#         'vat_registered': s.vat_registered
+#     } for s in supplier_models]
+#
+#     users = User.query.order_by(User.first_name).all()
+#     products_raw = TocProduct.query.order_by(TocProduct.item_name).all()
+#     products_dicts = [product_to_dict(p) for p in products_raw]
+#
+#     return render_template('po_create.html',
+#         suppliers=suppliers,
+#         users=users,
+#         products=products_dicts,
+#         user=user,
+#         shops=list_of_shops,
+#         roles=roles_list
+#     )
+
+
+
+@main.route('/purchase_orders/<int:po_id>')
+def po_detail(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    items = BbPurchaseOrderItem.query.filter_by(po_id=po_id).all()
+    suppliers = BbSupplier.query.all()
+    products = TocProduct.query.all()
+    products_dicts = [product_to_dict(p) for p in products]
+
+    # context user/shop/roles same as in po_create GET
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    users = User.query.order_by(User.first_name).all()
+
+    return render_template(
+        'po_create.html',
+        po=po,
+        items=items,
+        suppliers=suppliers,
+        users=users,
+        products=products_dicts,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        edit_mode=True,
+        view_only=True
+    )
+
+@main.route('/purchase_orders/<int:po_id>/update_status', methods=['POST'])
+def update_po_status(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+
+    # Parse incoming status value
+    data = request.get_json()
+    new_status = data.get('status')
+
+    if new_status not in ['Draft', 'Submitted', 'Approved', 'Sent', 'Partially Received', 'Completed', 'Short Closed', 'Cancelled']:
+        return jsonify({"success": False, "message": f"Invalid status: {new_status}"}), 400
+
+    # Parse user
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    username = user.get('username', 'system')
+
+    # Set status and update timestamps
+    now = datetime.now()
+    po.status = new_status
+    po.status_date = now
+
+    if new_status == 'Approved':
+        po.approved_by = username
+        po.approved_at = now
+    elif new_status == 'Cancelled':
+        po.cancelled_at = now
+    elif new_status == 'Short Closed':
+        po.short_closed_at = now
+
+    db.session.commit()
+    return jsonify({"success": True, "message": f"PO {po.po_number} status updated to {new_status}."})
+
+
+
+
+@main.route('/purchase_orders/<int:po_id>/approve')
+def po_approve(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    po.status = 'Approved'
+    po.status_date = datetime.utcnow()
+    db.session.commit()
+    flash(f'PO {po.po_number} approved.', 'success')
+    return redirect(url_for('main.purchase_orders'))
+
+@main.route('/purchase_orders/<int:po_id>/delete')
+def po_delete(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+
+    # Delete PO items
+    BbPurchaseOrderItem.query.filter_by(po_id=po.id).delete()
+
+    # Find GRV number if exists
+    grv_row = db.session.execute(text("SELECT grv_number FROM bb_grv WHERE po_id = :po_id"), {'po_id': po_id}).fetchone()
+    if grv_row:
+        grv_number = grv_row[0]
+
+        # Delete GRV items first
+        db.session.execute(text("DELETE FROM bb_grv_items WHERE grv_number = :grv_number"), {'grv_number': grv_number})
+
+        # Then delete the GRV header
+        db.session.execute(text("DELETE FROM bb_grv WHERE po_id = :po_id"), {'po_id': po_id})
+
+    # Delete the PO header
+    db.session.delete(po)
+    db.session.commit()
+
+    flash(f'PO {po.po_number} and all related records deleted.', 'warning')
+    return redirect(url_for('main.purchase_orders'))
+
+
+@main.route('/purchase_orders/<int:po_id>/edit')
+def po_edit(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    po.supplier = BbSupplier.query.get(po.supplier_id)
+    items = BbPurchaseOrderItem.query.filter_by(po_id=po.id).all()
+
+    # Enrich each item with product data (name, size, barcode)
+    for item in items:
+        product = TocProduct.query.filter_by(item_sku=item.sku).first()
+        item.item_name = product.item_name if product else ''
+        item.size = product.size if product else ''
+        item.barcode = product.barcode if product else ''
+
+    suppliers_raw = BbSupplier.query.all()
+    suppliers = [{
+        'id': s.id,
+        'name': s.name,
+        'email': s.email,
+        'vat_registered': s.vat_registered  # ✅ Add this line
+    } for s in suppliers_raw]
+
+    products_raw = TocProduct.query.all()
+    products = [product_to_dict(p) for p in products_raw]
+
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    users = User.query.order_by(User.first_name).all()
+
+    return render_template(
+        'po_create.html',
+        po=po,
+        items=items,
+        suppliers=suppliers,
+        users=users,
+        products=products,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        edit_mode=True,
+        view_only=False
+    )
+
+from decimal import Decimal
+
+@main.route('/purchase_orders/<int:po_id>/view')
+def po_view(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    po.supplier = BbSupplier.query.get(po.supplier_id)
+    items = BbPurchaseOrderItem.query.filter_by(po_id=po.id).all()
+
+    # Enrich line items with product details
+    for item in items:
+
+        print("✅ Item best_before_date:", item.best_before_date)
+
+        product = TocProduct.query.filter_by(item_sku=item.sku).first()
+        item.item_name = product.item_name if product else ''
+        item.size = product.size if product else ''
+        item.barcode = product.barcode if product else ''
+        item.cost_price = product.cost_price
+        item.retail_price = product.retail_price
+        item.vat_exempt_ind = product.vat_exempt_ind if product else 0  # ✅ ensure it's available in Jinja
+
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    default_shop = next((s for s in shops if s.blName == "Woodmeed"), shops[0])
+
+    users = User.query.order_by(User.first_name).all()
+    suppliers = BbSupplier.query.order_by(BbSupplier.name).all()
+
+    default_shop = next((s for s in shops if s.blName == "Woodmeed"), shops[0])
+
+    return render_template(
+        'po_view.html',
+        po=po,
+        items=items,
+        users=users,
+        suppliers=suppliers,
+        user=user,
+        shops=shops,  # ✅ full shop objects for address lookup
+        list_of_shops=list_of_shops,  # ✅ just names for the dropdown
+        default_shop=default_shop,
+        roles=roles_list,
+        Decimal=Decimal
+    )
+
+
+@main.route('/purchase_orders/<int:po_id>/mark_sent')
+def mark_po_sent(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    if po.status == 'Approved':
+        po.status = 'Sent'
+        po.status_date = datetime.now()
+        db.session.commit()
+        flash(f"PO {po.po_number} marked as Sent.", "success")
+    else:
+        flash("Only Approved POs can be marked as Sent.", "warning")
+    return redirect(url_for('main.purchase_orders'))
+
+@main.route('/purchase_orders/<int:po_id>/cancel')
+def cancel_po(po_id):
+    po = BbPurchaseOrder.query.get_or_404(po_id)
+    if po.status not in ['Completed', 'Cancelled']:
+        po.status = 'Cancelled'
+        po.status_date = datetime.now()
+        db.session.commit()
+        flash(f"PO {po.po_number} has been cancelled.", "info")
+    else:
+        flash("Cannot cancel a completed or already cancelled PO.", "warning")
+    return redirect(url_for('main.purchase_orders'))
+
+##############  Handle Receive Goods
+
+@main.route('/receive_goods', methods=['GET'])
+def receive_goods():
+    # Application context
+    user_data = session.get('user_data')
+    user = json.loads(user_data) if user_data else {}
+    user_id = user.get('user_id')
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    users = User.query.order_by(User.first_name).all()
+
+    # Include damage_ind and mismatch_ind explicitly
+    pos = db.session.execute(text("""
+        SELECT 
+            po.id, 
+            po.po_number, 
+            s.name AS supplier_name, 
+            po.status AS po_status, 
+            grv.status AS grv_status,
+            grv.damage_ind,
+            grv.mismatch_ind
+        FROM bb_purchase_orders po
+        JOIN bb_suppliers s ON s.id = po.supplier_id
+        LEFT JOIN bb_grv grv ON grv.po_id = po.id
+        WHERE po.status IN ('Approved', 'Sent', 'Partially Received')
+        ORDER BY po.created_at DESC
+    """)).fetchall()
+
+    return render_template('receive_goods.html',
+                           user=user,
+                           roles=roles_list,
+                           shop=shop,
+                           users=users,
+                           shops=list_of_shops,
+                           pos=pos)
+
+
+
+@main.route('/receive_grv/<int:po_id>', methods=['GET'])
+def receive_grv_form(po_id):
+    user_data = session.get('user_data')
+    user = json.loads(user_data) if user_data else {}
+    user_id = user.get('user_id')
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+    users = User.query.order_by(User.first_name).all()
+
+    po = db.session.execute(text("""
+        SELECT 
+            po.id, 
+            po.po_number, 
+            s.name AS supplier_name, 
+            po.status AS po_status, 
+            grv.status AS grv_status,
+            grv.damage_ind,
+            grv.mismatch_ind
+        FROM bb_purchase_orders po
+        JOIN bb_suppliers s ON s.id = po.supplier_id
+        LEFT JOIN bb_grv grv ON grv.po_id = po.id
+        WHERE po.id = :po_id
+    """), {'po_id': po_id}).fetchone()
+
+    # Fetch the GRV if it exists
+    grv = db.session.execute(text("""
+        SELECT
+            invoice_number,
+            invoice_date,
+            status,
+            update_date,
+            invoice_vat_total,
+            invoice_total_amount,
+            diff_amount,
+            po_total_amount,
+            po_vat_total
+        FROM bb_grv
+        WHERE po_id = :po_id
+    """), {'po_id': po_id}).fetchone()
+
+    invoice_date = ''
+    if grv and hasattr(grv, 'invoice_date') and grv.invoice_date:
+        try:
+            invoice_date = grv.invoice_date.strftime('%Y-%m-%d')
+        except:
+            invoice_date = str(grv.invoice_date)
+
+    grv_status = grv.status if grv and hasattr(grv, 'status') else 'Draft'
+    readonly = grv_status in ['Received', 'Completed']
+
+    items = db.session.execute(text("""
+        SELECT i.id, i.sku, p.item_name, p.size, i.quantity_ordered, p.cost_price,
+               i.tax_amount, i.total_amount
+        FROM bb_purchase_order_items i
+        JOIN toc_product p ON p.item_sku = i.sku
+        WHERE i.po_id = :po_id
+    """), {'po_id': po_id}).fetchall()
+
+    # Fetch latest GRV items per PO item
+    grv_items = db.session.execute(text("""
+        SELECT bi.po_item_id,
+               bi.quantity_received,
+               bi.best_before_date,
+               bi.damaged_quantity,
+               bi.invoice_quantity,
+               bi.invoice_price,
+               bi.invoice_vat,
+               bi.invoice_amount,
+               bi.rejected_quantity
+        FROM bb_grv_items bi
+        JOIN bb_grv bg ON bg.id = bi.grv_id
+        WHERE bg.po_id = :po_id
+          AND bi.id IN (
+              SELECT MAX(bi2.id)
+              FROM bb_grv_items bi2
+              JOIN bb_grv bg2 ON bg2.id = bi2.grv_id
+              WHERE bg2.po_id = :po_id
+              GROUP BY bi2.po_item_id
+          )
+    """), {'po_id': po_id}).fetchall()
+
+    # Build GRV item dict for template
+    grv_items_dict = {}
+    for row in grv_items:
+        grv_items_dict[row.po_item_id] = {
+            'quantity_received': row.quantity_received,
+            'best_before_date': row.best_before_date,
+            'damaged_quantity': row.damaged_quantity,
+            'invoice_quantity': row.invoice_quantity,
+            'invoice_price': row.invoice_price,
+            'invoice_vat': row.invoice_vat,
+            'invoice_amount': row.invoice_amount,
+            'rejected_quantity': row.rejected_quantity
+        }
+
+    # If no existing GRV items, pre-fill invoice_quantity = quantity_ordered
+    if not grv_items_dict:
+        for item in items:
+            grv_items_dict[item.id] = {
+                'quantity_received': item.quantity_ordered,
+                'best_before_date': '',
+                'damaged_quantity': 0,
+                'invoice_quantity': item.quantity_ordered,
+                'invoice_price': '',
+                'invoice_vat': '',
+                'invoice_amount': '',
+                'rejected_quantity': 0
+            }
+
+    return render_template('receive_grv_form.html',
+                           user=user,
+                           roles=roles_list,
+                           shop=shop,
+                           users=users,
+                           shops=list_of_shops,
+                           po=po,
+                           items=items,
+                           grv_items_dict=grv_items_dict,
+                           grv=grv,
+                           readonly=readonly,
+                           invoice_date=invoice_date)
+
+
+@main.route('/submit_grv/<int:po_id>', methods=['POST'])
+def submit_grv(po_id):
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    user_id = user.get('id')
+    note = request.form.get('note')
+
+    # Validate invoice number/date
+    invoice_number = request.form.get("invoice_number")
+    invoice_date = request.form.get("invoice_date")
+
+    if not invoice_number or not invoice_date:
+        flash("Invoice number and invoice date are required to submit GRV.", "danger")
+        return redirect(url_for('main.receive_grv_form', po_id=po_id))
+
+    # Get PO
+    po = db.session.execute(text("SELECT id, po_number FROM bb_purchase_orders WHERE id = :po_id"),
+                            {'po_id': po_id}).fetchone()
+    if not po:
+        flash("Purchase order not found.", "danger")
+        return redirect(url_for('main.receive_goods'))
+
+    grv_number = f"GRV-{po.po_number}"
+
+    # Fetch PO items
+    po_items = db.session.execute(text("""
+        SELECT i.id, i.sku, p.item_name AS description, i.unit_price, i.quantity_ordered
+        FROM bb_purchase_order_items i
+        JOIN toc_product p ON i.sku = p.item_sku
+        WHERE i.po_id = :po_id
+    """), {'po_id': po_id}).fetchall()
+
+    # Get all totals from the form (populated via client-side JS)
+    po_vat_total = Decimal(str(request.form.get("po_vat_total") or "0.00"))
+    po_total_amount = Decimal(str(request.form.get("po_total") or "0.00"))
+    invoice_vat_total = Decimal(str(request.form.get("inv_vat") or "0.00"))
+    invoice_total_amount = Decimal(str(request.form.get("inv_total") or "0.00"))
+    diff_amount = Decimal(str(request.form.get("difference") or "0.00"))
+
+    # Upsert bb_grv
+    existing_grv = db.session.execute(text("SELECT id FROM bb_grv WHERE po_id = :po_id"),
+                                      {'po_id': po_id}).fetchone()
+
+    if existing_grv:
+        grv_id = existing_grv.id if hasattr(existing_grv, 'id') else existing_grv[0]
+        db.session.execute(text("""
+            UPDATE bb_grv
+            SET received_by = :received_by,
+                comments = :comments,
+                invoice_number = :invoice_number,
+                invoice_date = :invoice_date,
+                invoice_vat_total = :invoice_vat_total,
+                invoice_total_amount = :invoice_total_amount,
+                po_vat_total = :po_vat_total,
+                po_total_amount = :po_total_amount,
+                diff_amount = :diff_amount,
+                update_date = CURRENT_TIMESTAMP,
+                status = 'Saved'
+            WHERE po_id = :po_id
+        """), {
+            'received_by': user_id,
+            'comments': note,
+            'invoice_number': invoice_number,
+            'invoice_date': invoice_date,
+            'invoice_vat_total': invoice_vat_total,
+            'invoice_total_amount': invoice_total_amount,
+            'po_vat_total': po_vat_total,
+            'po_total_amount': po_total_amount,
+            'diff_amount': diff_amount,
+            'po_id': po_id
+        })
+    else:
+        db.session.execute(text("""
+            INSERT INTO bb_grv (
+                grv_number, po_id, received_by, comments,
+                invoice_number, invoice_date,
+                invoice_vat_total, invoice_total_amount,
+                po_vat_total, po_total_amount, diff_amount,
+                creation_date, update_date, status
+            ) VALUES (
+                :grv_number, :po_id, :received_by, :comments,
+                :invoice_number, :invoice_date,
+                :invoice_vat_total, :invoice_total_amount,
+                :po_vat_total, :po_total_amount, :diff_amount,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'Saved'
+            )
+        """), {
+            'grv_number': grv_number,
+            'po_id': po_id,
+            'received_by': user_id,
+            'comments': note,
+            'invoice_number': invoice_number,
+            'invoice_date': invoice_date,
+            'invoice_vat_total': invoice_vat_total,
+            'invoice_total_amount': invoice_total_amount,
+            'po_vat_total': po_vat_total,
+            'po_total_amount': po_total_amount,
+            'diff_amount': diff_amount
+        })
+        grv_id = db.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+
+    # Loop and save GRV items
+    for row in po_items:
+        item_id = row.id
+        sku = row.sku
+        description = row.description
+        cost_price = Decimal(str(row.unit_price or 0.00))
+        quantity_ordered = row.quantity_ordered or 0
+
+        qty_received = int(request.form.get(f"received_{item_id}", type=float) or 0)
+
+        best_before = request.form.get(f"best_before_{item_id}") or None
+        damaged_qty = int(request.form.get(f"damaged_{item_id}", type=float) or 0)
+        invoice_qty = int(request.form.get(f"invoice_qty_{item_id}", type=float) or 0)
+        invoice_amount = Decimal(str(request.form.get(f"invoice_total_{item_id}", type=float) or 0.00))
+        invoice_vat_input = request.form.get(f"invoice_vat_{item_id}")
+
+        if invoice_vat_input:
+            invoice_vat = Decimal(str(invoice_vat_input))
+        else:
+            invoice_vat = (invoice_amount * Decimal("0.15")).quantize(Decimal("0.01"))
+
+        # Now calculate invoice_amount
+        invoice_amount = request.form.get(f"invoice_total_{item_id}", type=float) or 0.00
+
+        po_amount = round(cost_price * quantity_ordered, 2)
+        po_vat = round(po_amount * Decimal("0.15"), 2)
+
+        exists = db.session.execute(text("""
+            SELECT id FROM bb_grv_items
+            WHERE grv_number = :grv_number AND po_item_id = :po_item_id
+        """), {
+            'grv_number': grv_number,
+            'po_item_id': item_id
+        }).fetchone()
+
+        data = {
+            'grv_id': grv_id,
+            'grv_number': grv_number,
+            'po_item_id': item_id,
+            'sku': sku,
+            'description': description,
+            'cost_price': cost_price,
+            'quantity_ordered': quantity_ordered,
+            'po_vat': po_vat,
+            'po_amount': po_amount,
+            'quantity_received': qty_received,
+            'damaged_quantity': damaged_qty,
+            'best_before_date': best_before,
+            'invoice_quantity': invoice_qty,
+            'invoice_vat': invoice_vat,
+            'invoice_amount': invoice_amount,
+        }
+
+        if exists:
+            db.session.execute(text("""
+                UPDATE bb_grv_items
+                SET sku = :sku,
+                    description = :description,
+                    cost_price = :cost_price,
+                    quantity_ordered = :quantity_ordered,
+                    po_vat = :po_vat,
+                    po_amount = :po_amount,
+                    quantity_received = :quantity_received,
+                    damaged_quantity = :damaged_quantity,
+                    best_before_date = :best_before_date,
+                    invoice_quantity = :invoice_quantity,
+                    invoice_vat = :invoice_vat,
+                    invoice_amount = :invoice_amount,
+                    updated_at = CURRENT_TIMESTAMP,
+                    grv_id = :grv_id
+                WHERE grv_number = :grv_number AND po_item_id = :po_item_id
+            """), data)
+        else:
+            db.session.execute(text("""
+                INSERT INTO bb_grv_items (
+                    grv_id, grv_number, po_item_id, sku, description,
+                    cost_price, quantity_ordered, po_vat, po_amount,
+                    quantity_received, damaged_quantity, best_before_date,
+                    invoice_quantity, invoice_vat, invoice_amount,
+                    created_at, updated_at
+                ) VALUES (
+                    :grv_id, :grv_number, :po_item_id, :sku, :description,
+                    :cost_price, :quantity_ordered, :po_vat, :po_amount,
+                    :quantity_received, :damaged_quantity, :best_before_date,
+                    :invoice_quantity, :invoice_vat, :invoice_amount,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+            """), data)
+
+    db.session.commit()
+    db.session.expire_all()  # Ensure helper reads fresh data
+    update_grv_flags(po_id)
+    session['show_grv_modal'] = True
+    return redirect(url_for('main.receive_goods'))
+
+
+
+@main.route("/confirm_grv/<int:po_id>", methods=["POST"])
+def confirm_grv(po_id):
+    grv = BbGrv.query.filter_by(po_id=po_id).first()
+    if not grv:
+        return jsonify({"error": "GRV not found"}), 404
+
+    grv.status = "Completed"
+    db.session.commit()
+    return jsonify({"message": "GRV status updated to Completed"})
+
+@main.route("/create_debit_note/<int:po_id>", methods=["POST"])
+def create_debit_note(po_id):
+    grv = BbGrv.query.filter_by(po_id=po_id).first()
+    if not grv:
+        return jsonify({"error": "GRV not found"}), 404
+
+    grv.status = "Completed"
+    db.session.commit()
+    return jsonify({"message": "Debit Note created successfully. GRV is now completed."})
+
+
+
+
+# upload suppliers invoices
+@main.route('/upload_invoice/<int:po_id>', methods=['POST'])
+def upload_invoice(po_id):
+    uploaded_file = request.files.get('invoice_file')
+    if not uploaded_file or uploaded_file.filename == '':
+        flash('No file uploaded.', 'danger')
+        return redirect(request.referrer)
+
+    from werkzeug.utils import secure_filename
+    filename = secure_filename(uploaded_file.filename)
+
+    # Adjust this path to your actual project directory
+    save_path = os.path.join(os.getcwd(), 'uploads', 'invoices', filename)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    uploaded_file.save(save_path)
+    flash(f'{filename} uploaded successfully to {save_path}', 'success')
+    return redirect(request.referrer)
+
+
+@main.route('/test_upload', methods=['GET', 'POST'])
+def test_upload():
+    if request.method == 'POST':
+        file = request.files.get('invoice_file')
+        print("Got file:", file.filename if file else "None")
+        if file:
+            path = os.path.join('uploads', 'invoices', secure_filename(file.filename))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            file.save(path)
+            return "File uploaded!"
+        return "No file found"
+    return '''
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="invoice_file">
+            <input type="submit">
+        </form>
+    '''
+
+# @main.route("/extract_invoice_items", methods=["POST"])
+# def extract_invoice_items():
+#     try:
+#         # 1. Validate uploaded file
+#         if "invoice_pdf" not in request.files:
+#             return jsonify({"error": "Missing PDF file"}), 400
+#
+#         file = request.files["invoice_pdf"]
+#         temp_dir = "/tmp"  # Or a safer location on your server
+#         unique_filename = f"{uuid.uuid4()}.pdf"
+#         pdf_path = os.path.join(temp_dir, unique_filename)
+#         file.save(pdf_path)
+#
+#         # 2. Convert first page of PDF to image
+#         images = convert_from_path(pdf_path, dpi=300)
+#         image_path = os.path.join(temp_dir, unique_filename.replace(".pdf", ".png"))
+#         images[0].save(image_path, "PNG")
+#
+#         # 3. Convert image to base64
+#         with open(image_path, "rb") as image_file:
+#             base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+#
+#         # 4. Call OpenAI Vision
+#         client = OpenAI(api_key=current_app.config["OPENAI_KEY"])
+#
+#         response = client.chat.completions.create(
+#             model="gpt-4o",
+#             messages=[
+#                 {
+#                     "role": "user",
+#                     "content": [
+#                         {
+#                             "type": "text",
+#                             "text": (
+#                                 "Extract ALL line items from this invoice. "
+#                                 "Return JSON with fields: product_code, qty, description, unit_price, vat, total_incl_vat. "
+#                                 "Ignore signatures and summary totals."
+#                             )
+#                         },
+#                         {
+#                             "type": "image_url",
+#                             "image_url": {
+#                                 "url": f"data:image/png;base64,{base64_image}"
+#                             }
+#                         }
+#                     ]
+#                 }
+#             ],
+#             max_tokens=4096  # Increase token limit
+#         )
+#
+#         content = response.choices[0].message.content
+#         # Remove Markdown-style ```json ... ```
+#         cleaned = re.sub(r"^```(?:json)?\\n", "", content.strip())
+#         cleaned = re.sub(r"\\n```$", "", cleaned.strip())
+#
+#         content = cleaned
+#
+#         # 5. Save items to db
+#         po_id = request.args.get("po_id", type=int)
+#         if not po_id:
+#             return jsonify({"error": "Missing PO ID"}), 400
+#
+#         try:
+#             items = json.loads(content)
+#         except Exception as e:
+#             return jsonify({"error": "The application can't process the file. Please load GRV manually."}), 400
+#
+#         db.session.query(BbSupplierInvoiceItem).filter_by(po_id=po_id).delete()
+#
+#         for item in items:
+#             db.session.add(BbSupplierInvoiceItem(
+#                 po_id=po_id,
+#                 product_code=item.get("product_code", "").strip(),
+#                 description=item.get("description", "").strip(),
+#                 qty=item.get("qty"),
+#                 unit_price=item.get("unit_price"),
+#                 vat=item.get("vat"),
+#                 total_incl_vat=item.get("total_incl_vat"),
+#                 created_at=datetime.utcnow()
+#             ))
+#
+#         db.session.commit()
+#
+#         return jsonify({"line_items": content})
+#
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+
+##########################  Bill Of Materials   ####################################
+
+@main.route('/bom')
+def bom_list():
+
+    # Restore context
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    # -----------------------------------------------------
+    # SUPER FAST QUERY — Groups by bom_id (product SKU)
+    # -----------------------------------------------------
+    sql = """
+        SELECT 
+            c.bom_id,
+            c.bom_name,
+            COUNT(c.id) AS component_count,
+            p.cost_price
+        FROM toc_bom_components c
+        JOIN toc_product p 
+            ON p.item_sku COLLATE utf8mb4_unicode_ci =
+               c.bom_id COLLATE utf8mb4_unicode_ci
+        GROUP BY 
+            c.bom_id, c.bom_name, p.cost_price
+        ORDER BY 
+            c.bom_name
+    """
+    result = db.session.execute(db.text(sql)).mappings().all()
+
+    # Convert into list of dicts for Jinja
+    boms = [{
+        "bom_id": row["bom_id"],
+        "bom_name": row["bom_name"],
+        "components": row["component_count"],
+        "cost_price": row["cost_price"]
+    } for row in result]
+
+    return render_template(
+        "bom_list.html",
+        boms=boms,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list
+    )
+
+@main.route('/bom/create', methods=['GET', 'POST'])
+def bom_create():
+
+    # ---------------------------------------------------
+    # Restore application context (REQUIRED for UI header)
+    # ---------------------------------------------------
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    # ---------------------------------------------------
+    # Load products
+    # ---------------------------------------------------
+    all_products = TocProduct.query.filter_by(is_active=True).all()
+
+    # All BOM parent IDs already in use
+    existing_bom_ids = {row[0] for row in db.session.query(TocBOMComponent.bom_id).distinct()}
+
+    # PR products without BOM
+    products_pr = [
+        p for p in all_products
+        if p.item_type == 'PR' and p.item_sku not in existing_bom_ids
+    ]
+
+    # CO component list
+    components = [p for p in all_products if p.item_type == 'CO']
+
+    # ---------------------------------------------------
+    # SERIALIZE for template
+    # ---------------------------------------------------
+    products_json = [{
+        "item_sku": p.item_sku,
+        "item_name": p.item_name,
+        "cost_price": float(p.cost_price or 0)
+    } for p in products_pr]
+
+    components_json = [{
+        "item_sku": p.item_sku,
+        "item_name": p.item_name,
+        "cost_price": float(p.cost_price or 0)
+    } for p in components]
+
+    # ---------------------------------------------------
+    # POST — Save new BOM
+    # ---------------------------------------------------
+    if request.method == 'POST':
+        bom_id = request.form.get('product_sku')
+
+        # --------------------------------------------
+        # 🔒 SAFETY CHECK: Does this BOM already exist?
+        # --------------------------------------------
+        if TocBOMComponent.query.filter_by(bom_id=bom_id).first():
+            flash("This product already has a BOM defined.", "warning")
+            return redirect(url_for('main.bom_list'))
+
+
+        product = TocProduct.query.get(bom_id)
+        bom_name = product.item_name if product else None
+
+        comp_skus = request.form.getlist('component_sku[]')
+        comp_qtys = request.form.getlist('quantity[]')
+
+        for sku, qty in zip(comp_skus, comp_qtys):
+            if not sku:
+                continue
+            qty = float(qty or 0)
+            if qty <= 0:
+                continue
+
+            comp = TocProduct.query.get(sku)
+
+            db.session.add(TocBOMComponent(
+                bom_id=bom_id,
+                bom_name=bom_name,
+                component_sku=sku,
+                component_name=comp.item_name if comp else None,
+                quantity=qty,
+                cost=qty * float(comp.cost_price or 0)
+            ))
+
+        db.session.commit()
+        flash("BOM created successfully", "success")
+        return redirect(url_for('main.bom_list'))
+
+    # ---------------------------------------------------
+    # Render template
+    # ---------------------------------------------------
+    return render_template(
+        "bom_create.html",
+        edit_mode=False,
+        products=products_json,
+        components=components_json,
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list
+    )
+
+
+
+@main.route('/bom/<string:bom_id>/edit', methods=['GET', 'POST'])
+def bom_edit(bom_id):
+
+    # Load context
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    # Ensure the BOM exists
+    components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
+    if not components:
+        flash(f"BOM {bom_id} not found.", "danger")
+        return redirect(url_for('main.bom_list'))
+
+    # Get product info
+    product = TocProduct.query.filter_by(item_sku=bom_id).first()
+    bom_name = product.item_name if product else ""
+    product_cost = product.cost_price if product else 0
+
+    existing_components = [
+        {
+            "component_sku": c.component_sku,
+            "component_name": c.component_name,
+            "quantity": float(c.quantity)
+        }
+        for c in components
+    ]
+
+    # Product + component lists
+    manufacturable_products = TocProduct.query.filter_by(
+        is_active=True, item_type='PR'
+    ).order_by(TocProduct.item_name).all()
+
+    component_products = TocProduct.query.filter_by(
+        is_active=True, item_type='CO'
+    ).order_by(TocProduct.item_name).all()
+
+    # POST: save updates
+    if request.method == "POST":
+
+        TocBOMComponent.query.filter_by(bom_id=bom_id).delete()
+
+        component_skus = request.form.getlist("component_sku[]")
+        quantities = request.form.getlist("quantity[]")
+
+        for sku, qty in zip(component_skus, quantities):
+            if sku and qty:
+                p = TocProduct.query.filter_by(item_sku=sku).first()
+                component_name = p.item_name if p else ""
+                cost = (p.cost_price or 0) * float(qty)
+
+                db.session.add(TocBOMComponent(
+                    bom_id=bom_id,
+                    bom_name=bom_name,
+                    component_sku=sku,
+                    component_name=component_name,
+                    quantity=qty,
+                    cost=cost
+                ))
+
+        db.session.commit()
+        flash("BOM updated successfully!", "success")
+        return redirect(url_for("main.bom_list"))
+
+    return render_template(
+        "bom_create.html",
+        edit_mode=True,
+        bom_id=bom_id,
+        bom_name=bom_name,
+        product_cost=product_cost,
+        existing_components=existing_components,
+        products=[{"item_sku": p.item_sku, "item_name": p.item_name} for p in manufacturable_products],
+        components=[{"item_sku": p.item_sku, "item_name": p.item_name, "cost_price": p.cost_price}
+                    for p in component_products],
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list
+    )
+
+
+@main.route('/bom/<string:bom_id>/delete', methods=['POST'])
+def bom_delete(bom_id):
+    try:
+        # 1. Delete all components belonging to this BOM
+        deleted = TocBOMComponent.query.filter_by(bom_id=bom_id).delete()
+
+        if deleted == 0:
+            flash(f"No BOM found for product SKU {bom_id}.", "warning")
+            return redirect(url_for('main.bom_list'))
+
+        # 2. Commit deletion
+        db.session.commit()
+
+        flash(f"BOM for product SKU {bom_id} deleted successfully.", "success")
+        return redirect(url_for('main.bom_list'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error deleting BOM {bom_id}: {str(e)}", "danger")
+        return redirect(url_for('main.bom_list'))
+
+
+
+
 
 
 if __name__ == '__main__':

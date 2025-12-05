@@ -123,6 +123,16 @@
               <i class="bi bi-circle"></i><span>Products</span>
             </a>
           </li>
+          <li id="manageSuppliers">
+            <a href="{{ url_for('main.suppliers') }}">
+              <i class="bi bi-circle"></i><span>Suppliers</span>
+            </a>
+          </li>
+            <li id="manageBOM">
+              <a href="{{ url_for('main.bom_list') }}">
+                <i class="bi bi-diagram-3"></i><span>Bill of Materials</span>
+              </a>
+            </li>
            <li id="logs">
             <a href="{{ url_for('main.admin_logs') }}">
               <i class="bi bi-circle"></i><span>System Logs</span>
@@ -162,6 +172,36 @@
       </span>
     </a>
   </li><!-- End Dashboard Nav -->
+
+<li class="nav-item">
+  <a class="nav-link collapsed" data-bs-target="#po-nav" data-bs-toggle="collapse">
+    <i class="bi bi-truck"></i><span>Purchase Orders</span><i class="bi bi-chevron-down ms-auto"></i>
+  </a>
+  <ul id="po-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+    <li id="createPO">
+      <a href="{{ url_for('main.po_create') }}">
+        <i class="bi bi-circle"></i><span>Create PO</span>
+      </a>
+    </li>
+    <li id="viewPO">
+      <a href="{{ url_for('main.purchase_orders') }}">
+        <i class="bi bi-circle"></i><span>View POs</span>
+      </a>
+    </li>
+    <li id="receiveGRV">
+      <a href="{{ url_for('main.receive_goods') }}">
+        <i class="bi bi-circle"></i><span>Receive Goods (GRV)</span>
+      </a>
+    </li>
+    {#
+    <li id="poReports">
+      <a href="{{ url_for('main.po_reports') }}">
+        <i class="bi bi-circle"></i><span>PO Reports</span>
+      </a>
+    </li>
+    #}
+  </ul>
+</li>
 
   <li class="nav-item" id="online-sales">
     <a class="nav-link {{ 'active' if request.endpoint=='main.online_sales' else 'collapsed' }}"

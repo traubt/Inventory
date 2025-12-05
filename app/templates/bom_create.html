@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>
+    {% if edit_mode %}Edit BOM{% else %}Create BOM{% endif %}
+  </title>
+
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+</head>
+
+<body>
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+<main id="main" class="main">
+
+  <div class="pagetitle">
+    <h1>{% if edit_mode %}Edit Bill of Materials{% else %}Create Bill of Materials{% endif %}</h1>
+    <nav>
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="#">Home</a></li>
+        <li class="breadcrumb-item">Admin</li>
+        <li class="breadcrumb-item"><a href="/bom">Bill of Materials</a></li>
+        <li class="breadcrumb-item active">{% if edit_mode %}Edit{% else %}Create{% endif %}</li>
+      </ol>
+    </nav>
+  </div>
+
+  <section class="section">
+    <div class="card">
+      <div class="card-body">
+
+        <form method="POST" id="bomForm">
+
+          <!-- ===========================
+               FINISHED PRODUCT SECTION
+          ============================= -->
+          <h5 class="card-title">Finished Product</h5>
+
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Product SKU</label>
+              <select class="form-select" name="product_sku" id="product_sku" {% if edit_mode %} disabled {% endif %} required>
+                <option value="">-- Select Product --</option>
+                {% for p in products %}
+                <option value="{{ p.item_sku }}">
+                  {{ p.item_sku }} - {{ p.item_name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Description</label>
+              <input type="text" class="form-control" name="description" id="description"
+                placeholder="Product description">
+            </div>
+          </div>
+
+          <!-- ===========================
+               COST DISPLAY ROW
+          ============================= -->
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Product Cost Price</label>
+              <input type="text" id="product_cost" class="form-control" disabled>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Components Total Cost</label>
+              <input type="text" id="components_total_cost" class="form-control" disabled>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Difference (Product - Components)</label>
+              <input type="text" id="cost_difference" class="form-control" disabled>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- ===========================
+               COMPONENT LIST TABLE
+          ============================= -->
+          <h5 class="card-title">Components</h5>
+
+          <table class="table table-bordered" id="componentsTable">
+            <thead>
+              <tr>
+                <th style="width: 35%">Component SKU</th>
+                <th>Description</th>
+                <th style="width: 12%">Qty</th>
+                <th style="width: 12%">Cost</th>
+                <th style="width: 5%">Action</th>
+              </tr>
+            </thead>
+            <tbody id="componentRows">
+            </tbody>
+          </table>
+
+          <button type="button" class="btn btn-outline-primary mb-3" id="addRowBtn">
+            + Add Component
+          </button>
+
+          <!-- BUTTONS -->
+          <div class="mt-4">
+            <button type="submit" class="btn btn-success">
+              {% if edit_mode %}Update BOM{% else %}Save BOM{% endif %}
+            </button>
+            <a href="/bom" class="btn btn-secondary">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  const products = {{ products | tojson }};
+  const components = {{ components | tojson }};
+
+  // If editing, preload old components
+  const existing = {% if edit_mode %} {{ existing_components | tojson }} {% else %} [] {% endif %};
+
+  // ===========================
+  // EVENT: SET PRODUCT DETAILS
+  // ===========================
+  $("#product_sku").on("change", function () {
+    let sku = $(this).val();
+    let p = products.find(x => x.item_sku === sku);
+
+    $("#description").val(p ? p.item_name : "");
+    $("#product_cost").val(p ? p.cost_price : "");
+
+    updateCostTotals();
+  });
+
+  // ===========================
+  // COMPONENT ROW ADD
+  // ===========================
+  $("#addRowBtn").click(function () {
+    addComponentRow();
+  });
+
+  function addComponentRow(data = null) {
+    let row = `
+      <tr>
+        <td>
+          <select class="form-select component-sku" name="component_sku[]" required>
+            <option value="">-- Select --</option>
+            {% for c in components %}
+              <option value="{{ c.item_sku }}">{{ c.item_sku }} - {{ c.item_name }}</option>
+            {% endfor %}
+          </select>
+        </td>
+
+        <td>
+          <input type="text" class="form-control component-desc" disabled>
+        </td>
+
+        <td>
+          <input type="number" class="form-control qty" name="quantity[]" min="0.01" step="0.01" value="1" required>
+        </td>
+
+        <td>
+          <input type="text" class="form-control comp-cost" disabled>
+        </td>
+
+        <td>
+          <button type="button" class="btn btn-danger btn-sm remove-row">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>`;
+
+    $("#componentRows").append(row);
+
+    let added = $("#componentRows tr").last();
+
+    // Pre-fill if editing
+    if (data) {
+      added.find(".component-sku").val(data.component_sku).change();
+      added.find(".qty").val(data.quantity);
+    }
+
+    updateCostTotals();
+  }
+
+  // ===============================
+  // COMPONENT SELECTION CHANGE
+  // ===============================
+  $(document).on("change", ".component-sku", function () {
+    let sku = $(this).val();
+    let comp = components.find(x => x.item_sku === sku);
+    let row = $(this).closest("tr");
+
+    row.find(".component-desc").val(comp ? comp.item_name : "");
+    row.find(".comp-cost").val(comp ? comp.cost_price : "");
+
+    updateCostTotals();
+  });
+
+  // ===============================
+  // QUANTITY CHANGE
+  // ===============================
+  $(document).on("input", ".qty", function () {
+    updateCostTotals();
+  });
+
+  // ===============================
+  // REMOVE COMPONENT ROW
+  // ===============================
+  $(document).on("click", ".remove-row", function () {
+    $(this).closest("tr").remove();
+    updateCostTotals();
+  });
+
+  // ===============================
+  // COST CALCULATION
+  // ===============================
+  function updateCostTotals() {
+    let total = 0;
+
+    $("#componentRows tr").each(function () {
+      let sku = $(this).find(".component-sku").val();
+      let qty = parseFloat($(this).find(".qty").val()) || 0;
+
+      let comp = components.find(x => x.item_sku === sku);
+      if (comp) {
+        total += qty * (comp.cost_price || 0);
+      }
+    });
+
+    $("#components_total_cost").val(total.toFixed(2));
+
+    let productCost = parseFloat($("#product_cost").val()) || 0;
+    $("#cost_difference").val((productCost - total).toFixed(2));
+  }
+
+  // ===============================
+  // EDIT MODE INITIALIZATION
+  // ===============================
+  {% if edit_mode %}
+      $("#product_sku").val("{{ bom_id }}").change();
+      $("#product_name_display").val("{{ bom_name }}");
+      $("#product_cost").val("{{ product_cost }}");
+
+
+    existing.forEach(function (c) {
+      addComponentRow({
+        component_sku: c.component_sku,
+        quantity: c.quantity
+      });
+    });
+
+    updateCostTotals();
+  {% endif %}
+</script>
+
+</body>
+</html>

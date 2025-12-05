@@ -123,22 +123,52 @@ class TocReplenishOrder(db.Model):
     save_count = db.Column(db.Float, default=0)
     pastel_date = db.Column(db.DateTime, nullable=True)
 
+
 class TocProduct(db.Model):
     __tablename__ = 'toc_product'
 
+    # ----- CORE TOC FIELDS -----
     item_sku = db.Column(db.String(45), primary_key=True, nullable=False)
+    item_type = db.Column(db.String(4), nullable=True)
     item_name = db.Column(db.String(200), nullable=True)
     stat_group = db.Column(db.String(45), nullable=True)
     acct_group = db.Column(db.String(45), nullable=True)
+
     retail_price = db.Column(db.Float, nullable=True)
     cost_price = db.Column(db.Float, nullable=True)
     wh_price = db.Column(db.Float, nullable=True)
     cann_cost_price = db.Column(db.Float, nullable=True)
+
     product_url = db.Column(db.String(200), nullable=True)
     image_url = db.Column(db.String(200), nullable=True)
     stock_ord_ind = db.Column(db.Integer, nullable=True)
+
     creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
-    update_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    update_date = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+    supplier_id = db.Column(db.Integer, nullable=True)
+
+    # ----- EXTRA FIELDS REQUIRED FOR PURCHASE ORDERS & GRV -----
+    barcode = db.Column(db.String(50), nullable=True)
+    brand_name = db.Column(db.String(100), nullable=True)
+    uom = db.Column(db.String(20), nullable=True)
+    size = db.Column(db.String(50), nullable=True)
+
+    is_expiry_tracked = db.Column(db.Boolean, default=True)
+    is_active = db.Column(db.Boolean, default=True)
+
+    supplier_product_code = db.Column(db.String(50), nullable=True)
+
+    unit_price = db.Column(db.Numeric(10, 2), nullable=True)
+    lead_time_days = db.Column(db.Integer, nullable=True)
+
+    vat_exempt_ind = db.Column(db.Boolean, default=False)
+
+    # ----- NEW BOM FIELDS -----
+    is_manufacturable = db.Column(db.Boolean, default=False)  # Final product
+    is_component = db.Column(db.Boolean, default=False)       # Raw material/component
+
+
 
 class TOCReplenishCtrl(db.Model):
     __tablename__ = 'toc_replenish_ctrl'
@@ -377,3 +407,237 @@ class TocShopsHours(db.Model):
     closing_hour = db.Column(db.Time, nullable=False)
 
 
+###########  Purchase order CUSTOMIZED ####################
+
+class BbSupplier(db.Model):
+    __tablename__ = 'bb_suppliers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255))
+    vendor_code = db.Column(db.String(50))
+    vat_registered = db.Column(db.Boolean, default=False)
+    vat_number = db.Column(db.String(50))
+    contact_person = db.Column(db.String(100))
+    contact_email = db.Column(db.String(100))
+    contact_phone = db.Column(db.String(50))
+    address = db.Column(db.Text)
+    status = db.Column(db.Enum('Active', 'Inactive'), default='Active')
+    payment_terms = db.Column(db.String(100))
+    default_ship_to_store = db.Column(db.String(50))
+    document_received = db.Column(db.Boolean, default=False)
+    document_notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # products = db.relationship("TocProduct", back_populates="supplier", lazy='dynamic')
+
+class BbPurchaseOrder(db.Model):
+    __tablename__ = 'bb_purchase_orders'
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_number = db.Column(db.String(20), unique=True, nullable=False)
+    po_type = db.Column(db.String(50), default='Drop Ship')
+    supplier_id = db.Column(db.Integer, nullable=False)
+    ship_to_store = db.Column(db.String(50))
+    created_by = db.Column(db.Integer, nullable=False)
+    approved_by = db.Column(db.String(50))
+    status = db.Column(db.Enum('Draft', 'Submitted', 'Approved', 'Sent', 'Partially Received', 'Completed', 'Short Closed', 'Cancelled'), default='Draft')
+    status_date = db.Column(db.DateTime, default=datetime.now)
+    expected_delivery_date = db.Column(db.Date)
+    order_date = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    approved_at = db.Column(db.DateTime)
+    short_closed_at = db.Column(db.DateTime)
+    cancelled_at = db.Column(db.DateTime)
+    cancel_date = db.Column(db.Date)
+    notes = db.Column(db.Text)
+    po_terms = db.Column(db.String(100))
+    subtotal = db.Column(db.Numeric(12, 2), default=0.00)
+    freight = db.Column(db.Numeric(10, 2), default=0.00)
+    discount_amount = db.Column(db.Numeric(10, 2), default=0.00)
+    fee_type = db.Column(db.String(50))
+    fee_amount = db.Column(db.Numeric(10, 2), default=0.00)
+    vat_amount = db.Column(db.Numeric(10, 2), default=0.00)
+
+class BbPurchaseOrderItem(db.Model):
+    __tablename__ = 'bb_purchase_order_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, nullable=False)
+    sku = db.Column(db.String(45), nullable=False)
+    description = db.Column(db.String(255))
+    attribute = db.Column(db.String(50))
+    size = db.Column(db.String(50))
+    quantity_ordered = db.Column(db.Numeric(10, 2), nullable=False)
+    case_qty = db.Column(db.Integer, default=0)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    product_size = db.Column(db.String(50))
+    best_before_date = db.Column(db.Date, nullable=True)
+    uom = db.Column(db.String(20))
+    discount_percent = db.Column(db.Numeric(5, 2))
+    net_cost = db.Column(db.Numeric(12, 2))
+    tax_amount = db.Column(db.Numeric(10, 2))
+    landed_cost = db.Column(db.Numeric(12, 2))
+    notes = db.Column(db.Text)
+    quantity_due = db.Column(db.Numeric(10, 2), default=0.00)
+    cancelled_quantity = db.Column(db.Numeric(10, 2), default=0.00)
+    total_amount = db.Column(db.Numeric(10, 2))
+
+
+class BbGrv(db.Model):
+    __tablename__ = 'bb_grv'
+
+    id = db.Column(db.Integer, primary_key=True)
+    grv_number = db.Column(db.String(50), unique=True, nullable=False)
+    grv_reference = db.Column(db.String(50))
+    po_id = db.Column(db.Integer, nullable=False)
+    received_by = db.Column(db.Integer, nullable=False)
+    received_at = db.Column(db.DateTime, default=datetime.now)
+    status = db.Column(db.String(20))
+    store_code = db.Column(db.String(50))
+    reference = db.Column(db.String(100))
+    comments = db.Column(db.Text)
+    invoice_number = db.Column(db.String(50))
+    document_received = db.Column(db.Boolean, default=False)
+    delivery_note = db.Column(db.Text)
+    is_complete = db.Column(db.Boolean, default=False)
+    invoice_date = db.Column(db.Date)
+    invoice_vat_total = db.Column(db.Numeric(10, 2), default=0.00)
+    invoice_total_amount = db.Column(db.Numeric(10, 2), default=0.00)
+    invoice_currency = db.Column(db.String(10), default='ZAR')
+    invoice_uploaded_file = db.Column(db.String(255))
+
+    # ✅ NEW summary fields
+    po_vat_total = db.Column(db.Numeric(10, 2), default=0.00)
+    po_total_amount = db.Column(db.Numeric(10, 2), default=0.00)
+    diff_amount = db.Column(db.Numeric(10, 2), default=0.00)
+
+    creation_date = db.Column(db.DateTime)
+    update_date = db.Column(db.DateTime)
+
+    damage_ind = db.Column(db.Boolean)
+    mismatch_ind = db.Column(db.Boolean)
+
+
+class BbGrvItem(db.Model):
+    __tablename__ = 'bb_grv_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    grv_id = db.Column(db.Integer)
+    grv_number = db.Column(db.String(50), nullable=False)
+    po_item_id = db.Column(db.Integer, nullable=False)
+    sku = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255))
+    cost_price = db.Column(db.Numeric(10, 2), default=0.00)
+    quantity_ordered = db.Column(db.Integer, default=0)
+    po_vat = db.Column(db.Numeric(10, 2), default=0.00)
+    po_amount = db.Column(db.Numeric(10, 2), default=0.00)
+
+    quantity_received = db.Column(db.Integer)
+    damaged_quantity = db.Column(db.Integer, default=0)
+    best_before_date = db.Column(db.Date)
+    rejected_quantity = db.Column(db.Numeric(10, 2), default=0)
+
+    invoice_quantity = db.Column(db.Integer)
+    invoice_price = db.Column(db.Numeric(10, 2))
+    invoice_vat = db.Column(db.Numeric(10, 2))
+    invoice_amount = db.Column(db.Numeric(10, 2))
+
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+
+class BbDebitNote(db.Model):
+    __tablename__ = 'bb_debit_notes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    grv_id = db.Column(db.Integer, nullable=False)
+    sku = db.Column(db.String(50), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    reason = db.Column(db.String(50))
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+class BbUploadedInvoice(db.Model):
+    __tablename__ = 'bb_uploaded_invoices'
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, nullable=False)
+    file_name = db.Column(db.String(255))
+    uploaded_by = db.Column(db.Integer)
+    uploaded_at = db.Column(db.DateTime, server_default=db.func.now())
+    status = db.Column(db.String(50), default='Pending')  # 'Pending', 'Parsed', 'Error'
+    ocr_json = db.Column(db.Text)  # Store raw OCR result as JSON string
+
+class BbUploadedInvoiceItem(db.Model):
+    __tablename__ = 'bb_uploaded_invoice_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, nullable=False)
+    line_number = db.Column(db.Integer)
+    description = db.Column(db.String(255))
+    sku = db.Column(db.String(50))
+    quantity = db.Column(db.Numeric(10, 2))
+    unit_price = db.Column(db.Numeric(10, 2))
+    total_price = db.Column(db.Numeric(10, 2))
+    matched_po_item_id = db.Column(db.Integer)
+    match_confidence = db.Column(db.Numeric(5, 2))
+    is_flagged = db.Column(db.Boolean, default=False)
+
+class BbSupplierInvoiceItem(db.Model):
+    __tablename__ = 'bb_supplier_invoice_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, nullable=False)
+    product_code = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255))
+    qty = db.Column(db.Numeric(10, 2))
+    unit_price = db.Column(db.Numeric(10, 2))
+    vat = db.Column(db.Numeric(10, 2))
+    total_incl_vat = db.Column(db.Numeric(10, 2))
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+##########  BILL OF MATERIALS  ####################
+
+class TocBOMComponent(db.Model):
+    __tablename__ = 'toc_bom_components'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    bom_id = db.Column(db.String(50), nullable=False, index=True)
+
+    bom_name = db.Column(db.String(255), nullable=True)
+    component_sku = db.Column(db.String(50), nullable=False)
+    component_name = db.Column(db.String(255), nullable=True)
+
+    quantity = db.Column(db.Float, nullable=False, default=1)
+    cost = db.Column(db.Float, nullable=True)
+
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    update_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TocManufacturingTransaction(db.Model):
+    __tablename__ = 'toc_manufacturing_transaction'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bom_id = db.Column(db.Integer, db.ForeignKey('toc_bom_header.bom_id'), nullable=False)
+    product_sku = db.Column(db.String(45), nullable=False)
+    shop_id = db.Column(db.String(20), nullable=True)
+    quantity = db.Column(db.Numeric(10,3), nullable=False)
+    reference = db.Column(db.String(100))
+    type = db.Column(db.Enum('manufacture', 'unmanufacture'), nullable=False)
+    created_by = db.Column(db.Integer)
+    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+
+    components_used = db.relationship("TocManufacturingComponentUsed", backref="transaction", cascade="all, delete")
+
+class TocManufacturingComponentUsed(db.Model):
+    __tablename__ = 'toc_manufacturing_components_used'
+
+    id = db.Column(db.Integer, primary_key=True)
+    manufacturing_id = db.Column(db.Integer, db.ForeignKey('toc_manufacturing_transaction.id'), nullable=False)
+    component_sku = db.Column(db.String(45), nullable=False)
+    qty_used = db.Column(db.Numeric(10,3), nullable=False)

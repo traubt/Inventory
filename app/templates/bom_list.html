@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Bill of Materials</title>
+
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700|Nunito:300,400,600,700|Poppins:300,400,500,600,700" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="/static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+</head>
+
+<body>
+
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="pagetitle">
+      <h1>Bill of Materials</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Admin</li>
+          <li class="breadcrumb-item active">BOM List</li>
+        </ol>
+      </nav>
+    </div>
+
+    <section class="section">
+      <div class="row">
+        <div class="col-lg-12">
+
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Bill of Materials</h5>
+                <a href="{{ url_for('main.bom_create') }}" class="btn btn-primary">+ New BOM</a>
+              </div>
+
+              <table id="bomTable" class="table table-bordered table-striped w-100 mt-3">
+<thead>
+  <tr>
+    <th>BOM ID</th>
+    <th>Product Name</th>
+    <th>Components</th>
+    <th>Total Cost</th>
+    <th>Actions</th>
+  </tr>
+  <tr>
+    <th><input type="text" placeholder="🔍 ID"></th>
+    <th><input type="text" placeholder="🔍 Name"></th>
+    <th></th>
+    <th></th>
+    <th></th>
+  </tr>
+</thead>
+
+<tbody>
+  {% for b in boms %}
+  <tr>
+    <td>{{ b.bom_id }}</td>
+    <td>{{ b.bom_name }}</td>
+    <td>{{ b.components }}</td>
+    <td>R {{ "%.2f"|format(b.cost_price) }}</td>
+
+    <td>
+      <a href="{{ url_for('main.bom_edit', bom_id=b.bom_id) }}" class="btn btn-sm btn-primary">Edit</a>
+
+      <form action="{{ url_for('main.bom_delete', bom_id=b.bom_id) }}" method="post" style="display:inline-block;">
+        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>
+
+              </table>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.com/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/assets/js/main.js"></script>
+
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+
+  <script>
+    $(document).ready(function () {
+      $('#bomTable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [{
+          extend: 'excelHtml5',
+          text: 'Download Excel',
+          title: 'BOM_' + new Date().toISOString().slice(0, 10)
+        }],
+        order: [[0, 'asc']],
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        initComplete: function () {
+          this.api().columns().every(function () {
+            var column = this;
+            $('input', column.header()).on('keyup change clear', function () {
+              if (column.search() !== this.value) {
+                column.search(this.value).draw();
+              }
+            });
+          });
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>

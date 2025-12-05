@@ -144,6 +144,14 @@
                         <input type="text" class="form-control" id="updateItemName" >
                     </div>
                     <div class="mb-3">
+                        <label for="updateItemType" class="form-label">Item Type</label>
+                        <select id="updateItemType" class="form-select" disabled>
+                            <option value="PR">Product</option>
+                            <option value="CO">Component</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="updateStatGroup" class="form-label">Stat Group</label>
                         <input type="text" class="form-control" id="updateStatGroup">
                     </div>
@@ -213,6 +221,14 @@
             <label for="item_name" class="form-label">Item Name</label>
             <input type="text" class="form-control" id="item_name" required>
           </div>
+            <div class="mb-3">
+                <label for="item_type" class="form-label">Item Type</label>
+                <select id="item_type" class="form-select">
+                    <option value="PR">Product</option>
+                    <option value="CO">Component</option>
+                </select>
+            </div>
+
           <div class="mb-3">
             <label for="stat_group" class="form-label">Stat Group</label>
             <input type="text" class="form-control" id="stat_group">
@@ -308,7 +324,7 @@ $("#getUsers").on("click", function (event) {
 
             // Define the correct column order
             const columnOrder = [
-                "item_sku", "item_name", "stat_group", "acct_group", "retail_price",
+                "item_sku", "item_name","item_type", "stat_group", "acct_group", "retail_price",
                 "cost_price", "wh_price", "cann_cost_price", "product_url", "image_url", "stock_ord_ind"
             ];
 
@@ -403,6 +419,7 @@ $('#Users').on('click', '.btn-delete', function () {
         const productData = {
             item_sku: $("#item_sku").val(),
             item_name: $("#item_name").val(),
+            item_type: $('#updateItemType').val(),
             stat_group: $("#stat_group").val(),
             acct_group: $("#acct_group").val(),
             retail_price: $("#retail_price").val(),
