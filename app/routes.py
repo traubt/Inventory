@@ -21,8 +21,7 @@ from app.tables_for_openAI import DATABASE_SCHEMA
 import requests
 from sqlalchemy.exc import IntegrityError
 import unicodedata
-from pdf2image import convert_from_path
-import uuid
+
 
 from shipday import Shipday
 from shipday.order import Address, Customer, Pickup, OrderItem, Order
