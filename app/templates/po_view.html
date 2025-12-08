@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>View Purchase Order</title>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- CSS -->
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+
+  <!-- JS -->
+  <script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/assets/js/functions.js"></script>
+
+  <style>
+    /* Prevent print-only elements from showing */
+    @media print {
+      .d-print-none { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+<main id="main" class="main">
+
+  <div class="pagetitle">
+    <h1>Purchase Order</h1>
+    <nav>
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item"><a href="/purchase_orders">Orders</a></li>
+        <li class="breadcrumb-item active">View PO</li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- PRINT AREA -->
+  <section class="section bg-white p-4 shadow-sm rounded" id="poPrintArea">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+      <div>
+        <h3><strong>Taste Of Cannabis</strong></h3>
+        <p class="mt-2 mb-0"><strong>Status:</strong> {{ po.status }}</p>
+      </div>
+
+      <div class="text-end">
+        <h4 class="text-uppercase">Purchase Order</h4>
+        <p class="mb-1"><strong>Date:</strong> {{ po.order_date.strftime('%d-%m-%Y') if po.order_date else '' }}</p>
+        <p><strong>Purchase Order No:</strong> {{ po.po_number }}</p>
+      </div>
+    </div>
+
+    <!-- SUPPLIER INFO -->
+    <div class="mb-3">
+      <h5 class="bg-dark text-white p-2">Supplier Information</h5>
+      <p><strong>Vendor Name:</strong> {{ po.supplier.name if po.supplier }}</p>
+      <p><strong>Contact Email:</strong> {{ po.supplier.email or 'N/A' }}</p>
+    </div>
+
+    <!-- ITEMS TABLE -->
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle">
+
+        <thead class="table-dark">
+          <tr>
+            <th>SKU</th>
+            <th>Barcode</th>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>VAT</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+        {% set total_vat = namespace(val=0) %}
+        {% for item in items %}
+          {% set line_total = item.quantity_ordered * item.unit_price %}
+          {% set vat = (Decimal(line_total) * Decimal("0.15")) if item.vat_exempt_ind != 1 and po.supplier.vat_registered else Decimal("0.00") %}
+          {% set total_vat.val = total_vat.val + vat %}
+          <tr>
+            <td>{{ item.sku }}</td>
+            <td>{{ item.barcode }}</td>
+            <td>{{ item.item_name }}</td>
+            <td>{{ item.quantity_ordered }}</td>
+            <td>{{ '%.2f' % item.unit_price }}</td>
+            <td>{{ '%.2f' % vat }}</td>
+            <td>{{ '%.2f' % line_total }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+
+    <!-- TOTALS -->
+    <div class="row my-4">
+      <div class="col-md-6">
+        <h6 class="bg-dark text-white p-2">Additional Notes:</h6>
+        <p class="border p-2" style="min-height: 80px">{{ po.notes or 'None' }}</p>
+      </div>
+
+      <div class="col-md-6">
+        <div class="row justify-content-end">
+          <label class="col-sm-4 col-form-label text-end">VAT (15%):</label>
+          <div class="col-sm-4 text-end">{{ '%.2f' % total_vat.val }}</div>
+        </div>
+
+        <div class="row justify-content-end">
+          <label class="col-sm-4 col-form-label text-end">Grand Total:</label>
+          <div class="col-sm-4 text-end">
+            {% set subtotal = po.subtotal or 0 %}
+            {% set grand_total = subtotal + total_vat.val %}
+            {{ '%.2f' % grand_total }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- BUTTONS -->
+  <div class="text-end mt-4 d-print-none">
+
+    <a href="{{ url_for('main.purchase_orders') }}" class="btn btn-secondary">Back</a>
+
+    <a href="{{ url_for('main.po_edit', po_id=po.id) }}"
+       class="btn btn-outline-primary"
+       {% if po.status in ['Approved','Sent','Completed','Partially Received','Short Closed','Cancelled'] %}
+       disabled
+       {% endif %}>
+      Edit
+    </a>
+
+    <!-- NEW PRINT BUTTON -->
+    <button onclick="printPDF()" class="btn btn-outline-primary">Download</button>
+
+    <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#costOfSaleModal">Cost of Sale</button>
+
+    <button class="btn btn-outline-success"
+            id="approve-btn"
+            {% if po.status in ['Approved','Sent','Completed','Partially Received','Short Closed','Cancelled'] %}
+            disabled
+            {% endif %}>
+      Approve
+    </button>
+
+    <button id="SendSup" class="btn btn-primary">Send to Supplier</button>
+
+  </div>
+
+</main>
+
+<!-- PRINT FUNCTION -->
+<script>
+function printPDF() {
+    const printContent = document.querySelector('#poPrintArea').cloneNode(true);
+
+    const win = window.open('', '', 'width=1200,height=900');
+    win.document.write(`
+        <html>
+        <head>
+            <title>Purchase Order PDF</title>
+            <link rel="stylesheet" href="/static/assets/vendor/bootstrap/css/bootstrap.min.css">
+            <style>
+                body { padding: 20px; font-family: Arial, sans-serif; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #333; padding: 6px; }
+                th { background: #f0f0f0; }
+            </style>
+        </head>
+        <body>
+    `);
+
+    win.document.write(printContent.outerHTML);
+
+    win.document.write('</body></html>');
+    win.document.close();
+    win.focus();
+
+    setTimeout(() => win.print(), 500);
+}
+</script>
+
+</body>
+</html>

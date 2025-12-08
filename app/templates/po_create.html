@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Purchase Order</title>
+
+    <!-- jQuery must come before anything else -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700|Nunito:300,400,600,700|Poppins:300,400,500,600,700" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="/static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+
+
+<!--  <script src="{{ url_for('static', filename='assets/js/functions.js') }}"></script>-->
+  <script src="/static/assets/js/functions.js"></script>
+
+  <!-- DataTables & Buttons JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+
+  <!-- Bootstrap Bundle -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+  <!-- Custom Logic -->
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+</head>
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+<main id="main" class="main">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="pagetitle">
+    <h1>{{ 'Edit' if edit_mode else 'Create' }} Purchase Order</h1>
+    <nav><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Home</a></li><li class="breadcrumb-item active">{{ 'Edit' if edit_mode else 'Create' }} PO</li></ol></nav>
+  </div>
+
+  <section class="section">
+    <form method="POST" action="{{ url_for('main.po_create') }}">
+      <input type="hidden" name="status" id="po_status" value="{{ po.status if edit_mode else '' }}">
+      <input type="hidden" name="po_id" value="{{ po.id if edit_mode else '' }}">
+      <input type="hidden" name="vat_amount" id="vat_amount_input">
+
+      <div class="row mb-3 d-flex justify-content-between">
+        <div class="form-inline" style="flex: 0 0 16%; min-width: 200px;">
+        <label for="supplier_id" class="form-label me-2">Supplier</label>
+        <select id="supplier_id" name="supplier_id" class="form-select form-select-sm d-inline w-100" required
+          {% if edit_mode %}disabled{% endif %}>
+          <option value="">Select Supplier</option>
+          {% for supplier in suppliers %}
+            <option value="{{ supplier.id }}" data-code="{{ supplier.vendor_code }}"
+              {% if po and po.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.name }}</option>
+          {% endfor %}
+        </select>
+         {% if edit_mode %}
+            <input type="hidden" name="supplier_id" value="{{ po.supplier_id }}">
+          {% endif %}
+
+          <div class="form-check form-switch mt-4">
+            <input class="form-check-input" type="checkbox" id="vat_checkbox" disabled>
+            <label class="form-check-label ms-2" for="vat_checkbox">VAT Registered</label>
+          </div>
+
+        </div>
+
+        <div class="form-inline text-end" style="flex: 0 0 16%; min-width: 200px;">
+          <label for="po_number" class="form-label me-2">PO Number</label>
+          <input type="text" id="po_number" name="po_number" class="form-control form-control-sm d-inline w-100" value="{{ po.po_number if edit_mode else '' }}" readonly>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-success mb-3" id="addItemBtn">+ Add Item</button>
+
+      <div class="table-responsive">
+        <table class="table table-bordered align-middle text-center" id="poItemsTable">
+          <thead class="table-light">
+            <tr>
+              <th>Barcode</th>
+              <th>SKU</th>
+              <th>Description</th>
+<!--              <th>Size</th>-->
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>VAT</th>
+              <th>Total</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="poItemsBody">
+{% if edit_mode %}
+  {% for item in items %}
+  <tr data-sku="{{ item.sku }}" data-exempt="{{ item.vat_exempt_ind }}">
+    <td><input type="text" class="form-control" name="barcode[]" value="{{ item.barcode }}" readonly></td>
+    <td><input type="text" class="form-control" name="sku[]" value="{{ item.sku }}" readonly></td>
+    <td><input type="text" class="form-control" name="item_name[]" value="{{ item.item_name or '' }}" readonly></td>
+<!--    <td><input type="text" class="form-control" name="size[]" value="{{ item.size or '' }}" readonly></td>-->
+    <td><input type="number" class="form-control" name="quantity[]" value="{{ item.quantity_ordered }}" oninput="recalculateLine(this)"></td>
+    <td><input type="text" class="form-control" name="unit_price[]" value="{{ item.unit_price }}" readonly></td>
+    <td><input type="text" name="vat[]" class="form-control vat-field" readonly></td>
+<!--    <td><input type="date" class="form-control" name="best_before[]" value="{{ item.best_before_date.strftime('%Y-%m-%d') if item.best_before_date }}"></td>-->
+    <td><input type="text" class="form-control" name="line_total[]" value="{{ '%.2f' % (item.quantity_ordered * item.unit_price) }}" readonly></td>
+    <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); computeGrandTotal();">×</button></td>
+  </tr>
+  {% endfor %}
+{% endif %}
+
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mb-3 row justify-content-end">
+        <label class="col-sm-2 col-form-label text-end">VAT (15%):</label>
+        <div class="col-sm-2">
+          <input type="text" class="form-control" id="vat_amount" value="0.00" readonly>
+        </div>
+      </div>
+
+
+      <div class="mb-3 row justify-content-end">
+        <label class="col-sm-2 col-form-label text-end">Total Amount:</label>
+        <div class="col-sm-2">
+          <input type="text" class="form-control" id="grand_total" value="{{ '%.2f' % (po.subtotal or 0) if po else '' }}" readonly>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="note" class="form-label">Additional Notes</label>
+        <textarea class="form-control" id="note" name="note" rows="3">{{ po.notes if po else '' }}</textarea>
+      </div>
+
+      <div class="text-end mb-3">
+        <button type="button" class="btn btn-warning" onclick="submitPO('Draft')">Save PO</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<!-- Modal -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productModalLabel">Select Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-striped" id="productTable">
+          <thead>
+            <tr>
+              <th>Barcode</th>
+              <th>SKU</th>
+              <th>Description</th>
+              <th>Size</th>
+              <th>Unit Price</th>
+              <th>VAT</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products %}
+              <tr data-product='{{ product | tojson | safe }}'>
+                <td>{{ product.barcode }}</td>
+                <td>{{ product.item_sku }}</td>
+                <td>{{ product.item_name }}</td>
+                <td>{{ product.size }}</td>
+                <td>{{ product.cost_price }}</td>
+                      <td>
+                        {% if product.vat_exempt_ind %}
+                          <span class="badge bg-secondary">Exempt</span>
+                        {% else %}
+                          <span class="badge bg-success">15%</span>
+                        {% endif %}
+                      </td>
+                <td><button class="btn btn-sm btn-primary select-product">Add</button></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const products = {{ products | tojson | safe }};
+  const suppliers = {{ suppliers | tojson | safe }};
+  let productTable;
+
+  $(document).ready(function () {
+    productTable = $('#productTable').DataTable({
+      columns: [
+        { title: 'Barcode' },
+        { title: 'SKU' },
+        { title: 'Description' },
+        { title: 'Size' },
+        { title: 'Unit Price' },
+        { title: 'VAT' },
+        { title: 'Action' }
+      ]
+    });
+
+console.log("All suppliers:", suppliers);
+
+const selectedSupplierId = $('#supplier_id').val();
+console.log("Selected Supplier ID:", selectedSupplierId);
+
+const currentSupplier = suppliers.find(s => s.id === parseInt(selectedSupplierId));
+console.log("Matched Supplier:", currentSupplier);
+
+if (currentSupplier && currentSupplier.vat_registered == 1) {
+  $('#vat_checkbox').prop('checked', true);
+  console.log("✅ VAT checkbox set to checked");
+} else {
+  $('#vat_checkbox').prop('checked', false);
+  console.log("❌ VAT checkbox set to unchecked");
+}
+
+
+    // ✅ Ensure VAT checkbox is correctly checked in edit mode
+    setTimeout(() => {
+      const selectedSupplierId = $('#supplier_id').val();
+      const currentSupplier = suppliers.find(s => s.id === parseInt(selectedSupplierId));
+      if (currentSupplier && currentSupplier.vat_registered == 1) {
+        $('#vat_checkbox').prop('checked', true);
+      } else {
+        $('#vat_checkbox').prop('checked', false);
+      }
+    }, 100);
+
+
+    // ✅ Recalculate VAT/totals on page load (Edit Mode)
+    if ($('#poItemsBody tr').length > 0) {
+      computeGrandTotal();
+    }
+
+    // ✅ On supplier change: set checkbox + update totals
+    let initialSupplierId = $('#supplier_id').val();
+
+    $('#supplier_id').change(function () {
+      const newSupplierId = $(this).val();
+      const hasItems = $('#poItemsBody tr').length > 0;
+
+      if (hasItems && newSupplierId !== initialSupplierId) {
+        const confirmed = confirm("Changing supplier will reset the PO. Are you sure?");
+        if (!confirmed) {
+          $(this).val(initialSupplierId).trigger('change');
+          return;
+        }
+        $('#poItemsBody').empty();
+      }
+
+      initialSupplierId = newSupplierId;
+      const supplier = suppliers.find(s => s.id === parseInt(newSupplierId));
+      $('#vat_checkbox').prop('checked', supplier && supplier.vat_registered == 1);
+      computeGrandTotal();
+    });
+
+
+    // ✅ Load modal and list supplier-specific products
+    $(document).on('click', '#addItemBtn', function () {
+      const supplierSelected = $('#supplier_id').val();
+      if (!supplierSelected) {
+        alert("Please select supplier from the list");
+        return;
+      }
+
+      if ($.fn.DataTable.isDataTable('#productTable')) {
+        $('#productTable').DataTable().clear().destroy();
+      }
+
+      productTable = $('#productTable').DataTable({
+        columns: [
+          { title: 'Barcode' },
+          { title: 'SKU' },
+          { title: 'Description' },
+          { title: 'Size' },
+          { title: 'Unit Price' },
+          { title: 'VAT' },
+          { title: 'Action' }
+        ]
+      });
+
+      const filtered = products.filter(p =>  (p.acct_group || '').toLowerCase() !== 'specials');
+
+      filtered.forEach(p => {
+        const barcode = p.barcode || 'N/A';
+        const vatLabel = p.vat_exempt_ind
+          ? '<span class="badge bg-secondary">Exempt</span>'
+          : '<span class="badge bg-success">15%</span>';
+
+        productTable.row.add([
+          barcode,
+          p.item_sku,
+          p.item_name,
+          p.size,
+          p.cost_price,
+          vatLabel,
+          `<button class='btn btn-sm btn-primary select-product' data-product='${JSON.stringify(p)}'>Add</button>`
+        ]);
+      });
+      productTable.draw();
+      $('#productModal').modal('show');
+    });
+
+    // ✅ Add product to table
+    $(document).on('click', '.select-product', function () {
+      const product = $(this).data('product');
+      const barcode = product.barcode || 'N/A';
+      const newRow = `
+        <tr data-sku="${product.item_sku}" data-exempt="${product.vat_exempt_ind}">
+          <td><input type="text" name="barcode[]" class="form-control" value="${barcode}" readonly></td>
+          <td><input type="text" name="sku[]" class="form-control" value="${product.item_sku}" readonly></td>
+          <td><input type="text" name="item_name[]" class="form-control" value="${product.item_name}" readonly></td>
+          <td><input type="text" name="size[]" class="form-control" value="${product.size}" readonly></td>
+          <td><input type="number" name="quantity[]" class="form-control" value="1" min="1" oninput="recalculateLine(this)"></td>
+          <td><input type="number" name="unit_price[]" class="form-control" value="${product.cost_price}" readonly></td>
+          <td><input type="text" name="vat[]" class="form-control vat-field" readonly></td>
+
+          <td><input type="text" name="line_total[]" class="form-control" readonly></td>
+          <td><button type="button" class="btn btn-sm btn-danger" onclick="$(this).closest('tr').remove(); computeGrandTotal();">x</button></td>
+        </tr>
+      `;
+      $('#poItemsBody').append(newRow);
+      computeGrandTotal();
+    });
+  });
+
+  function recalculateLine(input) {
+    const row = input.closest('tr');
+    const qty = parseFloat($(row).find('[name="quantity[]"]').val()) || 0;
+    const price = parseFloat($(row).find('[name="unit_price[]"]').val()) || 0;
+    const total = qty * price;
+    $(row).find('[name="line_total[]"]').val(total.toFixed(2));
+    computeGrandTotal();
+  }
+
+  function computeGrandTotal() {
+    const supplierId = $('#supplier_id').val();
+    const supplier = suppliers.find(s => s.id === parseInt(supplierId));
+    const vatRegistered = supplier?.vat_registered;
+
+    let grandTotal = 0;
+    let totalVAT = 0;
+
+    $('#poItemsBody tr').each(function () {
+      const row = $(this);
+      let isExempt = row.attr('data-exempt') === "1";
+
+      // ✅ Fallback: check products array if data-exempt is missing
+      if (!isExempt) {
+        const sku = row.find('[name="sku[]"]').val();
+        const matchingProduct = products.find(p => p.item_sku === sku);
+        if (matchingProduct && matchingProduct.vat_exempt_ind == 1) {
+          isExempt = true;
+        }
+      }
+
+      const qty = parseFloat(row.find('[name="quantity[]"]').val()) || 0;
+      const price = parseFloat(row.find('[name="unit_price[]"]').val()) || 0;
+      const lineTotal = qty * price;
+      const vat = (vatRegistered && !isExempt) ? lineTotal * 0.15 : 0;
+
+      row.find('[name="line_total[]"]').val(lineTotal.toFixed(2));
+      row.find('.vat-field').val(vat.toFixed(2));
+
+      grandTotal += lineTotal;
+      totalVAT += vat;
+    });
+
+    const totalWithVat = grandTotal + totalVAT;
+    $('#vat_amount').val(totalVAT.toFixed(2));
+    $('#grand_total').val(totalWithVat.toFixed(2));
+    $('#vat_amount_input').val(totalVAT.toFixed(2)); // for backend
+  }
+
+    function submitPO(status) {
+    const rowCount = document.querySelectorAll('#poItemsBody tr').length;
+    if (rowCount === 0) {
+      alert("You should have at least one item in PO");
+      return;
+    }
+    document.getElementById('po_status').value = status;
+    document.querySelector('form').submit();
+  }
+
+      //log activity
+    $(".btn").on("click", function () {
+        // Get the text of the clicked button
+        const buttonText = $(this).text().trim();
+
+        // Get the current file name without the ".html" postfix
+        const fileName = window.location.pathname.split("/").pop().replace(".html", "");
+
+        // Create a combined activity description
+        const activityDescription = `${fileName}: ${buttonText}`;
+
+        console.log("clicking on ",activityDescription);
+
+        // Call the logUserActivity function with the combined description
+        logUserActivity(activityDescription);
+    });
+
+</script>
+
+

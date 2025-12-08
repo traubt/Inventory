@@ -564,7 +564,8 @@ def distribute_product_to_shops(sku):
         CROSS JOIN 
             toc_product
         WHERE 
-            toc_product.item_sku = %s;
+            toc_product.item_sku = %s
+            AND toc_shops.blName <> 'Canna Holdings';
     '''
 
     try:

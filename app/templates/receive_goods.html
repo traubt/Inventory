@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Purchase Orders</title>
+
+  <!-- Favicons -->
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700|Nunito:300,400,600,700|Poppins:300,400,500,600,700" rel="stylesheet">
+
+  <!-- Vendor JS Files -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/static/assets/vendor/quill/quill.js"></script>
+<script src="/static/assets/vendor/simple-datatables/simple-datatables.js"></script>
+<script src="/static/assets/js/functions.js"></script>
+
+<!-- DataTables -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Vendor CSS Files -->
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="/static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="/static/assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+  <!-- DataTables -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+
+  <!-- Main CSS File -->
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+</head>
+
+<body>
+
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+
+
+<main id="main" class="main">
+<div class="pagetitle">
+  <h1>Receive Goods (GRV)</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">Home</a></li>
+      <li class="breadcrumb-item active">Receive Goods</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Approved / Sent Purchase Orders</h5>
+
+      <table class="table table-striped" id="grvPOList">
+        <thead>
+          <tr>
+            <th scope="col">PO Number</th>
+            <th scope="col">Supplier</th>
+            <th scope="col">PO Status</th>
+            <th>GRV Status</th>
+                <th scope="col">Damage?</th>       <!-- New -->
+                <th scope="col">Mismatch?</th>     <!-- New -->
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for po in pos %}
+          <tr>
+            <td>{{ po.po_number }}</td>
+            <td>{{ po.supplier_name }}</td>
+            <td>{{ po.po_status }}</td>
+            <td>{{ po.grv_status or 'Not Started' }}</td>
+            <td>{% if po.damage_ind %}Yes{% else %}-{% endif %}</td>
+            <td>{% if po.mismatch_ind %}Yes{% else %}-{% endif %}</td>
+            <td>
+              <a href="{{ url_for('main.receive_grv_form', po_id=po.id) }}" class="btn btn-sm btn-primary">
+                Open
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+  $(document).ready(function () {
+    let table = $('#poTable').DataTable({
+      dom: 'Bfrtip',
+      buttons: [
+        {
+          extend: 'excelHtml5',
+          text: 'Download Excel',
+          title: 'PO_List_' + new Date().toISOString().slice(0, 10)
+        }
+      ],
+      order: [[0, 'desc']],
+      pageLength: 25,
+      lengthMenu: [[25, 50, 100], [25, 50, 100]],
+      initComplete: function () {
+        this.api().columns().every(function () {
+          var column = this;
+          $('input', column.header()).on('keyup change clear', function () {
+            if (column.search() !== this.value) {
+              column.search(this.value).draw();
+            }
+          });
+        });
+      }
+    });
+  });
+</script>
+
+
+
+<!-- Your existing DataTable init -->
+<script>
+  $(document).ready(function () {
+    let table = $('#poTable').DataTable({
+      dom: 'Bfrtip',
+      buttons: [
+        {
+          extend: 'excelHtml5',
+          text: 'Download Excel',
+          title: 'PO_List_' + new Date().toISOString().slice(0, 10)
+        }
+      ],
+      order: [[0, 'desc']],
+      pageLength: 25,
+      lengthMenu: [[25, 50, 100], [25, 50, 100]],
+      initComplete: function () {
+        this.api().columns().every(function () {
+          var column = this;
+          $('input', column.header()).on('keyup change clear', function () {
+            if (column.search() !== this.value) {
+              column.search(this.value).draw();
+            }
+          });
+        });
+      }
+    });
+
+
+      $(document).on('click', '.update-status', function () {
+        const poId = $(this).data('id');
+        const newStatus = $(this).data('status');
+
+        if (!confirm(`Are you sure you want to set status to ${newStatus}?`)) return;
+
+        $.ajax({
+          url: `/purchase_orders/${poId}/update_status`,
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ status: newStatus }),
+          success: function (data) {
+            alert(data.message);
+            location.reload();
+          },
+          error: function () {
+            alert("Status update failed.");
+          }
+        });
+      });
+  });
+
+        //log activity
+    $(".btn").on("click", function () {
+        // Get the text of the clicked button
+        const buttonText = $(this).text().trim();
+
+        // Get the current file name without the ".html" postfix
+        const fileName = window.location.pathname.split("/").pop().replace(".html", "");
+
+        // Create a combined activity description
+        const activityDescription = `${fileName}: ${buttonText}`;
+
+        console.log("clicking on ",activityDescription);
+
+        // Call the logUserActivity function with the combined description
+        logUserActivity(activityDescription);
+    });
+</script>
+
+<!-- GRV Success Modal -->
+<div class="modal fade" id="grvSuccessModal" tabindex="-1" aria-labelledby="grvSuccessModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="grvSuccessModalLabel">Success</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Goods Received Voucher was submitted successfully.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  {% if session.get('show_grv_modal') %}
+    var grvModal = new bootstrap.Modal(document.getElementById('grvSuccessModal'));
+    grvModal.show();
+    {% set _ = session.pop('show_grv_modal') %}
+  {% endif %}
+</script>
+
+
+
+</body>
+</html>
+

@@ -586,18 +586,52 @@ class BbUploadedInvoiceItem(db.Model):
     match_confidence = db.Column(db.Numeric(5, 2))
     is_flagged = db.Column(db.Boolean, default=False)
 
+class BbSupplierInvoice(db.Model):
+    __tablename__ = 'bb_supplier_invoice'
+
+    id = db.Column(db.Integer, primary_key=True)
+    po_id = db.Column(db.Integer, nullable=False)
+    supplier_id = db.Column(db.Integer, nullable=False)
+
+    invoice_number = db.Column(db.String(100), nullable=False)
+    invoice_date = db.Column(db.Date)
+
+    vat_amount = db.Column(db.Numeric(10, 2), default=0)
+    total_amount = db.Column(db.Numeric(10, 2), default=0)
+    difference_amount = db.Column(db.Numeric(10, 2), default=0)
+
+    status = db.Column(db.String(20), default="Open")
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 👉 Add the property here
+    @property
+    def total_ex_vat(self):
+        return float(self.total_amount or 0) - float(self.vat_amount or 0)
+
+    # Relationship at the bottom
+    items = db.relationship("BbSupplierInvoiceItem", backref="invoice", lazy=True)
+
+
+
 class BbSupplierInvoiceItem(db.Model):
     __tablename__ = 'bb_supplier_invoice_items'
 
     id = db.Column(db.Integer, primary_key=True)
-    po_id = db.Column(db.Integer, nullable=False)
-    product_code = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.String(255))
+    invoice_id = db.Column(db.Integer, db.ForeignKey("bb_supplier_invoice.id"), nullable=False)
+
+    sku = db.Column(db.String(50))
+    description = db.Column(db.Text)
+
     qty = db.Column(db.Numeric(10, 2))
     unit_price = db.Column(db.Numeric(10, 2))
+
     vat = db.Column(db.Numeric(10, 2))
     total_incl_vat = db.Column(db.Numeric(10, 2))
-    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 
 ##########  BILL OF MATERIALS  ####################
 
@@ -619,25 +653,39 @@ class TocBOMComponent(db.Model):
     update_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class TocManufacturingTransaction(db.Model):
-    __tablename__ = 'toc_manufacturing_transaction'
+class TocBOMManufactureLog(db.Model):
+    __tablename__ = 'toc_bom_manufacture_log'
 
     id = db.Column(db.Integer, primary_key=True)
-    bom_id = db.Column(db.Integer, db.ForeignKey('toc_bom_header.bom_id'), nullable=False)
-    product_sku = db.Column(db.String(45), nullable=False)
-    shop_id = db.Column(db.String(20), nullable=True)
-    quantity = db.Column(db.Numeric(10,3), nullable=False)
-    reference = db.Column(db.String(100))
-    type = db.Column(db.Enum('manufacture', 'unmanufacture'), nullable=False)
-    created_by = db.Column(db.Integer)
-    creation_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    bom_id = db.Column(db.String(50), nullable=False)
+    finished_name = db.Column(db.String(255))
+    qty_built = db.Column(db.Float, nullable=False)
+    shop_id = db.Column(db.String(10), nullable=False)
+    created_by = db.Column(db.String(100))
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-    components_used = db.relationship("TocManufacturingComponentUsed", backref="transaction", cascade="all, delete")
+class TocBOMManufacture(db.Model):
+    __tablename__ = 'toc_bom_manufacture'
 
-class TocManufacturingComponentUsed(db.Model):
-    __tablename__ = 'toc_manufacturing_components_used'
+    manufacture_id = db.Column(db.Integer, primary_key=True)
+    item_sku = db.Column(db.String(50), nullable=False)
+    qty = db.Column(db.Float, nullable=False)
+    shop_id = db.Column(db.String(10), nullable=False)
+    created_by = db.Column(db.Integer, nullable=False)
+    creation_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    items = db.relationship("TocBOMManufactureItem",
+                            backref="manufacture",
+                            cascade="all, delete-orphan")
+
+class TocBOMManufactureItem(db.Model):
+    __tablename__ = 'toc_bom_manufacture_items'
 
     id = db.Column(db.Integer, primary_key=True)
-    manufacturing_id = db.Column(db.Integer, db.ForeignKey('toc_manufacturing_transaction.id'), nullable=False)
-    component_sku = db.Column(db.String(45), nullable=False)
-    qty_used = db.Column(db.Numeric(10,3), nullable=False)
+    manufacture_id = db.Column(db.Integer,
+                               db.ForeignKey('toc_bom_manufacture.manufacture_id'),
+                               nullable=False)
+
+    component_sku = db.Column(db.String(50), nullable=False)
+    required_qty = db.Column(db.Float)
+    deducted_qty = db.Column(db.Float)

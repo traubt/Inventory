@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>BOM Manufacture</title>
+
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+</head>
+
+<body>
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+<main id="main" class="main">
+
+  <!-- ===========================
+       PAGE TITLE + BREADCRUMBS
+  ============================ -->
+  <div class="pagetitle">
+    <h1>BOM Manufacture</h1>
+    <nav>
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="#">Home</a></li>
+        <li class="breadcrumb-item">Admin</li>
+        <li class="breadcrumb-item active">BOM Manufacture</li>
+      </ol>
+    </nav>
+  </div>
+
+  <section class="section">
+
+    <!-- ===================================
+         CARD 1 — FINISHED PRODUCT SELECTION
+    ==================================== -->
+    <div class="card mb-4">
+      <div class="card-body">
+
+        <h5 class="card-title">Select Finished Product</h5>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Finished Product</label>
+            <select id="finishedSku" class="form-select">
+              <option value="">-- Select Product --</option>
+              {% for p in finished_products %}
+                <option value="{{ p.sku }}">{{ p.sku }} — {{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Quantity to Manufacture</label>
+            <input type="number" min="1" class="form-control" id="manuQty" value="1">
+          </div>
+
+          <div class="col-md-3 d-flex align-items-end">
+            <button id="loadComponents" class="btn btn-primary w-100">
+              Load Components
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===================================
+         CARD 2 — COMPONENT BREAKDOWN
+    ==================================== -->
+    <div class="card d-none" id="componentsCard">
+      <div class="card-body">
+
+        <h5 class="card-title">Component Requirements</h5>
+
+        <!-- Warning for insufficient stock -->
+        <div id="warningBox" class="alert alert-warning d-none">
+          Some components have <b>insufficient stock</b>.
+          Manufacturing is allowed, but please double-check.
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-bordered" id="componentTable">
+            <thead>
+              <tr>
+                <th>Component SKU</th>
+                <th>Description</th>
+                <th>Qty / Unit</th>
+                <th>Required Qty</th>
+                <th>Available Stock</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="mt-3">
+          <button class="btn btn-success w-100" id="btnManufacture">
+            Manufacture
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+<script>
+
+let hasLowStock = false;
+
+// =========================================================
+// LOAD COMPONENTS FOR SELECTED BOM
+// =========================================================
+$("#loadComponents").on("click", function () {
+    const bom_id = $("#finishedSku").val();
+    const qty = parseFloat($("#manuQty").val());
+
+    if (!bom_id) {
+        alert("Please select a finished product.");
+        return;
+    }
+
+    $("#componentTable tbody").empty();
+    $("#componentsCard").addClass("d-none");
+
+    fetch(`/bom/manufacture/components/${bom_id}`)
+        .then(resp => resp.json())
+        .then(data => {
+
+            const components = data.components;
+            hasLowStock = false;
+
+            components.forEach(c => {
+                const required = c.qty_per_unit * qty;
+                const available = c.available_qty;
+                const low = (available < required);
+
+                if (low) hasLowStock = true;
+
+                const row = `
+                    <tr class="${low ? 'table-danger' : ''}">
+                        <td>${c.component_sku}</td>
+                        <td>${c.component_name}</td>
+                        <td>${c.qty_per_unit}</td>
+                        <td>${required.toFixed(2)}</td>
+                        <td>${available.toFixed(2)}</td>
+                        <td>
+                            ${low
+                                ? '<span class="text-danger fw-bold">LOW</span>'
+                                : '<span class="text-success fw-bold">OK</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+                $("#componentTable tbody").append(row);
+            });
+
+            if (hasLowStock) {
+                $("#warningBox").removeClass("d-none");
+            } else {
+                $("#warningBox").addClass("d-none");
+            }
+
+            $("#componentsCard").removeClass("d-none");
+        });
+});
+
+// =========================================================
+// SUBMIT MANUFACTURING REQUEST
+// =========================================================
+$("#btnManufacture").on("click", function () {
+    const bom_id = $("#finishedSku").val();
+    const qty = parseFloat($("#manuQty").val());
+
+    fetch("/bom/manufacture/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bom_id, qty })
+    })
+    .then(resp => resp.json())
+    .then(result => {
+        if (result.status === "success") {
+            alert(result.message);
+            window.location.reload();
+        } else {
+            alert("Error: " + result.message);
+        }
+    });
+});
+
+</script>
+
+</body>
+</html>

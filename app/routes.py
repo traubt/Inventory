@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app, send_file
 import pymysql
 import json
 import os
@@ -8,7 +8,7 @@ from . import db
 from .db_queries import *
 from datetime import datetime, timezone, timedelta, date
 from flask import Flask, request, jsonify
-from sqlalchemy import distinct, or_, text, desc
+from sqlalchemy import distinct, or_, text, desc, func
 from flask import session, jsonify
 import smtplib
 from email.mime.text import MIMEText
@@ -41,6 +41,10 @@ _windows_device_files = {
     *(f"COM{i}" for i in range(10)),
     *(f"LPT{i}" for i in range(10)),
 }
+
+import platform
+IS_WINDOWS = platform.system().lower() == "windows"
+
 
 
 # Set your Shipday API key
@@ -4751,13 +4755,13 @@ def po_create():
             skus = request.form.getlist('sku[]')
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
-            raw_dates = request.form.getlist('best_before[]')
+            # raw_dates = request.form.getlist('best_before[]')
             tax_amounts = request.form.getlist('vat[]')
             line_totals = request.form.getlist('line_total[]')
 
-            best_before_dates = [
-                datetime.strptime(d, '%Y-%m-%d').date() if d else None for d in raw_dates
-            ]
+            # best_before_dates = [
+            #     datetime.strptime(d, '%Y-%m-%d').date() if d else None for d in raw_dates
+            # ]
 
             subtotal = 0
             for i in range(len(skus)):
@@ -4774,7 +4778,7 @@ def po_create():
                         sku=skus[i],
                         quantity_ordered=qty,
                         unit_price=price,
-                        best_before_date=best_before_dates[i],
+                        # best_before_date=best_before_dates[i],
                         tax_amount=tax,
                         total_amount=total
                     )
@@ -5109,9 +5113,6 @@ def po_view(po_id):
 
     # Enrich line items with product details
     for item in items:
-
-        print("✅ Item best_before_date:", item.best_before_date)
-
         product = TocProduct.query.filter_by(item_sku=item.sku).first()
         item.item_name = product.item_name if product else ''
         item.size = product.size if product else ''
@@ -5152,7 +5153,6 @@ def po_view(po_id):
         Decimal=Decimal
     )
 
-
 @main.route('/purchase_orders/<int:po_id>/mark_sent')
 def mark_po_sent(po_id):
     po = BbPurchaseOrder.query.get_or_404(po_id)
@@ -5182,7 +5182,7 @@ def cancel_po(po_id):
 @main.route('/receive_goods', methods=['GET'])
 def receive_goods():
     # Application context
-    user_data = session.get('user_data')
+    user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
     user_id = user.get('user_id')
 
@@ -5223,7 +5223,7 @@ def receive_goods():
 
 @main.route('/receive_grv/<int:po_id>', methods=['GET'])
 def receive_grv_form(po_id):
-    user_data = session.get('user_data')
+    user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
     user_id = user.get('user_id')
 
@@ -5288,7 +5288,7 @@ def receive_grv_form(po_id):
     grv_items = db.session.execute(text("""
         SELECT bi.po_item_id,
                bi.quantity_received,
-               bi.best_before_date,
+         --      bi.best_before_date,
                bi.damaged_quantity,
                bi.invoice_quantity,
                bi.invoice_price,
@@ -5312,7 +5312,7 @@ def receive_grv_form(po_id):
     for row in grv_items:
         grv_items_dict[row.po_item_id] = {
             'quantity_received': row.quantity_received,
-            'best_before_date': row.best_before_date,
+            # 'best_before_date': row.best_before_date,
             'damaged_quantity': row.damaged_quantity,
             'invoice_quantity': row.invoice_quantity,
             'invoice_price': row.invoice_price,
@@ -5326,7 +5326,7 @@ def receive_grv_form(po_id):
         for item in items:
             grv_items_dict[item.id] = {
                 'quantity_received': item.quantity_ordered,
-                'best_before_date': '',
+                # 'best_before_date': '',
                 'damaged_quantity': 0,
                 'invoice_quantity': item.quantity_ordered,
                 'invoice_price': '',
@@ -5349,213 +5349,244 @@ def receive_grv_form(po_id):
                            invoice_date=invoice_date)
 
 
-@main.route('/submit_grv/<int:po_id>', methods=['POST'])
+@main.route("/receive_grv/<int:po_id>/submit", methods=["POST"])
 def submit_grv(po_id):
+    from datetime import datetime
+
     user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
-    user_id = user.get('id')
-    note = request.form.get('note')
+    user_id = user.get('username')
 
-    # Validate invoice number/date
-    invoice_number = request.form.get("invoice_number")
-    invoice_date = request.form.get("invoice_date")
+    po = BbPurchaseOrder.query.get_or_404(po_id)
 
-    if not invoice_number or not invoice_date:
-        flash("Invoice number and invoice date are required to submit GRV.", "danger")
-        return redirect(url_for('main.receive_grv_form', po_id=po_id))
+    # Find or create GRV header
+    grv = BbGrv.query.filter_by(po_id=po_id).first()
+    if not grv:
+        grv = BbGrv(
+            po_id=po_id,
+            status="Draft",
+            received_by=user_id,
+            received_at=datetime.utcnow(),
+            grv_number=f"GRV-{po.po_number}"  # Or whatever format you use
+        )
+        db.session.add(grv)
+        db.session.flush()
 
-    # Get PO
-    po = db.session.execute(text("SELECT id, po_number FROM bb_purchase_orders WHERE id = :po_id"),
-                            {'po_id': po_id}).fetchone()
-    if not po:
-        flash("Purchase order not found.", "danger")
-        return redirect(url_for('main.receive_goods'))
+    # Update GRV header fields
+    grv.invoice_number = request.form.get("invoice_number")
+    grv.invoice_date = request.form.get("invoice_date")
+    grv.note = request.form.get("note")
+    grv.update_date = datetime.utcnow()
+    grv.status = "Saved"
 
-    grv_number = f"GRV-{po.po_number}"
+    invoice_total_sum = 0
+    invoice_vat_sum = 0
 
-    # Fetch PO items
-    po_items = db.session.execute(text("""
-        SELECT i.id, i.sku, p.item_name AS description, i.unit_price, i.quantity_ordered
-        FROM bb_purchase_order_items i
-        JOIN toc_product p ON i.sku = p.item_sku
-        WHERE i.po_id = :po_id
-    """), {'po_id': po_id}).fetchall()
+    items = BbPurchaseOrderItem.query.filter_by(po_id=po_id).all()
 
-    # Get all totals from the form (populated via client-side JS)
-    po_vat_total = Decimal(str(request.form.get("po_vat_total") or "0.00"))
-    po_total_amount = Decimal(str(request.form.get("po_total") or "0.00"))
-    invoice_vat_total = Decimal(str(request.form.get("inv_vat") or "0.00"))
-    invoice_total_amount = Decimal(str(request.form.get("inv_total") or "0.00"))
-    diff_amount = Decimal(str(request.form.get("difference") or "0.00"))
+    grv_items = BbGrvItem.query.filter_by(grv_id=grv.id).all()
 
-    # Upsert bb_grv
-    existing_grv = db.session.execute(text("SELECT id FROM bb_grv WHERE po_id = :po_id"),
-                                      {'po_id': po_id}).fetchone()
+    for item in items:
+        grv_item = BbGrvItem.query.filter_by(grv_id=grv.id, po_item_id=item.id).first()
 
-    if existing_grv:
-        grv_id = existing_grv.id if hasattr(existing_grv, 'id') else existing_grv[0]
-        db.session.execute(text("""
-            UPDATE bb_grv
-            SET received_by = :received_by,
-                comments = :comments,
-                invoice_number = :invoice_number,
-                invoice_date = :invoice_date,
-                invoice_vat_total = :invoice_vat_total,
-                invoice_total_amount = :invoice_total_amount,
-                po_vat_total = :po_vat_total,
-                po_total_amount = :po_total_amount,
-                diff_amount = :diff_amount,
-                update_date = CURRENT_TIMESTAMP,
-                status = 'Saved'
-            WHERE po_id = :po_id
-        """), {
-            'received_by': user_id,
-            'comments': note,
-            'invoice_number': invoice_number,
-            'invoice_date': invoice_date,
-            'invoice_vat_total': invoice_vat_total,
-            'invoice_total_amount': invoice_total_amount,
-            'po_vat_total': po_vat_total,
-            'po_total_amount': po_total_amount,
-            'diff_amount': diff_amount,
-            'po_id': po_id
-        })
-    else:
-        db.session.execute(text("""
-            INSERT INTO bb_grv (
-                grv_number, po_id, received_by, comments,
-                invoice_number, invoice_date,
-                invoice_vat_total, invoice_total_amount,
-                po_vat_total, po_total_amount, diff_amount,
-                creation_date, update_date, status
-            ) VALUES (
-                :grv_number, :po_id, :received_by, :comments,
-                :invoice_number, :invoice_date,
-                :invoice_vat_total, :invoice_total_amount,
-                :po_vat_total, :po_total_amount, :diff_amount,
-                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'Saved'
+        if not grv_item:
+            grv_item = BbGrvItem(
+                grv_id=grv.id,
+                grv_number=grv.grv_number,
+                po_item_id=item.id,
+                sku=item.sku,
+                description=item.description,
+                cost_price=item.unit_price,
+                quantity_ordered=item.quantity_ordered,
+                po_vat=item.tax_amount,
+                po_amount=item.total_amount,
             )
-        """), {
-            'grv_number': grv_number,
-            'po_id': po_id,
-            'received_by': user_id,
-            'comments': note,
-            'invoice_number': invoice_number,
-            'invoice_date': invoice_date,
-            'invoice_vat_total': invoice_vat_total,
-            'invoice_total_amount': invoice_total_amount,
-            'po_vat_total': po_vat_total,
-            'po_total_amount': po_total_amount,
-            'diff_amount': diff_amount
-        })
-        grv_id = db.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
-
-    # Loop and save GRV items
-    for row in po_items:
-        item_id = row.id
-        sku = row.sku
-        description = row.description
-        cost_price = Decimal(str(row.unit_price or 0.00))
-        quantity_ordered = row.quantity_ordered or 0
-
-        qty_received = int(request.form.get(f"received_{item_id}", type=float) or 0)
-
-        best_before = request.form.get(f"best_before_{item_id}") or None
-        damaged_qty = int(request.form.get(f"damaged_{item_id}", type=float) or 0)
-        invoice_qty = int(request.form.get(f"invoice_qty_{item_id}", type=float) or 0)
-        invoice_amount = Decimal(str(request.form.get(f"invoice_total_{item_id}", type=float) or 0.00))
-        invoice_vat_input = request.form.get(f"invoice_vat_{item_id}")
-
-        if invoice_vat_input:
-            invoice_vat = Decimal(str(invoice_vat_input))
+            db.session.add(grv_item)
         else:
-            invoice_vat = (invoice_amount * Decimal("0.15")).quantize(Decimal("0.01"))
+            # ensure required fields are not NULL
+            grv_item.grv_number = grv.grv_number
+            grv_item.sku = item.sku
+            grv_item.description = item.description
 
-        # Now calculate invoice_amount
-        invoice_amount = request.form.get(f"invoice_total_{item_id}", type=float) or 0.00
+        # Read posted fields
+        rec_qty = float(request.form.get(f"received_{item.id}", 0))
+        dmg_qty = float(request.form.get(f"damaged_{item.id}", 0))
+        inv_qty = float(request.form.get(f"invoice_qty_{item.id}", 0))
+        inv_vat = float(request.form.get(f"invoice_vat_{item.id}", 0))
+        inv_amt = float(request.form.get(f"invoice_total_{item.id}", 0))
 
-        po_amount = round(cost_price * quantity_ordered, 2)
-        po_vat = round(po_amount * Decimal("0.15"), 2)
+        grv_item.quantity_received = rec_qty
+        grv_item.damaged_quantity = dmg_qty
+        grv_item.invoice_quantity = inv_qty
+        grv_item.invoice_vat = inv_vat
+        grv_item.invoice_amount = inv_amt
 
-        exists = db.session.execute(text("""
-            SELECT id FROM bb_grv_items
-            WHERE grv_number = :grv_number AND po_item_id = :po_item_id
-        """), {
-            'grv_number': grv_number,
-            'po_item_id': item_id
-        }).fetchone()
+    # Save totals on GRV header
+    grv.invoice_total_amount = invoice_total_sum
+    grv.invoice_vat_total = invoice_vat_sum
 
-        data = {
-            'grv_id': grv_id,
-            'grv_number': grv_number,
-            'po_item_id': item_id,
-            'sku': sku,
-            'description': description,
-            'cost_price': cost_price,
-            'quantity_ordered': quantity_ordered,
-            'po_vat': po_vat,
-            'po_amount': po_amount,
-            'quantity_received': qty_received,
-            'damaged_quantity': damaged_qty,
-            'best_before_date': best_before,
-            'invoice_quantity': invoice_qty,
-            'invoice_vat': invoice_vat,
-            'invoice_amount': invoice_amount,
-        }
+    # PO total
+    po_total = sum(float(i.total_amount or 0) for i in items)
+    grv.diff_amount = invoice_total_sum - po_total
 
-        if exists:
-            db.session.execute(text("""
-                UPDATE bb_grv_items
-                SET sku = :sku,
-                    description = :description,
-                    cost_price = :cost_price,
-                    quantity_ordered = :quantity_ordered,
-                    po_vat = :po_vat,
-                    po_amount = :po_amount,
-                    quantity_received = :quantity_received,
-                    damaged_quantity = :damaged_quantity,
-                    best_before_date = :best_before_date,
-                    invoice_quantity = :invoice_quantity,
-                    invoice_vat = :invoice_vat,
-                    invoice_amount = :invoice_amount,
-                    updated_at = CURRENT_TIMESTAMP,
-                    grv_id = :grv_id
-                WHERE grv_number = :grv_number AND po_item_id = :po_item_id
-            """), data)
-        else:
-            db.session.execute(text("""
-                INSERT INTO bb_grv_items (
-                    grv_id, grv_number, po_item_id, sku, description,
-                    cost_price, quantity_ordered, po_vat, po_amount,
-                    quantity_received, damaged_quantity, best_before_date,
-                    invoice_quantity, invoice_vat, invoice_amount,
-                    created_at, updated_at
-                ) VALUES (
-                    :grv_id, :grv_number, :po_item_id, :sku, :description,
-                    :cost_price, :quantity_ordered, :po_vat, :po_amount,
-                    :quantity_received, :damaged_quantity, :best_before_date,
-                    :invoice_quantity, :invoice_vat, :invoice_amount,
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                )
-            """), data)
+    # Indicators
+    # --- Indicators ---
+    grv.damage_ind = any((i.damaged_quantity or 0) > 0 for i in grv_items)
+    grv.mismatch_ind = (grv.diff_amount or 0) != 0
 
     db.session.commit()
-    db.session.expire_all()  # Ensure helper reads fresh data
-    update_grv_flags(po_id)
-    session['show_grv_modal'] = True
-    return redirect(url_for('main.receive_goods'))
 
-
+    return jsonify({"message": "GRV saved successfully"})
 
 @main.route("/confirm_grv/<int:po_id>", methods=["POST"])
 def confirm_grv(po_id):
+    from datetime import datetime
+
+    po = BbPurchaseOrder.query.get_or_404(po_id)
     grv = BbGrv.query.filter_by(po_id=po_id).first()
+
     if not grv:
         return jsonify({"error": "GRV not found"}), 404
 
+    if grv.status != "Saved":
+        return jsonify({"error": "GRV must be saved before confirming"}), 400
+
+    # ----------------------------------------------------
+    # 0. Get PO items + calculate PO total
+    # ----------------------------------------------------
+    po_items = BbPurchaseOrderItem.query.filter_by(po_id=po_id).all()
+
+    po_total = sum([
+        float(item.unit_price or 0) * float(item.quantity_ordered or 0)
+        for item in po_items
+    ])
+
+    # ----------------------------------------------------
+    # 1. Create Supplier Invoice Header
+    # ----------------------------------------------------
+    invoice_total = float(grv.invoice_total_amount or 0)
+    invoice_vat = float(grv.invoice_vat_total or 0)
+
+    supplier_invoice = BbSupplierInvoice(
+        po_id=po.id,
+        supplier_id=po.supplier_id,
+        invoice_number=grv.invoice_number,
+        invoice_date=grv.invoice_date,
+        vat_amount=invoice_vat,
+        total_amount=invoice_total,
+        difference_amount=invoice_total - po_total,
+        status="Open"
+    )
+
+    db.session.add(supplier_invoice)
+    db.session.flush()  # Need supplier_invoice.id for items
+
+    # ----------------------------------------------------
+    # 2. Load GRV Items
+    # ----------------------------------------------------
+    grv_items = BbGrvItem.query.filter_by(grv_id=grv.id).all()
+    cost_update_items = []
+
+    # ----------------------------------------------------
+    # 3. Supplier Invoice Items + Cost Price Updates
+    # ----------------------------------------------------
+    for gi in grv_items:
+
+        po_item = BbPurchaseOrderItem.query.get(gi.po_item_id)
+        if not po_item:
+            continue
+
+        invoice_qty = float(gi.invoice_quantity or 0)
+        invoice_amt = float(gi.invoice_amount or 0)
+        po_unit_price = float(po_item.unit_price or 0)
+
+        invoice_unit_price = invoice_amt / invoice_qty if invoice_qty > 0 else 0
+
+        # Detect cost price change
+        product = TocProduct.query.filter_by(item_sku=po_item.sku).first()
+        if product and round(invoice_unit_price, 4) != round(po_unit_price, 4):
+
+            cost_update_items.append({
+                "sku": po_item.sku,
+                "name": po_item.description,
+                "old": float(product.cost_price or 0),
+                "new": invoice_unit_price
+            })
+
+            # Update cost price
+            product.cost_price = invoice_unit_price
+
+        # Add invoice item
+        sii = BbSupplierInvoiceItem(
+            invoice_id=supplier_invoice.id,
+            sku=po_item.sku,
+            description=po_item.description,
+            qty=invoice_qty,
+            unit_price=invoice_unit_price,
+            vat=float(gi.invoice_vat or 0),
+            total_incl_vat=invoice_amt
+        )
+
+        db.session.add(sii)
+
+    # ----------------------------------------------------
+    # 4. Update Stock *STRICT MODE* (only TOC888)
+    # ----------------------------------------------------
+    for gi in grv_items:
+
+        po_item = BbPurchaseOrderItem.query.get(gi.po_item_id)
+        if not po_item:
+            continue
+
+        received_qty = float(gi.quantity_received or 0) - float(gi.damaged_quantity or 0)
+        if received_qty <= 0:
+            continue
+
+        # Find existing stock row (must exist)
+        stock = TocStock.query.filter_by(
+            shop_id="TOC888",
+            sku=po_item.sku
+        ).first()
+
+        if not stock:
+            db.session.rollback()
+            return jsonify({
+                "error": f"Stock record missing for SKU {po_item.sku} in TOC888. "
+                         "Please populate toc_stock and try again."
+            }), 400
+
+        # Update ONLY final_stock_qty
+        stock.final_stock_qty = (stock.final_stock_qty or 0) + received_qty
+        stock.stock_qty_date = datetime.utcnow()
+
+    # ----------------------------------------------------
+    # 5. Update GRV Header Status
+    # ----------------------------------------------------
     grv.status = "Completed"
+    grv.update_date = datetime.utcnow()
+
+    grv.damage_ind = any((gi.damaged_quantity or 0) > 0 for gi in grv_items)
+    grv.mismatch_ind = (invoice_total - po_total) != 0
+
     db.session.commit()
-    return jsonify({"message": "GRV status updated to Completed"})
+
+    # ----------------------------------------------------
+    # 6. Return cost-update list (UI modal uses it)
+    # ----------------------------------------------------
+    if cost_update_items:
+        return jsonify({
+            "message": "cost_updates",
+            "items": cost_update_items
+        }), 200
+
+    return jsonify({
+        "message": "GRV successfully confirmed"
+    }), 200
+
+
+
+
+
 
 @main.route("/create_debit_note/<int:po_id>", methods=["POST"])
 def create_debit_note(po_id):
@@ -5967,6 +5998,208 @@ def bom_delete(bom_id):
 
 
 
+######################  BOM MANUFACTURE  #################################
+######################  BOM MANUFACTURE  #################################
+@main.route('/bom/manufacture')
+def bom_manufacture():
+
+    # ---------------------------------------------------
+    # Restore application context (REQUIRED for UI header)
+    # ---------------------------------------------------
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    # List of shops for top-bar shop selector
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    # ---------------------------------------------------
+    # Manufacturing shop (Canna Holdings)
+    # ---------------------------------------------------
+    manufacture_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+
+    # ---------------------------------------------------
+    # Finished products = all bom_id values
+    # ---------------------------------------------------
+    finished_products = (
+        db.session.query(
+            TocBOMComponent.bom_id.label("sku"),
+            func.max(TocBOMComponent.bom_name).label("name")
+        )
+        .group_by(TocBOMComponent.bom_id)
+        .order_by(TocBOMComponent.bom_id)
+        .all()
+    )
+
+    # ---------------------------------------------------
+    # Render template
+    # ---------------------------------------------------
+    return render_template(
+        "bom_manufacture.html",
+
+        # Context (required by header)
+        user=user,
+        shops=list_of_shops,
+        roles=roles_list,
+        shop=shop,
+        active_shop=manufacture_shop.blName if manufacture_shop else None,
+
+        # Data
+        finished_products=finished_products
+    )
+
+
+@main.route('/bom/manufacture/components/<bom_id>')
+def bom_manufacture_components(bom_id):
+
+    # ---------------------------------------------------
+    # Restore application context (required for header)
+    # ---------------------------------------------------
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data) if shop_data else {}
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
+
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [s.blName for s in shops]
+
+    # Manufacturing shop
+    canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    canna_shop_id = canna_shop.store if canna_shop else None
+
+    # ---------------------------------------------------
+    # Get components for this BOM
+    # ---------------------------------------------------
+    components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
+
+    results = []
+    for c in components:
+
+        # Lookup available stock for this component in Canna Holdings
+        stock_row = (
+            TocStock.query
+                .filter_by(sku=c.component_sku, shop_id=canna_shop_id)
+                .first()
+        )
+        available_qty = float(stock_row.final_stock_qty) if stock_row and stock_row.final_stock_qty is not None else 0
+
+        results.append({
+            "component_sku": c.component_sku,
+            "component_name": c.component_name,
+            "qty_per_unit": float(c.quantity),
+            "available_qty": available_qty
+        })
+
+    return jsonify({
+        "bom_id": bom_id,
+        "components": results,
+        "user": user,
+        "shops": list_of_shops,
+        "roles": roles_list,
+        "active_shop": canna_shop.blName if canna_shop else None
+    })
+
+
+@main.route('/bom/manufacture/submit', methods=['POST'])
+def bom_manufacture_submit():
+
+    data = request.get_json()
+    bom_id = data.get('bom_id')
+    qty_to_build = float(data.get('qty', 0))
+
+    if not bom_id or qty_to_build <= 0:
+        return jsonify({"status": "error", "message": "Invalid parameters"}), 400
+
+    # Restore user
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    user_id = user.get("id") or 0
+
+    # Canna Holdings
+    canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    canna_shop_id = canna_shop.store if canna_shop else None
+
+    # Load components for this BOM
+    components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
+
+    # Create manufacturing header row
+    man = TocBOMManufacture(
+        item_sku=bom_id,
+        qty=qty_to_build,
+        shop_id=canna_shop_id,
+        created_by=user_id
+    )
+    db.session.add(man)
+    db.session.flush()   # get manufacture_id
+
+    # Process each component
+    for comp in components:
+
+        required_qty = float(comp.quantity) * qty_to_build
+
+        # Try loading existing stock row
+        stock_row = TocStock.query.filter_by(
+            sku=comp.component_sku,
+            shop_id=canna_shop_id
+        ).first()
+
+        # If missing, create row with zero stock
+        if not stock_row:
+            stock_row = TocStock(
+                sku=comp.component_sku,
+                shop_id=canna_shop_id,
+                final_stock_qty=0
+            )
+            db.session.add(stock_row)
+
+        # Deduct from final_stock_qty
+        current_stock = float(stock_row.final_stock_qty or 0)
+        stock_row.final_stock_qty = current_stock - required_qty
+
+        # Log consumption line
+        man_item = TocBOMManufactureItem(
+            manufacture_id=man.manufacture_id,
+            component_sku=comp.component_sku,
+            required_qty=required_qty,
+            deducted_qty=required_qty
+        )
+        db.session.add(man_item)
+
+    # Add finished product stock
+    fp_row = TocStock.query.filter_by(
+        sku=bom_id,
+        shop_id=canna_shop_id
+    ).first()
+
+    if not fp_row:
+        fp_row = TocStock(
+            sku=bom_id,
+            shop_id=canna_shop_id,
+            final_stock_qty=0
+        )
+        db.session.add(fp_row)
+
+    current_fp_stock = float(fp_row.final_stock_qty or 0)
+    fp_row.final_stock_qty = current_fp_stock + qty_to_build
+
+    # Commit everything
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "message": f"Manufactured {qty_to_build} units of {bom_id}.",
+        "manufacture_id": man.manufacture_id
+    })
 
 
 
