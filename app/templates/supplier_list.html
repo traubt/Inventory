@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Suppliers</title>
+
+  <link href="/static/assets/img/best_before.png" rel="icon">
+  <link href="/static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700|Nunito:300,400,600,700|Poppins:300,400,500,600,700" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="/static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+</head>
+
+<body>
+<!-- REPLACE the entire body block with the following -->
+
+
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="pagetitle">
+      <h1>Admin</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Pages</li>
+          <li class="breadcrumb-item active">Suppliers</li>
+        </ol>
+      </nav>
+    </div>
+
+    <section class="section">
+      <div class="row">
+        <div class="col-lg-12">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Suppliers</h5>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#supplierModal" onclick="openAddSupplierModal()">Add Supplier</button>
+              </div>
+
+              <table id="supplierTable" class="table table-bordered table-striped w-100 mt-3">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Vendor Code</th>
+                    <th>Contact</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                  <tr>
+                    <th><input type="text" placeholder="🔍 Search Name"></th>
+                    <th><input type="text" placeholder="🔍 Search Code"></th>
+                    <th><input type="text" placeholder="🔍 Search Contact"></th>
+                    <th><input type="text" placeholder="🔍 Search Phone"></th>
+                    <th><input type="text" placeholder="🔍 Search Status"></th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for s in suppliers %}
+                    <tr>
+                      <td>{{ s.name }}</td>
+                      <td>{{ s.vendor_code }}</td>
+                      <td>{{ s.contact_person }}</td>
+                      <td>{{ s.contact_phone }}</td>
+                      <td>{{ s.status }}</td>
+                      <td>
+                        <button class="btn btn-sm btn-primary" onclick="openEditSupplierModal({{ s.id }})">Edit</button>
+                        <form action="{{ url_for('main.delete_supplier', supplier_id=s.id) }}" method="post" style="display:inline-block;">
+                          <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Supplier Modal -->
+  <div class="modal fade" id="supplierModal" tabindex="-1" aria-labelledby="supplierModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form method="post" action="{{ url_for('main.suppliers') }}">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="supplierModalLabel">Add Supplier</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="form_mode" id="form_mode" value="add">
+            <input type="hidden" name="supplier_id" id="supplier_id">
+
+            <div class="row mb-3">
+              <div class="col"><label class="form-label">Name</label><input type="text" class="form-control" name="name" id="name" required></div>
+              <div class="col"><label class="form-label">Vendor Code</label><input type="text" class="form-control" name="vendor_code" id="vendor_code"></div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col"><label class="form-label">Contact Person</label><input type="text" class="form-control" name="contact_person" id="contact_person"></div>
+              <div class="col"><label class="form-label">Phone</label><input type="text" class="form-control" name="contact_phone" id="contact_phone"></div>
+              <div class="col"><label class="form-label">Email</label><input type="email" class="form-control" name="contact_email" id="contact_email"></div>
+            </div>
+
+            <div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address" id="address" rows="2"></textarea></div>
+
+            <div class="row mb-3">
+              <div class="col"><label class="form-label">VAT Registered</label><input type="checkbox" name="vat_registered" id="vat_registered"></div>
+              <div class="col"><label class="form-label">VAT Number</label><input type="text" class="form-control" name="vat_number" id="vat_number"></div>
+              <div class="col"><label class="form-label">Status</label>
+                <select name="status" id="status" class="form-select">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col"><label class="form-label">Payment Terms</label><input type="text" class="form-control" name="payment_terms" id="payment_terms"></div>
+              <div class="col"><label class="form-label">Default Ship To Store</label><input type="text" class="form-control" name="default_ship_to_store" id="default_ship_to_store"></div>
+            </div>
+
+            <div class="mb-3 form-check"><input type="checkbox" class="form-check-input" name="document_received" id="document_received"> <label class="form-check-label" for="document_received">Documents Received</label></div>
+            <div class="mb-3"><label class="form-label">Document Notes</label><textarea class="form-control" name="document_notes" id="document_notes" rows="2"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>NiceAdmin</span></strong>. All Rights Reserved
+    </div>
+    <div class="credits">
+      Designed by <a href="http://algo-tt.co.za/">algo-tt</a>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="static/assets/js/main.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+  <script>
+    const supplierData = {{ suppliers_dicts | tojson | safe }};
+
+    function openAddSupplierModal() {
+      $('#form_mode').val('add');
+      $('#supplierModalLabel').text('Add Supplier');
+      $('#supplier_id').val('');
+      $('#supplierModal input[type="text"], #supplierModal input[type="email"], #supplierModal textarea').val('');
+      $('#supplierModal input[type="checkbox"]').prop('checked', false);
+      $('#status').val('Active');
+    }
+
+    function openEditSupplierModal(id) {
+      const s = supplierData.find(x => x.id === id);
+      if (!s) return;
+      $('#form_mode').val('edit');
+      $('#supplierModalLabel').text('Edit Supplier');
+      $('#supplier_id').val(s.id);
+      $('#name').val(s.name);
+      $('#vendor_code').val(s.vendor_code);
+      $('#contact_person').val(s.contact_person);
+      $('#contact_phone').val(s.contact_phone);
+      $('#contact_email').val(s.contact_email);
+      $('#address').val(s.address);
+      $('#vat_registered').prop('checked', s.vat_registered);
+      $('#vat_number').val(s.vat_number);
+      $('#status').val(s.status);
+      $('#payment_terms').val(s.payment_terms);
+      $('#default_ship_to_store').val(s.default_ship_to_store);
+      $('#document_received').prop('checked', s.document_received);
+      $('#document_notes').val(s.document_notes);
+      $('#supplierModal').modal('show');
+    }
+
+    $(document).ready(function () {
+      $('#supplierTable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [{
+          extend: 'excelHtml5',
+          text: 'Download Excel',
+          title: 'Suppliers_' + new Date().toISOString().slice(0, 10)
+        }],
+        order: [[0, 'asc']],
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        initComplete: function () {
+          this.api().columns().every(function () {
+            var column = this;
+            $('input', column.header()).on('keyup change clear', function () {
+              if (column.search() !== this.value) {
+                column.search(this.value).draw();
+              }
+            });
+          });
+        }
+      });
+    });
+  </script>
+
+</body>
+
+</html>

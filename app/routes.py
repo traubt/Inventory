@@ -5118,7 +5118,15 @@ def po_view(po_id):
         item.barcode = product.barcode if product else ''
         item.cost_price = product.cost_price
         item.retail_price = product.retail_price
-        item.vat_exempt_ind = product.vat_exempt_ind if product else 0  # ✅ ensure it's available in Jinja
+        item.vat_exempt_ind = product.vat_exempt_ind if product else 0
+
+    # === NEW: calculate PO total (sum of line totals) ===
+    from decimal import Decimal
+    po_total = Decimal("0.00")
+    for item in items:
+        qty = Decimal(str(item.quantity_ordered or 0))
+        price = Decimal(str(item.unit_price or 0))
+        po_total += qty * price
 
     user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
@@ -5145,12 +5153,15 @@ def po_view(po_id):
         users=users,
         suppliers=suppliers,
         user=user,
-        shops=shops,  # ✅ full shop objects for address lookup
-        list_of_shops=list_of_shops,  # ✅ just names for the dropdown
+        shops=shops,
+        list_of_shops=list_of_shops,
         default_shop=default_shop,
         roles=roles_list,
-        Decimal=Decimal
+        Decimal=Decimal,
+        po_total=po_total   # 👈 NEW
     )
+
+
 
 @main.route('/purchase_orders/<int:po_id>/mark_sent')
 def mark_po_sent(po_id):
@@ -5637,95 +5648,6 @@ def test_upload():
             <input type="submit">
         </form>
     '''
-
-# @main.route("/extract_invoice_items", methods=["POST"])
-# def extract_invoice_items():
-#     try:
-#         # 1. Validate uploaded file
-#         if "invoice_pdf" not in request.files:
-#             return jsonify({"error": "Missing PDF file"}), 400
-#
-#         file = request.files["invoice_pdf"]
-#         temp_dir = "/tmp"  # Or a safer location on your server
-#         unique_filename = f"{uuid.uuid4()}.pdf"
-#         pdf_path = os.path.join(temp_dir, unique_filename)
-#         file.save(pdf_path)
-#
-#         # 2. Convert first page of PDF to image
-#         images = convert_from_path(pdf_path, dpi=300)
-#         image_path = os.path.join(temp_dir, unique_filename.replace(".pdf", ".png"))
-#         images[0].save(image_path, "PNG")
-#
-#         # 3. Convert image to base64
-#         with open(image_path, "rb") as image_file:
-#             base64_image = base64.b64encode(image_file.read()).decode("utf-8")
-#
-#         # 4. Call OpenAI Vision
-#         client = OpenAI(api_key=current_app.config["OPENAI_KEY"])
-#
-#         response = client.chat.completions.create(
-#             model="gpt-4o",
-#             messages=[
-#                 {
-#                     "role": "user",
-#                     "content": [
-#                         {
-#                             "type": "text",
-#                             "text": (
-#                                 "Extract ALL line items from this invoice. "
-#                                 "Return JSON with fields: product_code, qty, description, unit_price, vat, total_incl_vat. "
-#                                 "Ignore signatures and summary totals."
-#                             )
-#                         },
-#                         {
-#                             "type": "image_url",
-#                             "image_url": {
-#                                 "url": f"data:image/png;base64,{base64_image}"
-#                             }
-#                         }
-#                     ]
-#                 }
-#             ],
-#             max_tokens=4096  # Increase token limit
-#         )
-#
-#         content = response.choices[0].message.content
-#         # Remove Markdown-style ```json ... ```
-#         cleaned = re.sub(r"^```(?:json)?\\n", "", content.strip())
-#         cleaned = re.sub(r"\\n```$", "", cleaned.strip())
-#
-#         content = cleaned
-#
-#         # 5. Save items to db
-#         po_id = request.args.get("po_id", type=int)
-#         if not po_id:
-#             return jsonify({"error": "Missing PO ID"}), 400
-#
-#         try:
-#             items = json.loads(content)
-#         except Exception as e:
-#             return jsonify({"error": "The application can't process the file. Please load GRV manually."}), 400
-#
-#         db.session.query(BbSupplierInvoiceItem).filter_by(po_id=po_id).delete()
-#
-#         for item in items:
-#             db.session.add(BbSupplierInvoiceItem(
-#                 po_id=po_id,
-#                 product_code=item.get("product_code", "").strip(),
-#                 description=item.get("description", "").strip(),
-#                 qty=item.get("qty"),
-#                 unit_price=item.get("unit_price"),
-#                 vat=item.get("vat"),
-#                 total_incl_vat=item.get("total_incl_vat"),
-#                 created_at=datetime.utcnow()
-#             ))
-#
-#         db.session.commit()
-#
-#         return jsonify({"line_items": content})
-#
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 
 
 ##########################  Bill Of Materials   ####################################

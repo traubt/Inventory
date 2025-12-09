@@ -155,14 +155,114 @@
       Approve
     </button>
 
-    <button id="SendSup" class="btn btn-primary">Send to Supplier</button>
+    <button type="button" class="btn btn-primary" id="sendToSupplierBtn">
+        Send to Supplier
+    </button>
+
 
   </div>
 
 </main>
 
 <!-- PRINT FUNCTION -->
+
 <script>
+
+function pad(str, length) {
+    str = String(str);
+    return str.length >= length ? str.substring(0, length) : str + " ".repeat(length - str.length);
+}
+
+function padLeft(str, length) {
+    str = String(str);
+    return str.length >= length ? str.substring(0, length) : " ".repeat(length - str.length) + str;
+}
+
+function formatLine(sku, name, qty, unit, total) {
+    return (
+        pad(sku, 8) + " | " +
+        pad(name, 25) + " | " +
+        padLeft(qty, 3) + " | " +
+        padLeft(unit, 6) + " | " +
+        padLeft(total, 8) + "\n"
+    );
+}
+
+$(document).ready(function () {
+
+    $("#approve-btn").click(function () {
+
+        const poId = {{ po.id }};
+
+        // Optional safety popup
+        if (!confirm("Are you sure you want to approve this Purchase Order?")) {
+            return;
+        }
+
+        $.get(`/purchase_orders/${poId}/approve`)
+            .done(function () {
+                alert("Purchase Order approved successfully.");
+                window.location.reload();
+            })
+            .fail(function () {
+                alert("Failed to approve Purchase Order.");
+            });
+    });
+
+    document.getElementById("sendToSupplierBtn").addEventListener("click", function () {
+
+        // 1. To address (may be empty – user can fill in)
+        const to = "{{ po.supplier.email or '' }}";
+
+        // 2. Subject
+        const subject = "Purchase Order {{ po.po_number }}";
+
+        // 3. Build nice text body (Outlook will show line breaks)
+        let body = "";
+
+// Greeting
+body += "Dear {{ (po.supplier.name or '')|replace('\\n',' ') }},\n\n";
+
+body += "Please find below the details of our Purchase Order:\n";
+body += "PO Number: {{ po.po_number }}\n";
+body += "PO Date: {{ po.created_at.strftime('%d-%m-%Y') }}\n\n";
+body += "Items Ordered:\n";
+body += "----------------------------------------\n";
+body += "SKU    | Description                 | Qty | Unit | Total\n";
+body += "----------------------------------------\n";
+
+
+        // Items (one line per item)
+        {% for item in items %}
+        body += formatLine(
+            "{{ item.sku or '' }}",
+            "{{ item.item_name or '' }}",
+            "{{ '%.2f'|format(item.quantity_ordered or 0) }}",
+            "{{ '%.2f'|format(item.unit_price or 0) }}",
+            "{{ '%.2f'|format((item.quantity_ordered or 0)*(item.unit_price or 0)) }}"
+        );
+        {% endfor %}
+
+
+        body += "----------------------------------------" + "\n";
+        body += "Grand Total: {{ '%.2f'|format(po_total) }}" + "\n\n";
+
+        body += "Kind regards," + "\n";
+        body += "Taste Of Cannabis Purchasing Team";
+
+        // 4. Encode for mailto
+        const mailtoUrl =
+            "mailto:" + encodeURIComponent(to) +
+            "?subject=" + encodeURIComponent(subject) +
+            "&body=" + encodeURIComponent(body);
+
+        // 5. Open default mail client
+        window.location.href = mailtoUrl;
+    });
+
+
+});
+
 function printPDF() {
     const printContent = document.querySelector('#poPrintArea').cloneNode(true);
 
