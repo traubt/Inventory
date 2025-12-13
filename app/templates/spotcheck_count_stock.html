@@ -151,6 +151,11 @@
 
 <script>
 
+    function round2(value) {
+      return Math.round((value + Number.EPSILON) * 100) / 100;
+    }
+
+
     function waitForTableReady(selector, timeout = 5000) {
           return new Promise((resolve, reject) => {
             const interval = 100;
@@ -178,7 +183,7 @@
         // Calculate "Current Quantity" for each row before initializing the table
         rows.forEach(row => {
             // Perform the calculation for Current Quantity
-            row.current_qty = (row.last_stock_count || 0) - (row.sold_qty || 0) + (row.received_qty || 0);
+            row.current_qty = ((row.last_stock_count || 0) - (row.sold_qty || 0) + (row.received_qty || 0)).toFixed(3);
         });
 
         // Destroy existing DataTable if it exists
@@ -259,22 +264,16 @@
         // After table initialization, check variance for each row
         table.rows().every(function () {
             const row = this.node();
+            const $row = $(row); // ✅ IMPORTANT
             const data = this.data();
-            const currentQty = data.current_qty || 0;
-            const countedQty = parseFloat($(row).find('.current-stock-count').val()) || 0;
-            const rejectedQty = parseFloat($(row).find('.current-stock-rejected').val()) || 0;
 
-            // Calculate the variance
-            const variance = currentQty - countedQty;
+            const currentQty = parseFloat(data.current_qty) || 0;
+            const countedQty = parseFloat($row.find('.current-stock-count').val()) || 0;
 
-            // If variance > 10% of current quantity, set red border
-            //const threshold = 0.1; // 10%
-            const difference = Math.abs(currentQty - countedQty);
-            //if (currentQty > 0 && (difference / currentQty) > threshold) {
-           // if (difference != 0) {
-           //     $(row).find('.current-stock-count').css('border', '5px solid red');
-           // }
+            const variance = round2(currentQty - countedQty);
+            $row.find('.variance').text(variance.toFixed(2));
         });
+
 
         // Update variance dynamically when the current stock count changes
         $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
@@ -312,8 +311,9 @@ $(document).off('input.counted').on('input.counted', '#ProductOrderTemplate .cur
 
     // (optional) also show variance immediately
     const currentQty = parseFloat($row.find('td:nth-child(7)').text()) || 0;
-    const variance   = currentQty - parseFloat(val || 0);
-    $row.find('.variance').text(variance);
+    const variance = round2(currentQty - parseFloat(val || 0));
+    $row.find('.variance').text(variance.toFixed(2));
+
   } else {
     $row.removeClass('counted-row');
     $row.find('.variance').text('');
@@ -1077,8 +1077,9 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
             // Recalculate variance
             const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
             const countedQty = parseFloat(stockCountInput.val()) || 0;
-            const variance = currentQty - countedQty;
-            row.find(".variance").text(variance);
+            const variance = round2(currentQty - countedQty);
+            row.find(".variance").text(variance.toFixed(2));
+
 
           //  if (variance !== 0) {
           //    stockCountInput.css("border", "5px solid red");
