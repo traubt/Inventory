@@ -53,6 +53,7 @@ class TOC_SHOPS(db.Model):
     zip = db.Column(db.String(5))
     city  = db.Column(db.String(20))
     state = db.Column(db.String(20))
+    vat_no = db.Column(db.BigInteger)
 
 class TocMessages(db.Model):
     __tablename__ = 'toc_messages'

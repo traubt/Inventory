@@ -265,7 +265,24 @@
 
 <script>
 
+let grvConfirmedWithCostUpdates = false;
+
 $(document).ready(function () {
+
+    $("#modalOkBtn").on("click", function () {
+
+        if (grvConfirmedWithCostUpdates) {
+
+            const successModal = new bootstrap.Modal(
+                document.getElementById("grvConfirmSuccessModal")
+            );
+
+            successModal.show();
+
+            grvConfirmedWithCostUpdates = false; // reset
+        }
+    });
+
 
     // Mark preloaded invoice amounts as user-set so JS won't override them
     $("input[name^='invoice_total_']").each(function () {
@@ -456,6 +473,8 @@ $(document).ready(function () {
                 // If backend sent cost updates → Show cost modal
                 if (response.message === "cost_updates") {
 
+                    grvConfirmedWithCostUpdates = true;
+
                     const list = $("#costUpdateList");
                     list.empty();
 
@@ -474,6 +493,7 @@ $(document).ready(function () {
                     $("#grv_status_display").val("Completed");
                     disableGrvButtons();
                 }
+
 
                 // Normal success → Show success modal
                 else if (response.message === "grv_confirmed" || response.message === "GRV successfully confirmed") {

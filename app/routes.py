@@ -5083,7 +5083,7 @@ def po_edit(po_id):
     roles = TocRole.query.all()
     roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
 
-    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    shops = TOC_SHOPS.query.all()
     list_of_shops = [s.blName for s in shops]
 
     users = User.query.order_by(User.first_name).all()
@@ -5106,8 +5106,11 @@ from decimal import Decimal
 
 @main.route('/purchase_orders/<int:po_id>/view')
 def po_view(po_id):
+    from decimal import Decimal
+
     po = BbPurchaseOrder.query.get_or_404(po_id)
     po.supplier = BbSupplier.query.get(po.supplier_id)
+
     items = BbPurchaseOrderItem.query.filter_by(po_id=po.id).all()
 
     # Enrich line items with product details
@@ -5116,12 +5119,11 @@ def po_view(po_id):
         item.item_name = product.item_name if product else ''
         item.size = product.size if product else ''
         item.barcode = product.barcode if product else ''
-        item.cost_price = product.cost_price
-        item.retail_price = product.retail_price
+        item.cost_price = product.cost_price if product else 0
+        item.retail_price = product.retail_price if product else 0
         item.vat_exempt_ind = product.vat_exempt_ind if product else 0
 
-    # === NEW: calculate PO total (sum of line totals) ===
-    from decimal import Decimal
+    # Calculate PO total
     po_total = Decimal("0.00")
     for item in items:
         qty = Decimal(str(item.quantity_ordered or 0))
@@ -5131,20 +5133,14 @@ def po_view(po_id):
     user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
 
-    shop_data = session.get('shop')
-    shop = json.loads(shop_data) if shop_data else {}
-
     roles = TocRole.query.all()
     roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
 
-    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
-    list_of_shops = [s.blName for s in shops]
-    default_shop = next((s for s in shops if s.blName == "Woodmeed"), shops[0])
+    # Load ALL shops (includes Canna Holdings)
+    shops = TOC_SHOPS.query.all()
 
     users = User.query.order_by(User.first_name).all()
     suppliers = BbSupplier.query.order_by(BbSupplier.name).all()
-
-    default_shop = next((s for s in shops if s.blName == "Woodmeed"), shops[0])
 
     return render_template(
         'po_view.html',
@@ -5154,12 +5150,11 @@ def po_view(po_id):
         suppliers=suppliers,
         user=user,
         shops=shops,
-        list_of_shops=list_of_shops,
-        default_shop=default_shop,
         roles=roles_list,
         Decimal=Decimal,
-        po_total=po_total   # 👈 NEW
+        po_total=po_total
     )
+
 
 
 
@@ -5561,12 +5556,19 @@ def confirm_grv(po_id):
         if not stock:
             db.session.rollback()
             return jsonify({
-                "error": f"Stock record missing for SKU {po_item.sku} in TOC888. "
-                         "Please populate toc_stock and try again."
+                "error": (
+                    f"Stock record missing for SKU {po_item.sku} in TOC888. "
+                    "Please populate toc_stock and try again."
+                )
             }), 400
 
-        # Update ONLY final_stock_qty
+        # ✅ Update final stock
         stock.final_stock_qty = (stock.final_stock_qty or 0) + received_qty
+
+        # ✅ Update stock transfer (NEW)
+        stock.stock_transfer = (stock.stock_transfer or 0) + received_qty
+
+        # Update timestamp
         stock.stock_qty_date = datetime.utcnow()
 
     # ----------------------------------------------------
@@ -5592,10 +5594,6 @@ def confirm_grv(po_id):
     return jsonify({
         "message": "GRV successfully confirmed"
     }), 200
-
-
-
-
 
 
 @main.route("/create_debit_note/<int:po_id>", methods=["POST"])
