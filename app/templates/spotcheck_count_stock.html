@@ -261,20 +261,6 @@
 
         $('#ProductOrderTemplate').show();
 
-        // After table initialization, check variance for each row
-        table.rows().every(function () {
-            const row = this.node();
-            const $row = $(row); // ✅ IMPORTANT
-            const data = this.data();
-
-            const currentQty = parseFloat(data.current_qty) || 0;
-            const countedQty = parseFloat($row.find('.current-stock-count').val()) || 0;
-
-            const variance = round2(currentQty - countedQty);
-            $row.find('.variance').text(variance.toFixed(2));
-        });
-
-
         // Update variance dynamically when the current stock count changes
         $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
             const row = $(this).closest('tr');
