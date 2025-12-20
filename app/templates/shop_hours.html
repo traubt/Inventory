@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Trading Hours</title>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- BOOTSTRAP 5 -->
+  <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+  <link href="/static/assets/css/style.css" rel="stylesheet">
+</head>
+
+<body>
+
+{% include 'header-bar.html' %}
+{% include 'side-bar.html' %}
+
+<main id="main" class="main">
+
+  <!-- PAGE TITLE -->
+  <div class="pagetitle">
+    <h1>Shop Trading Hours</h1>
+    <nav>
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item">Instant Delivery</li>
+        <li class="breadcrumb-item active">Shop Hours</li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- FILTER -->
+  <section class="section">
+    <div class="card mb-3">
+      <div class="card-body">
+
+        <form method="get" class="row align-items-center">
+          <div class="col-md-4">
+            <label class="form-label mb-1">Select Shop</label>
+            <select name="shop_name"
+                    class="form-select"
+                    onchange="this.form.submit()">
+              <option value="">All Shops</option>
+              {% for s in shops %}
+                <option value="{{ s }}"
+                        {% if s == selected_shop %}selected{% endif %}>
+                  {{ s }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- HOURS TABLE -->
+    <div class="card">
+      <div class="card-body">
+
+        <h5 class="card-title">Weekly Trading Hours</h5>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped align-middle text-center">
+            <thead class="table-dark">
+              <tr>
+                <th>Shop</th>
+                <th>Day</th>
+                <th>Open</th>
+                <th>Close</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+            {% for h in hours %}
+              <tr>
+                <form method="post">
+                  <input type="hidden" name="shop_name" value="{{ h.shop_name }}">
+                  <input type="hidden" name="day_of_week" value="{{ h.day_of_week }}">
+
+                  <td class="text-start">{{ h.shop_name }}</td>
+
+                  <td>
+                    <strong>{{ h.day_of_week }}</strong>
+                  </td>
+
+                  <td>
+                    <input type="time"
+                           name="open_hour"
+                           class="form-control form-control-sm"
+                           value="{{ h.open_hour.strftime('%H:%M') }}">
+                  </td>
+
+                  <td>
+                    <input type="time"
+                           name="closing_hour"
+                           class="form-control form-control-sm"
+                           value="{{ h.closing_hour.strftime('%H:%M') }}">
+                  </td>
+
+                  <td>
+                    <button class="btn btn-sm btn-primary">
+                      <i class="bi bi-save"></i> Save
+                    </button>
+                  </td>
+                </form>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

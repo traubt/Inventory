@@ -4070,6 +4070,103 @@ def pay_driver(driver_id):
     return jsonify({'message': 'Driver paid successfully', 'payment_id': new_payment.payment_id})
 
 
+@main.route("/shop_hours", methods=["GET", "POST"])
+def shop_hours():
+    try:
+        import json
+        from datetime import datetime
+        from sqlalchemy import or_, case
+
+        # ===============================
+        # Standard TOC context
+        # ===============================
+        user_data = session.get("user")
+        user = json.loads(user_data) if user_data else None
+
+        shop_data = session.get("shop")
+        shop = json.loads(shop_data) if shop_data else None
+
+        roles = TocRole.query.all()
+        roles_list = [
+            {"role": r.role, "exclusions": r.exclusions}
+            for r in roles
+        ]
+
+        # ===============================
+        # Handle UPDATE
+        # ===============================
+        if request.method == "POST":
+            shop_name   = request.form["shop_name"]
+            day_of_week = request.form["day_of_week"]
+            open_hour   = request.form["open_hour"]
+            close_hour  = request.form["closing_hour"]
+
+            row = TocShopsHours.query.filter_by(
+                shop_name=shop_name,
+                day_of_week=day_of_week
+            ).first()
+
+            if not row:
+                raise Exception("Shop hours row not found")
+
+            row.open_hour = datetime.strptime(open_hour, "%H:%M").time()
+            row.closing_hour = datetime.strptime(close_hour, "%H:%M").time()
+
+            db.session.commit()
+
+            return redirect(
+                url_for("main.shop_hours", shop_name=shop_name)
+            )
+
+        # ===============================
+        # Handle VIEW
+        # ===============================
+        selected_shop = request.args.get("shop_name")
+
+        shops = (
+            db.session.query(TocShopsHours.shop_name)
+            .distinct()
+            .order_by(TocShopsHours.shop_name)
+            .all()
+        )
+
+        q = TocShopsHours.query
+        if selected_shop:
+            q = q.filter(TocShopsHours.shop_name == selected_shop)
+
+        hours = q.order_by(
+            TocShopsHours.shop_name,
+            case(
+                (TocShopsHours.day_of_week == "Monday", 1),
+                (TocShopsHours.day_of_week == "Tuesday", 2),
+                (TocShopsHours.day_of_week == "Wednesday", 3),
+                (TocShopsHours.day_of_week == "Thursday", 4),
+                (TocShopsHours.day_of_week == "Friday", 5),
+                (TocShopsHours.day_of_week == "Saturday", 6),
+                (TocShopsHours.day_of_week == "Sunday", 7),
+            )
+        ).all()
+
+        return render_template(
+            "shop_hours.html",
+            user=user,
+            shop=shop,
+            roles=roles_list,
+            hours=hours,
+            shops=[s[0] for s in shops],
+            selected_shop=selected_shop
+        )
+
+    except Exception as e:
+        print(f"Error in shop_hours route: {e}")
+        return render_template(
+            "pages-error-404.html",
+            message="Failed to load shop hours"
+        )
+
+
+
+
 @main.route('/get_shop_hours', methods=['GET'])
 def get_shop_hours():
     shop_name = request.args.get('shop_name')
