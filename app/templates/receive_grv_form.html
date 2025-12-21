@@ -120,8 +120,8 @@
       <th>PO VAT</th>
       <th>PO Amount</th>
       <th>Qty Received</th>
-
       <th>Damaged Qty</th>
+      <th>Invoice Item Cost</th>
       <th>Invoice Qty</th>
       <th>Invoice VAT</th>
       <th>Invoice Amount</th>
@@ -172,13 +172,23 @@
                    {% if fully_received %}readonly disabled{% endif %}>
         </td>
 
+        <!-- Invoice Item Cost -->
+        <td>
+          <input type="number"
+                 name="invoice_cost_{{ item.id }}"
+                 class="form-control invoice-cost"
+                 step="0.0001"
+                 value="{{ gi.invoice_amount / gi.invoice_quantity if gi and gi.invoice_quantity else item.cost_price }}">
+        </td>
+
+
         <!-- Invoice Qty -->
         <td>
-            <input type="number"
-                   name="invoice_qty_{{ item.id }}"
-                   class="form-control"
-                   step="0.01"
-                   value="{{ gi.invoice_quantity if gi else item.quantity_ordered }}">
+          <input type="number"
+                 name="invoice_qty_{{ item.id }}"
+                 class="form-control"
+                 step="0.01"
+                 value="{{ gi.invoice_quantity if gi else item.quantity_ordered }}">
         </td>
 
         <!-- Invoice VAT -->
@@ -194,9 +204,10 @@
         <td>
             <input type="number"
                    name="invoice_total_{{ item.id }}"
-                   class="form-control"
+                   class="form-control bg-light"
                    step="0.01"
-                   value="{{ gi.invoice_amount if gi else '' }}">
+                   value="{{ gi.invoice_amount if gi else '' }}"
+                   readonly>
         </td>
     </tr>
 {% endfor %}
@@ -331,35 +342,36 @@ $(document).ready(function () {
         updateInvoiceTotals();
     });
 
+    $(document).on("input", "input[name^='invoice_cost_']", function () {
+        updateInvoiceTotals();
+    });
+
+
     // -----------------------------
     //  Update row values
     // -----------------------------
     function updateRow(row) {
 
         const qty = parseFloat(row.find("input[name^='invoice_qty_']").val()) || 0;
-        const costPrice = parseFloat(row.find("td:eq(2)").text().trim()) || 0;
+        const itemCost = parseFloat(row.find("input[name^='invoice_cost_']").val()) || 0;
+
         const poVat = parseFloat(row.find("td:eq(4)").text().trim()) || 0;
         const poAmount = parseFloat(row.find("td:eq(5)").text().trim()) || 0;
 
-        const autoInvoiceAmount = qty * costPrice;
+        const invoiceAmount = qty * itemCost;
 
-        const amountField = row.find("input[name^='invoice_total_']");
+        // Set calculated invoice amount
+        row.find("input[name^='invoice_total_']")
+           .val(invoiceAmount.toFixed(2));
+
+        // VAT auto-calc unless overridden
         const vatField = row.find("input[name^='invoice_vat_']");
-
-        // Auto calculate invoice amount ONLY IF USER HAS NOT TYPED ANYTHING
-        if (!amountField.data("user-set")) {
-            amountField.val(autoInvoiceAmount.toFixed(2));
-        }
-
-        const invoiceAmount = parseFloat(amountField.val()) || 0;
-
-        // Auto calculate VAT ONLY IF USER HAS NOT OVERRIDDEN IT
         if (!vatField.data("user-set")) {
             const vatRate = poAmount > 0 ? (poVat / poAmount) : 0;
-            const autoVat = invoiceAmount * vatRate;
-            vatField.val(autoVat.toFixed(2));
+            vatField.val((invoiceAmount * vatRate).toFixed(2));
         }
     }
+
 
     // -----------------------------
     //  Update totals
