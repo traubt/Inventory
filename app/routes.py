@@ -5252,9 +5252,6 @@ def po_view(po_id):
         po_total=po_total
     )
 
-
-
-
 @main.route('/purchase_orders/<int:po_id>/mark_sent')
 def mark_po_sent(po_id):
     po = BbPurchaseOrder.query.get_or_404(po_id)
@@ -5545,6 +5542,24 @@ def confirm_grv(po_id):
     from datetime import datetime
 
     po = BbPurchaseOrder.query.get_or_404(po_id)
+
+    # ----------------------------------------------------
+    # Resolve PO shop from logged-in user
+    # ----------------------------------------------------
+    user_data = session.get("user")
+    user = json.loads(user_data) if user_data else {}
+
+    shop_name = user.get("shop")  # e.g. "Head Office"
+
+    shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
+
+    if not shop:
+        return jsonify({
+            "error": f"Cannot resolve shop for user shop '{shop_name}'"
+        }), 400
+
+    shop_id = shop.store_customer
+
     grv = BbGrv.query.filter_by(po_id=po_id).first()
 
     if not grv:
@@ -5632,7 +5647,7 @@ def confirm_grv(po_id):
         db.session.add(sii)
 
     # ----------------------------------------------------
-    # 4. Update Stock *STRICT MODE* (only TOC888)
+    # 4. Update Stock
     # ----------------------------------------------------
     for gi in grv_items:
 
@@ -5646,7 +5661,7 @@ def confirm_grv(po_id):
 
         # Find existing stock row (must exist)
         stock = TocStock.query.filter_by(
-            shop_id="TOC888",
+            shop_id=shop_id,
             sku=po_item.sku
         ).first()
 
@@ -5654,7 +5669,7 @@ def confirm_grv(po_id):
             db.session.rollback()
             return jsonify({
                 "error": (
-                    f"Stock record missing for SKU {po_item.sku} in TOC888. "
+                    f"Stock record missing for SKU {po_item.sku} in shop {shop.blName} ({shop_id}). "
                     "Please populate toc_stock and try again."
                 )
             }), 400

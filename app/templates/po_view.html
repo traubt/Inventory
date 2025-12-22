@@ -12,6 +12,8 @@
   <link href="/static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="/static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
   <script src="/static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='assets/js/functions.js') }}"></script>
+
 
   <link href="/static/assets/css/style.css" rel="stylesheet">
 
@@ -40,55 +42,14 @@
     </nav>
   </div>
 
-<script>
-  console.log("DEBUG: shops passed to po_view");
-
-  {% for s in shops %}
-    console.log("Shop:", {
-      blName: "{{ s.blName }}",
-      mt_shop_name: "{{ s.mt_shop_name }}",
-      address: "{{ s.address }}",
-      vat_no: "{{ s.vat_no }}"
-    });
-  {% endfor %}
-</script>
-
-
-{# ===============================
-   Resolve selected company (ROBUST)
-   =============================== #}
-
-{% set company_choice = request.args.get('company', 'holdings') %}
-
-{% if company_choice == 'foods' %}
-
-  {% set company_display_name = 'Canna Foods' %}
-
-  {# Head Office = Canna Foods #}
-  {% set company_shop = (
+  {# Resolve logged-in user's shop from shops list #}
+  {% set shop_name = user.shop %}
+  {% set shop = (
       shops
-      | selectattr('blName', 'equalto', 'Head Office')
+      | selectattr('blName', 'equalto', shop_name)
       | list
       | first
   ) %}
-
-{% else %}
-
-  {% set company_display_name = 'Canna Holdings' %}
-
-  {% set company_shop = (
-      shops
-      | selectattr('blName', 'equalto', 'Canna Holdings')
-      | list
-      | first
-  ) %}
-
-{% endif %}
-
-
-
-
-
 
 
   <!-- PRINT AREA -->
@@ -97,41 +58,29 @@
     <!-- HEADER -->
   <div class="d-flex justify-content-between mb-4">
 
-  <div>
-    <!-- Company selector -->
-    <form method="get" class="mb-2 d-print-none">
-      <select name="company"
-              class="form-select form-select-sm w-auto"
-              onchange="this.form.submit()">
-        <option value="holdings" {% if company_choice == 'holdings' %}selected{% endif %}>
-          Canna Holdings
-        </option>
-        <option value="foods" {% if company_choice == 'foods' %}selected{% endif %}>
-          Canna Foods
-        </option>
-      </select>
-    </form>
-
-    <!-- Company details -->
+<div>
+  {% if shop %}
     <h3 class="mb-1">
-      <strong>{{ company_display_name }}</strong>
+      <strong>{{ shop.blName }}</strong>
     </h3>
 
-    {% if company_shop %}
-      {% if company_shop.address %}
-        <p class="mb-0">{{ company_shop.address }}</p>
-      {% endif %}
-
-      {% if company_shop.vat_no %}
-        <p class="mb-0">VAT No: {{ company_shop.vat_no }}</p>
-      {% endif %}
+    {% if shop.address %}
+      <p class="mb-0">{{ shop.address }}</p>
     {% endif %}
 
+    {% if shop.vat_no %}
+      <p class="mb-0">VAT No: {{ shop.vat_no }}</p>
+    {% endif %}
+  {% else %}
+    <h3 class="mb-1 text-danger">
+      <strong>Unknown Shop ({{ user.shop }})</strong>
+    </h3>
+  {% endif %}
 
+  <br>
+  <p class="mb-0"><strong>Status:</strong> {{ po.status }}</p>
+</div>
 
-    <br>
-    <p class="mb-0"><strong>Status:</strong> {{ po.status }}</p>
-  </div>
 
   <div class="text-end">
     <h4>PURCHASE ORDER</h4>
