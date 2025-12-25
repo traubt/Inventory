@@ -78,7 +78,7 @@ def get_recent_sales(shop_name, from_date, to_date):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         query = '''              
             SELECT 
                 CONCAT(m.first_name, ' ', m.last_name) AS customer,
@@ -235,7 +235,7 @@ def get_product_sales(timeframe, shop_name):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         query = f'''
             SELECT product_name, SUM(total_sales_{timeframe}) AS total_sales
             FROM toc_sales_summary_product
@@ -268,7 +268,7 @@ def get_specials_sales(timeframe, shop_name):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         query = f'''
             SELECT product_name, SUM(count_sales_{timeframe}) AS total_sales
             FROM toc_sales_summary_product ts
@@ -303,7 +303,7 @@ def get_recent_product_sales(timeframe, shop_name):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         query = f'''
                 SELECT 
                     p.product_name, 
@@ -378,11 +378,11 @@ def get_hourly_sales(shop_name, timeframe):
     # print(f"shop_name: {shop_name}")
     # print(f"time_frame: {timeframe}")
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         if timeframe == "hourly":
             query = '''                             
                 SELECT 
-                    'Head Office' as store_name,
+                    'Cannafoods International' as store_name,
                     DATE_FORMAT(s.time_of_sale, '%Y-%m-%d %H:00') AS sale_hour, 
                     ROUND(SUM(net_amt)) AS total_amount
                 FROM 
@@ -400,7 +400,7 @@ def get_hourly_sales(shop_name, timeframe):
         elif timeframe == "daily":
             query = '''
                 SELECT 
-                    'Head Office' AS store_name,
+                    'Cannafoods International' AS store_name,
                     DATE_FORMAT(i.time_of_sale, '%Y-%m-%d') AS sale_date,
                     ROUND(SUM(net_amt)) AS total_amount
                 FROM 
@@ -1084,7 +1084,7 @@ def get_sales_by_shop_last_three_months(user_shop):
     cursor = conn.cursor()
 
     # Query to retrieve the stock order form
-    if user_shop == 'Head Office':
+    if user_shop == 'Cannafoods International':
         query = '''
                 SELECT 
                     ts.store_name,
@@ -1203,7 +1203,7 @@ def get_top_agents (shop_name, timeframe):
     # print(f"shop_name: {shop_name}")
     # print(f"time_frame: {timeframe}")
 
-    if shop_name == "Head Office":
+    if shop_name == "Cannafoods International":
         if timeframe == "daily":
             query = '''                             
             SELECT 
@@ -1315,8 +1315,8 @@ def get_sales_data(shop_name, from_date, to_date):
 
     try:
 
-    # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+    # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
                 SELECT
                     DATE_FORMAT(ts.time_of_sale, '%%Y-%%m-%%d') AS date,  
@@ -1450,8 +1450,8 @@ def get_60MIN_Sales(shop_name, from_date, to_date):
 
     try:
 
-        # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+        # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
                 select DATE_FORMAT(creation_date, '%%Y-%%m-%%d') AS date,  round(sum(total_amt/1.15)) 
                  from toc_shipday tsd
@@ -1524,8 +1524,8 @@ def get_product_sales_data(shop_name, from_date, to_date):
 
     try:
 
-        # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+        # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
                     SELECT
                         p.item_name,  
@@ -1675,8 +1675,8 @@ def get_top_sellers(shop_name, from_date, to_date):
 
     try:
 
-        # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+        # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
             SELECT 
                 staff_name,                
@@ -1749,8 +1749,8 @@ def get_top_specials(shop_name, from_date, to_date):
 
     try:
 
-        # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+        # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
                     SELECT
                         p.item_name,  
@@ -1845,8 +1845,8 @@ def get_top_brand(shop_name, from_date, to_date):
 
     try:
 
-        # Default query for Head Office or non-specific shop
-        if shop_name == "Head Office":
+        # Default query for Cannafoods International or non-specific shop
+        if shop_name == "Cannafoods International":
             query = '''
                     SELECT
                         p.acct_group as category,  

@@ -529,12 +529,12 @@
   $(document).ready(async function() {
 
   fetchLastUpdateTime();
-  // Change option from Head Office to All Shops
+  // Change option from Cannafoods International to All Shops
     const shopDropdown = document.getElementById('shopDropdown');
     const options = shopDropdown.options;
 
     for (let i = 0; i < options.length; i++) {
-      if (options[i].value === 'Head Office') {
+      if (options[i].value === 'Cannafoods International') {
         options[i].text = 'All Shops'; // Change displayed text
         break;
       }

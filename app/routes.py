@@ -1679,7 +1679,7 @@ def fetch_history_orders():
     user_data = json.loads(session.get('user'))
 
     # Get the shop_name from the request parameters (if provided)
-    shop_name = request.args.get("replenishShop")  # Default to Head Office shop if not provided
+    shop_name = request.args.get("replenishShop")  # Default to Cannafoods International shop if not provided
 
     # Get the store code
     if shop_name == '':
@@ -5549,7 +5549,7 @@ def confirm_grv(po_id):
     user_data = session.get("user")
     user = json.loads(user_data) if user_data else {}
 
-    shop_name = user.get("shop")  # e.g. "Head Office"
+    shop_name = user.get("shop")  # e.g. "Cannafoods International"
 
     shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
 
