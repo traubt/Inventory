@@ -178,7 +178,12 @@
                  name="invoice_cost_{{ item.id }}"
                  class="form-control invoice-cost"
                  step="0.0001"
-                 value="{{ gi.invoice_amount / gi.invoice_quantity if gi and gi.invoice_quantity else item.cost_price }}">
+                 value="{{
+                      ((gi.invoice_amount|float) / (gi.invoice_quantity|float))
+                      if gi and (gi.invoice_quantity|float) > 0
+                      else (item.cost_price|float)
+                    }}"
+                    >
         </td>
 
 

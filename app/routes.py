@@ -5233,7 +5233,7 @@ def po_view(po_id):
     roles = TocRole.query.all()
     roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
 
-    # Load ALL shops (includes Canna Holdings)
+    # Load ALL shops (includes Canndo Holdings)
     shops = TOC_SHOPS.query.all()
 
     users = User.query.order_by(User.first_name).all()
@@ -6051,9 +6051,9 @@ def bom_manufacture():
     list_of_shops = [s.blName for s in shops]
 
     # ---------------------------------------------------
-    # Manufacturing shop (Canna Holdings)
+    # Manufacturing shop (Canndo Holdings)
     # ---------------------------------------------------
-    manufacture_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    manufacture_shop = TOC_SHOPS.query.filter_by(blName="Canndo Holdings").first()
 
     # ---------------------------------------------------
     # Finished products = all bom_id values
@@ -6104,9 +6104,9 @@ def bom_manufacture_components(bom_id):
     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
     list_of_shops = [s.blName for s in shops]
 
-    # Manufacturing shop
-    canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
-    canna_shop_id = canna_shop.store if canna_shop else None
+    # Manufacturing shop (FIXED – stable identifier)
+    canna_shop_id = "TOC888"
+    canna_shop = TOC_SHOPS.query.filter_by(store=canna_shop_id).first()
 
     # ---------------------------------------------------
     # Get components for this BOM
@@ -6116,7 +6116,7 @@ def bom_manufacture_components(bom_id):
     results = []
     for c in components:
 
-        # Lookup available stock for this component in Canna Holdings
+        # Lookup available stock for this component in Canndo Holdings
         stock_row = (
             TocStock.query
                 .filter_by(sku=c.component_sku, shop_id=canna_shop_id)
@@ -6156,8 +6156,8 @@ def bom_manufacture_submit():
     user = json.loads(user_data) if user_data else {}
     user_id = user.get("id") or 0
 
-    # Canna Holdings
-    canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    # Canndo Holdings
+    canna_shop = TOC_SHOPS.query.filter_by(blName="Canndo Holdings").first()
     canna_shop_id = canna_shop.store if canna_shop else None
 
     # Load components for this BOM

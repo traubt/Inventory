@@ -565,7 +565,7 @@ def distribute_product_to_shops(sku):
             toc_product
         WHERE 
             toc_product.item_sku = %s
-            AND toc_shops.blName <> 'Canna Holdings';
+            AND toc_shops.blName <> 'Canndo Holdings';
     '''
 
     try:
