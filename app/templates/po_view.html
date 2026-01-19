@@ -204,8 +204,9 @@
         <tbody>
         {% for item in items %}
           {# Ensure Decimal arithmetic #}
-          {% set qty = item.quantity_ordered %}
-          {% set sale_p = Decimal(item.retail_price/1.15 or 0) %}
+          {% set qty = Decimal(item.quantity_ordered or 0) %}
+
+          {% set sale_p = (Decimal(item.retail_price or 0) / Decimal('1.15')) %}
           {% set cost_p = Decimal(item.cost_price or 0) %}
           {% set sale_t = sale_p * qty %}
           {% set cost_t = cost_p * qty %}
