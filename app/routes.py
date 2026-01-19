@@ -5549,16 +5549,17 @@ def confirm_grv(po_id):
     user_data = session.get("user")
     user = json.loads(user_data) if user_data else {}
 
-    shop_name = user.get("shop")  # e.g. "Cannafoods International"
+    canna_store = "888"
+    shop = TOC_SHOPS.query.filter_by(store=canna_store).first()
 
-    shop = TOC_SHOPS.query.filter_by(blName=shop_name).first()
+    # Optional fallback (if some env uses only blName)
+    if not shop:
+        shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
 
     if not shop:
-        return jsonify({
-            "error": f"Cannot resolve shop for user shop '{shop_name}'"
-        }), 400
+        return jsonify({"error": "Manufacturing shop not found (store=888 / Canna Holdings)"}), 400
 
-    shop_id = shop.store_customer
+    shop_id = f"TOC{shop.store}"  # => "TOC888"
 
     grv = BbGrv.query.filter_by(po_id=po_id).first()
 

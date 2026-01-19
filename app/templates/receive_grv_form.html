@@ -522,12 +522,20 @@ $(document).ready(function () {
                     disableGrvButtons();
                 }
 
-            }).fail(function () {
-                // Error modal
-                const errorModal = new bootstrap.Modal(document.getElementById("grvConfirmErrorModal"));
-                $("#grvErrorText").text("Failed to confirm GRV. Please try again.");
-                errorModal.show();
-            });
+}).fail(function (xhr) {
+    const msg =
+        xhr.responseJSON?.error ||
+        xhr.responseJSON?.message ||
+        (xhr.responseText || "").slice(0, 200) ||
+        "Failed to confirm GRV. Please try again.";
+
+    Swal.fire({
+        icon: "error",
+        title: "Confirm GRV failed",
+        text: msg
+    });
+});
+
 
         });
     });
