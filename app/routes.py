@@ -6105,9 +6105,12 @@ def bom_manufacture_components(bom_id):
     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
     list_of_shops = [s.blName for s in shops]
 
-    # Manufacturing shop (FIXED – stable identifier)
+    # Manufacturing shop (store='888' in toc_shops, but shop_id='TOC888' in toc_stock)
+    canna_store = "888"
     canna_shop_id = "TOC888"
-    canna_shop = TOC_SHOPS.query.filter_by(store=canna_shop_id).first()
+    canna_shop = TOC_SHOPS.query.filter_by(store=canna_store).first()
+    if not canna_shop:
+        canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
 
     # ---------------------------------------------------
     # Get components for this BOM
@@ -6116,19 +6119,17 @@ def bom_manufacture_components(bom_id):
 
     results = []
     for c in components:
-
-        # Lookup available stock for this component in Canndo Holdings
         stock_row = (
             TocStock.query
                 .filter_by(sku=c.component_sku, shop_id=canna_shop_id)
                 .first()
         )
-        available_qty = float(stock_row.final_stock_qty) if stock_row and stock_row.final_stock_qty is not None else 0
+        available_qty = float(stock_row.final_stock_qty or 0) if stock_row else 0
 
         results.append({
             "component_sku": c.component_sku,
             "component_name": c.component_name,
-            "qty_per_unit": float(c.quantity),
+            "qty_per_unit": float(c.quantity or 0),
             "available_qty": available_qty
         })
 
@@ -6146,12 +6147,12 @@ def bom_manufacture_components(bom_id):
 def bom_manufacture_submit():
     """
     Manufacture finished goods from a BOM:
-    - Deduct component stock (toc_stock.final_stock_qty) for the manufacturing shop
+    - Deduct component stock (toc_stock.final_stock_qty) for the manufacturing shop (TOC888)
     - Increase finished product stock for the same shop
+    - Update stock_transfer:
+        * +finished qty
+        * -component qty
     - Write header + lines to toc_bom_manufacture / toc_bom_manufacture_items
-
-    IMPORTANT: In TOC DB, toc_stock.shop_id is like 'TOC888' while toc_shops.store is '888'.
-    So we resolve the manufacturing shop by store='888' (or blName), but we always write stock using shop_id='TOC888'.
     """
     from datetime import datetime
 
@@ -6170,26 +6171,20 @@ def bom_manufacture_submit():
     user_id = user.get("id") or 0
 
     # ---------------------------------------------------
-    # Manufacturing shop:
-    # - toc_shops.store is '888'
-    # - toc_stock.shop_id is 'TOC888'
+    # HARD-CODE manufacturing shop to TOC888
     # ---------------------------------------------------
-    # Prefer store=888 as the canonical manufacturing store.
     canna_store = "888"
     canna_shop = TOC_SHOPS.query.filter_by(store=canna_store).first()
-
-    # Fallback (optional): if some env has only blName (typos etc.)
     if not canna_shop:
         canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
 
     if not canna_shop:
         return jsonify({"status": "error", "message": "Manufacturing shop not found (store=888 / Canna Holdings)"}), 400
 
-    # This is the key fix: stock table uses 'TOC888'
-    canna_shop_id = f"TOC{canna_shop.store}"
+    canna_shop_id = f"TOC{canna_shop.store}"  # => TOC888
 
     # ---------------------------------------------------
-    # Load components for this BOM (bom_id is the finished SKU)
+    # Load components for this BOM (bom_id is finished SKU)
     # ---------------------------------------------------
     components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
     if not components:
@@ -6210,7 +6205,7 @@ def bom_manufacture_submit():
         db.session.flush()  # get manufacture_id
 
         # ---------------------------------------------------
-        # Process each component: deduct stock + log line
+        # Process each component: deduct stock + transfer + log line
         # ---------------------------------------------------
         for comp in components:
             required_qty = float(comp.quantity or 0) * qty_to_build
@@ -6222,7 +6217,7 @@ def bom_manufacture_submit():
                 shop_id=canna_shop_id
             ).first()
 
-            # If missing, create row with zero stock
+            # If missing, create row with zeros
             if not stock_row:
                 stock_row = TocStock(
                     sku=comp.component_sku,
@@ -6234,8 +6229,12 @@ def bom_manufacture_submit():
                 db.session.add(stock_row)
                 db.session.flush()
 
-            current_stock = float(stock_row.final_stock_qty or 0)
-            stock_row.final_stock_qty = current_stock - required_qty
+            # Deduct component final stock
+            stock_row.final_stock_qty = float(stock_row.final_stock_qty or 0) - required_qty
+
+            # ✅ Deduct component transfer (your requirement)
+            stock_row.stock_transfer = float(stock_row.stock_transfer or 0) - required_qty
+
             stock_row.stock_qty_date = datetime.utcnow()
 
             db.session.add(TocBOMManufactureItem(
@@ -6246,7 +6245,7 @@ def bom_manufacture_submit():
             ))
 
         # ---------------------------------------------------
-        # Add finished product stock
+        # Add finished product stock + transfer
         # ---------------------------------------------------
         fp_row = TocStock.query.filter_by(
             sku=bom_id,
@@ -6265,6 +6264,10 @@ def bom_manufacture_submit():
             db.session.flush()
 
         fp_row.final_stock_qty = float(fp_row.final_stock_qty or 0) + qty_to_build
+
+        # ✅ Add finished product transfer (your requirement)
+        fp_row.stock_transfer = float(fp_row.stock_transfer or 0) + qty_to_build
+
         fp_row.stock_qty_date = datetime.utcnow()
 
         db.session.commit()
@@ -6282,6 +6285,7 @@ def bom_manufacture_submit():
             "status": "error",
             "message": f"Manufacture failed: {str(e)}"
         }), 500
+
 
 
 
