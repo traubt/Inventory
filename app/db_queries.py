@@ -994,9 +994,13 @@ def get_stock_count_per_shop(shop):
     cursor = conn.cursor()
 
     # ----------------------------------------------------
-    # HEAD OFFICE (TOC999) -> WooCommerce sales
+    # Head Office name (blName) -> use WC sales + shop_id TOC999
     # ----------------------------------------------------
-    if shop == "TOC999":
+    # IMPORTANT: We keep the input contract unchanged (shop is a NAME)
+    HEAD_OFFICE_NAME = "Cannafoods International"
+    HEAD_OFFICE_ID   = "TOC999"
+
+    if shop == HEAD_OFFICE_NAME:
 
         query = """
             WITH sales_data AS (
@@ -1042,7 +1046,7 @@ def get_stock_count_per_shop(shop):
                 st.stock_qty_date AS last_stock_count_date,
                 COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
                 COALESCE(st.final_stock_qty, 0) - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
-                COALESCE(st.stock_transfer, 0) - COALESCE(dd.total_damaged, 0) AS received_stock
+                COALESCE(st.stock_transfer,0) - COALESCE(dd.total_damaged, 0) AS received_stock
             FROM toc_stock st
             JOIN toc_product p
               ON p.item_sku = st.sku
@@ -1055,7 +1059,7 @@ def get_stock_count_per_shop(shop):
             ORDER BY COALESCE(s.sales_since_stock_read, 0) DESC;
         """
 
-        cursor.execute(query, (shop, shop, shop))
+        cursor.execute(query, (HEAD_OFFICE_ID, HEAD_OFFICE_ID, HEAD_OFFICE_ID))
         result = cursor.fetchall()
 
         cursor.close()
@@ -1063,9 +1067,9 @@ def get_stock_count_per_shop(shop):
         return result
 
     # ----------------------------------------------------
-    # OTHER SHOPS -> existing POS query (unchanged)
+    # Default: original working POS query (unchanged)
     # ----------------------------------------------------
-    query = '''   
+    query = '''
             WITH sales_data AS (
               SELECT 
                   d.item_sku,
@@ -1123,6 +1127,7 @@ def get_stock_count_per_shop(shop):
     conn.close()
 
     return result
+
 
 
 def get_stock_order_per_shop(shop):
