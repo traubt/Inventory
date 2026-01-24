@@ -1001,7 +1001,6 @@ def get_stock_count_per_shop(shop):
     HEAD_OFFICE_ID   = "TOC999"
 
     if shop == HEAD_OFFICE_NAME:
-
         query = """
             WITH sales_data AS (
               SELECT
@@ -1009,7 +1008,7 @@ def get_stock_count_per_shop(shop):
                   st.stock_qty_date,
                   SUM(
                     CASE
-                      WHEN COALESCE(wo.order_date, wo.creation_date) > st.stock_qty_date
+                      WHEN wo.creation_date > st.stock_qty_date
                       THEN COALESCE(wi.quantity, 0)
                       ELSE 0
                     END
@@ -1019,6 +1018,12 @@ def get_stock_count_per_shop(shop):
                      ON p.item_sku = wi.sku
               LEFT JOIN toc_wc_sales_order wo
                      ON wi.order_id = wo.order_id
+                    AND wo.status <> 'wc-pending'
+                    AND wo.order_id NOT IN (
+                        SELECT s.wc_orderid
+                        FROM toc_shipday s
+                        WHERE s.wc_orderid IS NOT NULL
+                    )
               LEFT JOIN toc_stock st
                      ON p.item_sku = st.sku
                     AND st.shop_id = %s
