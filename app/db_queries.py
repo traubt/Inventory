@@ -1028,19 +1028,6 @@ def get_stock_count_per_shop(shop):
                      ON p.item_sku = st.sku
                     AND st.shop_id = %s
               GROUP BY p.item_sku, st.stock_qty_date
-            ),
-            damaged_data AS (
-              SELECT
-                  d.sku,
-                  d.shop_id,
-                  SUM(d.rcv_damaged) AS total_damaged
-              FROM toc_damaged d
-              INNER JOIN toc_stock st
-                      ON d.sku = st.sku
-                     AND d.shop_id = st.shop_id
-              WHERE d.order_open_date > st.stock_qty_date
-                AND d.shop_id = %s
-              GROUP BY d.sku, d.shop_id
             )
             SELECT DISTINCT
                 st.sku AS item_sku,
@@ -1050,16 +1037,15 @@ def get_stock_count_per_shop(shop):
                 st.stock_count AS last_stock_count,
                 st.stock_qty_date AS last_stock_count_date,
                 COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
-                COALESCE(st.final_stock_qty, 0) - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
-                COALESCE(st.stock_transfer,0) - COALESCE(dd.total_damaged, 0) AS received_stock
+                COALESCE(st.final_stock_qty, 0)
+                    - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
+                COALESCE(st.stock_transfer, 0) AS received_stock   -- 👈 damaged stock forced to 0
             FROM toc_stock st
             JOIN toc_product p
               ON p.item_sku = st.sku
              AND p.acct_group NOT IN ('Specials', 'Non stock Item')
             LEFT JOIN sales_data s
               ON st.sku = s.item_sku
-            LEFT JOIN damaged_data dd
-              ON st.sku = dd.sku AND st.shop_id = dd.shop_id
             WHERE st.shop_id = %s
             ORDER BY COALESCE(s.sales_since_stock_read, 0) DESC;
         """
