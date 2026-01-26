@@ -2105,48 +2105,39 @@ def delete_count_draft():
     return jsonify({'message': f'Deleted drafts: {draft_ids}'})
 
 
-
-
+#
 # @main.route('/update_count_receive_stock', methods=['POST'])
 # def update_count_receive_stock():
 #     try:
 #         data = request.get_json()
 #
 #         table = data.get('table', [])
-#         shop = data.get('shop', '')
-#         shop_name = data.get('shop_name', '')
+#         shop = data.get('shop', '')                # receiving shop_id (customer)
+#         shop_name = data.get('shop_name', '')      # receiving blName
 #         user_name = data.get('user_name', '')
-#         date = data.get('date', '')
 #         replenish_order_id = data.get('replenish_order_id', '')
 #
 #         for row in table:
-#             sku = row.get('sku', '')
-#             product_name = row.get('product_name', '')
-#             stock_sent = row.get('sent_qty', 0)
-#             stock_count = row.get('received_qty', 0)
-#             rcv_damaged = row.get('received_damaged', 0)
-#             variance = row.get('variance', 0)
-#             comments = row.get('comments', '')
+#             sku           = row.get('sku', '')
+#             product_name  = row.get('product_name', '')
+#             sent_qty      = float(row.get('sent_qty', 0) or 0)           # for info
+#             received_qty  = float(row.get('received_qty', 0) or 0)       # <-- use this
+#             rcv_damaged   = float(row.get('received_damaged', 0) or 0)
+#             variance      = float(row.get('variance', 0) or 0)
+#             comments      = row.get('comments', '')
 #
-#             # 1. Update receiving shop toc_stock
-#             stock_record = TocStock.query.filter_by(shop_id=shop, sku=sku).first()
-#             if not stock_record:
+#             # --- 1) Receiving shop record ---
+#             recv_stock = TocStock.query.filter_by(shop_id=shop, sku=sku).first()
+#             if not recv_stock:
 #                 raise Exception(f"Receiving shop {shop} SKU {sku} not found in toc_stock")
 #
-#             # 3. Get replenish record for reference
-#             existing_record = TocReplenishOrder.query.filter_by(order_id=replenish_order_id, sku=sku).first()
-#             if not existing_record:
+#             # --- 2) Replenishment row (for meta) ---
+#             repl_line = TocReplenishOrder.query.filter_by(order_id=replenish_order_id, sku=sku).first()
+#             if not repl_line:
 #                 raise Exception(f"toc_replenish_order not found for {sku}")
 #
-#             # Set received + sent damage values
-#             stock_record.stock_transfer += float(existing_record.received_qty or 0)
-#             stock_record.rcv_damaged = float(rcv_damaged)
-#             stock_record.rejects_qty = float(existing_record.rejected_qty or 0)
-#             stock_record.final_stock_qty = float(stock_count) - float(rcv_damaged)
-#             stock_record.audit_count = float(stock_count) - float(rcv_damaged)
-#
-#             # 2. Update sending shop toc_stock
-#             toc_stock_record = (
+#             # --- 3) Sending shop record (using control header sent_from) ---
+#             sending_stock = (
 #                 db.session.query(TocStock)
 #                 .join(TOC_SHOPS, TocStock.shop_id == TOC_SHOPS.customer)
 #                 .join(TOCReplenishCtrl, TOC_SHOPS.store == TOCReplenishCtrl.sent_from)
@@ -2156,51 +2147,94 @@ def delete_count_draft():
 #                 )
 #                 .first()
 #             )
-#             if toc_stock_record:
-#                 toc_stock_record.stock_transfer -= float(existing_record.received_qty or 0)
-#             else:
+#             if not sending_stock:
 #                 raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")
 #
-#             # 4. Update replenish record
-#             existing_record.received_date = datetime.now(timezone.utc)
-#             existing_record.received_qty = stock_count
-#             existing_record.variance = variance
-#             existing_record.received_by = user_name
-#             existing_record.received_comment = comments
+#             # --- 4) Compute deltas ---
+#             net_in = max(received_qty - rcv_damaged, 0.0)  # units added to receiving
+#             recv_prior = recv_stock.audit_count if recv_stock.audit_count is not None else (
+#                 recv_stock.final_stock_qty if recv_stock.final_stock_qty is not None else 0.0
+#             )
+#             recv_new = recv_prior + net_in
 #
-#             # 5. Update toc_damaged if exists
+#             send_prior = sending_stock.audit_count if sending_stock.audit_count is not None else (
+#                 sending_stock.final_stock_qty if sending_stock.final_stock_qty is not None else 0.0
+#             )
+#             send_new = send_prior - received_qty  # shipping shop loses what was shipped
+#
+#             # --- 5) Apply receiving shop updates ---
+#             # Treat stock_transfer as “movement since last count”
+#             recv_stock.stock_transfer = (recv_stock.stock_transfer or 0) + received_qty
+#             recv_stock.rcv_damaged = rcv_damaged
+#             # Keep your rejected logic (line-level rejected_qty on repl_line)
+#             recv_stock.rejects_qty = float(repl_line.rejected_qty or 0)
+#
+#             recv_stock.final_stock_qty = recv_new
+#             recv_stock.audit_count = recv_new
+#
+#             # --- 6) Apply sending shop updates ---
+#             sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - received_qty
+#             # Be conservative with final_stock_qty at source; we adjust audit_count (your running number)
+#             sending_stock.audit_count = send_new
+#
+#             # --- 7) Update the replenishment line ---
+#             repl_line.received_date = datetime.now(timezone.utc)
+#             repl_line.received_qty = received_qty
+#             repl_line.variance = variance
+#             repl_line.received_by = user_name
+#             repl_line.received_comment = comments
+#
+#             # --- 8) Damaged table line (if exists) ---
 #             damaged_record = TocDamaged.query.filter_by(order_id=replenish_order_id, sku=sku).first()
 #             if damaged_record:
-#                 damaged_record.rcv_damaged = float(rcv_damaged)
-#                 damaged_record.variance = float(damaged_record.rejected_qty or 0) - float(rcv_damaged)
+#                 damaged_record.rcv_damaged = rcv_damaged
+#                 damaged_record.variance = float(damaged_record.rejected_qty or 0) - rcv_damaged
 #
-#             # 6. Log variance if needed
+#             # --- 9) Variance logging (kept as-is) ---
 #             if variance != 0:
 #                 db.session.add(TOCStockVariance(
 #                     shop_id=shop,
 #                     sku=sku,
 #                     product_name=product_name,
-#                     stock_count=float(stock_count),
+#                     stock_count=received_qty,
 #                     count_by=user_name,
-#                     last_stock_qty=float(stock_count),
-#                     calc_stock_qty=float(stock_sent),
-#                     variance=float(variance),
+#                     last_stock_qty=received_qty,   # prior behavior kept
+#                     calc_stock_qty=sent_qty,
+#                     variance=variance,
 #                     stock_recount=0,
 #                     shop_name=shop_name,
-#                     final_stock_qty=float(stock_count),
+#                     final_stock_qty=received_qty,
 #                     comments=comments,
 #                     replenish_id=replenish_order_id
 #                 ))
 #
-#         # 7. Finalize control
+#             # --- 10) AUDIT rows for both shops ---
+#             # Receiving
+#             log_stock_audit_entry(
+#                 shop_id=shop,
+#                 sku=sku,
+#                 product_name=product_name,
+#                 stock_count=recv_new,  # running after receipt
+#                 shop_name=shop_name,
+#                 comments=f"Transfer IN: +{received_qty} (damaged {rcv_damaged}) • order {replenish_order_id}"
+#             )
+#
+#             # Sending
+#             send_shop_name = sending_stock.shop_name or "Source"
+#             log_stock_audit_entry(
+#                 shop_id=sending_stock.shop_id,
+#                 sku=sku,
+#                 product_name=product_name,
+#                 stock_count=send_new,  # running after shipment
+#                 shop_name=send_shop_name,
+#                 comments=f"Transfer OUT: -{received_qty} → {shop_name} • order {replenish_order_id}"
+#             )
+#
+#         # --- 11) Close the control header ---
 #         ctrl = TOCReplenishCtrl.query.filter(
-#             or_(
-#                 TOCReplenishCtrl.order_status == "New",
-#                 TOCReplenishCtrl.order_status == "Submitted"
-#             ),
+#             or_(TOCReplenishCtrl.order_status == "New", TOCReplenishCtrl.order_status == "Submitted"),
 #             TOCReplenishCtrl.order_id == replenish_order_id
 #         ).first()
-#
 #         if ctrl:
 #             ctrl.order_status = "Completed"
 #             ctrl.order_status_date = datetime.now(timezone.utc)
@@ -2210,15 +2244,13 @@ def delete_count_draft():
 #
 #     except SQLAlchemyError as e:
 #         db.session.rollback()
-#         print("Database error:", e)
+#         logger.exception("Database error:")
 #         return jsonify({"status": "error", "message": "Failed to update stock data", "error": str(e)}), 500
 #
 #     except Exception as e:
-#         print("Error:", e)
+#         db.session.rollback()
+#         logger.exception("Error in update_count_receive_stock:")
 #         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
-#
-#     finally:
-#         db.session.close()
 
 @main.route('/update_count_receive_stock', methods=['POST'])
 def update_count_receive_stock():
@@ -2234,11 +2266,14 @@ def update_count_receive_stock():
         for row in table:
             sku           = row.get('sku', '')
             product_name  = row.get('product_name', '')
-            sent_qty      = float(row.get('sent_qty', 0) or 0)           # for info
-            received_qty  = float(row.get('received_qty', 0) or 0)       # <-- use this
+            sent_qty      = float(row.get('sent_qty', 0) or 0)           # what left source
+            received_qty  = float(row.get('received_qty', 0) or 0)       # what arrived at dest (may include damaged)
             rcv_damaged   = float(row.get('received_damaged', 0) or 0)
             variance      = float(row.get('variance', 0) or 0)
             comments      = row.get('comments', '')
+
+            # Safety: sender should always lose SENT qty (including damaged)
+            out_qty = sent_qty if sent_qty > 0 else received_qty
 
             # --- 1) Receiving shop record ---
             recv_stock = TocStock.query.filter_by(shop_id=shop, sku=sku).first()
@@ -2265,7 +2300,9 @@ def update_count_receive_stock():
                 raise Exception(f"Sending shop for order {replenish_order_id} SKU {sku} not found")
 
             # --- 4) Compute deltas ---
-            net_in = max(received_qty - rcv_damaged, 0.0)  # units added to receiving
+            # Receiving gets NET after damaged
+            net_in = max(received_qty - rcv_damaged, 0.0)
+
             recv_prior = recv_stock.audit_count if recv_stock.audit_count is not None else (
                 recv_stock.final_stock_qty if recv_stock.final_stock_qty is not None else 0.0
             )
@@ -2274,21 +2311,22 @@ def update_count_receive_stock():
             send_prior = sending_stock.audit_count if sending_stock.audit_count is not None else (
                 sending_stock.final_stock_qty if sending_stock.final_stock_qty is not None else 0.0
             )
-            send_new = send_prior - received_qty  # shipping shop loses what was shipped
+
+            # ✅ FIX: sending shop loses FULL sent qty (including damaged)
+            send_new = send_prior - out_qty
 
             # --- 5) Apply receiving shop updates ---
-            # Treat stock_transfer as “movement since last count”
+            # Keep original behavior: movement shown at receiver is received_qty (you already like this)
             recv_stock.stock_transfer = (recv_stock.stock_transfer or 0) + received_qty
             recv_stock.rcv_damaged = rcv_damaged
-            # Keep your rejected logic (line-level rejected_qty on repl_line)
             recv_stock.rejects_qty = float(repl_line.rejected_qty or 0)
 
             recv_stock.final_stock_qty = recv_new
             recv_stock.audit_count = recv_new
 
             # --- 6) Apply sending shop updates ---
-            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - received_qty
-            # Be conservative with final_stock_qty at source; we adjust audit_count (your running number)
+            # ✅ FIX: movement at sender must reflect full sent qty
+            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - out_qty
             sending_stock.audit_count = send_new
 
             # --- 7) Update the replenishment line ---
@@ -2312,7 +2350,7 @@ def update_count_receive_stock():
                     product_name=product_name,
                     stock_count=received_qty,
                     count_by=user_name,
-                    last_stock_qty=received_qty,   # prior behavior kept
+                    last_stock_qty=received_qty,
                     calc_stock_qty=sent_qty,
                     variance=variance,
                     stock_recount=0,
@@ -2323,25 +2361,25 @@ def update_count_receive_stock():
                 ))
 
             # --- 10) AUDIT rows for both shops ---
-            # Receiving
+            # Receiving audit (shows running after receipt)
             log_stock_audit_entry(
                 shop_id=shop,
                 sku=sku,
                 product_name=product_name,
-                stock_count=recv_new,  # running after receipt
+                stock_count=recv_new,
                 shop_name=shop_name,
                 comments=f"Transfer IN: +{received_qty} (damaged {rcv_damaged}) • order {replenish_order_id}"
             )
 
-            # Sending
-            send_shop_name = sending_stock.shop_name or "Source"
+            # Sending audit (shows running after shipment) ✅ uses out_qty
+            send_shop_name = getattr(sending_stock, "shop_name", None) or "Source"
             log_stock_audit_entry(
                 shop_id=sending_stock.shop_id,
                 sku=sku,
                 product_name=product_name,
-                stock_count=send_new,  # running after shipment
+                stock_count=send_new,
                 shop_name=send_shop_name,
-                comments=f"Transfer OUT: -{received_qty} → {shop_name} • order {replenish_order_id}"
+                comments=f"Transfer OUT: -{out_qty} → {shop_name} (damaged {rcv_damaged}) • order {replenish_order_id}"
             )
 
         # --- 11) Close the control header ---
@@ -2354,7 +2392,7 @@ def update_count_receive_stock():
             ctrl.order_status_date = datetime.now(timezone.utc)
 
         db.session.commit()
-        return jsonify({"status": "success", "message": "Stock data updated successfully"})
+        return jsonify({"status": "success", "message": "Stock data updated successfully (v2)"})
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -2363,8 +2401,9 @@ def update_count_receive_stock():
 
     except Exception as e:
         db.session.rollback()
-        logger.exception("Error in update_count_receive_stock:")
+        logger.exception("Error in update_count_receive_stock_v2:")
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
 
 
 
