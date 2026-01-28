@@ -191,6 +191,7 @@
             columns: [
                 { title: "SKU", data: "sku" },
                 { title: "Product Name", data: "product_name" },
+                { title: "Item Type", data: "item_type" },
                 { title: "Last Stock Count", data: "last_stock_count" },
                 { title: "Last Stock Count Date", data: "last_stock_count_date" },
                 { title: "Sold Quantity", data: "sold_qty" },
@@ -245,7 +246,7 @@
                 }
             ],
     <!--        pageLength: 300,-->
-            order: [[6, 'desc']],
+            order: [[7, 'desc']],
             autoWidth: false,
             paging: false,
             searching: true,
@@ -277,7 +278,7 @@
         $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
             const row = $(this).closest('tr');
             const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-            const calculatedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
+            const calculatedQty = parseFloat(row.find('td:nth-child(8)').text()) || 0;
             const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
 
             const variance = round2(calculatedQty - countedQty);
@@ -535,15 +536,17 @@ $("#saveOrder").off("click").on("click", async function () {
     const rowData = {
       sku: row.find("td:nth-child(1)").text().trim(),
       product_name: row.find("td:nth-child(2)").text().trim(),
-      last_stock_count: parseFloat(row.find("td:nth-child(3)").text().trim()) || 0,
-      last_stock_count_date: row.find("td:nth-child(4)").text().trim(),
-      sold_qty: parseFloat(row.find("td:nth-child(5)").text().trim()) || 0,
-      current_qty: parseFloat(row.find("td:nth-child(7)").text().trim()) || 0,
+      item_type: row.find("td:nth-child(3)").text().trim(),            // ✅ NEW
+      last_stock_count: parseFloat(row.find("td:nth-child(4)").text().trim()) || 0,
+      last_stock_count_date: row.find("td:nth-child(5)").text().trim(),
+      sold_qty: parseFloat(row.find("td:nth-child(6)").text().trim()) || 0,
+      current_qty: parseFloat(row.find("td:nth-child(8)").text().trim()) || 0, // ✅ was 7
       stock_count: parseFloat(row.find(".current-stock-count").val()) || 0,
       stock_rejected: parseFloat(row.find(".current-stock-rejected").val()) || 0,
       variance: parseFloat(row.find(".variance").text().trim()) || 0,
       comments: row.find(".comments").val()?.trim() || ""
     };
+
 
     // require comment on variance (your rule)
     if (row.find('.current-stock-count').css('border-color') === 'rgb(255, 0, 0)' && rowData.comments === "") {
@@ -1036,7 +1039,7 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
             commentsInput.val(savedItem.comments || "");
 
             // Recalculate variance
-            const currentQty = parseFloat(row.find("td:nth-child(7)").text()) || 0;
+            const currentQty = parseFloat(row.find("td:nth-child(8)").text()) || 0;
             const countedQty = parseFloat(stockCountInput.val()) || 0;
             const variance = round2(currentQty - countedQty);
             row.find('.variance').text(variance.toFixed(2));

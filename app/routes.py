@@ -1031,25 +1031,56 @@ def get_product_order_template():
     return jsonify(formatted_data)
 
 
+# @main.route('/get_product_order_form', methods=['GET'])
+# def get_product_order_form():
+#     try:
+#         # Fetch the shop customer from the session
+#         shop = json.loads(session.get('shop'))['name']  # Assuming 'shop.customer' is stored in the session
+#
+#         data = get_stock_count_per_shop(shop)
+#
+#         if not data:
+#             return jsonify({"message": "Error fetching stock order form data"}), 500
+#
+#         # Format the data for the client
+#         formatted_data = [
+#             {
+#                 "sku": row[0],
+#                 "product_name": row[1],
+#                 "stock_count": row[7],
+#                 "last_stock_qty": row[4],
+#                 "calc_stock_qty": row[7],
+#                 "variance": 0,
+#                 "variance_rsn": "NA",
+#                 "stock_recount": 0,
+#                 "rejects_qty": 0,
+#                 "comments": "NA"
+#             }
+#             for row in data
+#         ]
+#
+#         return jsonify(formatted_data)
+#
+#     except Exception as e:
+#         print("Error in get_product_order_form:", e)
+#         return jsonify({"message": "Internal server error"}), 500
+
 @main.route('/get_product_order_form', methods=['GET'])
 def get_product_order_form():
     try:
-        # Fetch the shop customer from the session
-        shop = json.loads(session.get('shop'))['name']  # Assuming 'shop.customer' is stored in the session
-
+        shop = json.loads(session.get('shop'))['name']
         data = get_stock_count_per_shop(shop)
 
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
 
-        # Format the data for the client
         formatted_data = [
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "stock_count": row[7],
-                "last_stock_qty": row[4],
-                "calc_stock_qty": row[7],
+                "stock_count": row[8],     # was row[7]
+                "last_stock_qty": row[5],  # was row[4]
+                "calc_stock_qty": row[8],  # was row[7]
                 "variance": 0,
                 "variance_rsn": "NA",
                 "stock_recount": 0,
@@ -1064,6 +1095,7 @@ def get_product_order_form():
     except Exception as e:
         print("Error in get_product_order_form:", e)
         return jsonify({"message": "Internal server error"}), 500
+
 
 @main.route('/get_product_replenish_form', methods=['POST'])
 def get_product_replenish_form():
@@ -1104,30 +1136,64 @@ def get_product_replenish_form():
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# @main.route('/get_stock_count_form', methods=['GET'])
+# def get_stock_count_form():
+#     try:
+#         shop_data = json.loads(session.get('shop'))
+#         selected_shop = shop_data['name']
+#         # Print the selected shop value
+#         print(f"Selected shop from client: {selected_shop}")
+#
+#         data = get_stock_count_per_shop(selected_shop)
+#     #
+#         if not data:
+#             return jsonify({"message": "Error fetching stock order form data"}), 500
+#     #
+#         # Format the data for the client
+#         formatted_data = [
+#             {
+#                 "sku": row[0],
+#                 "product_name": row[1],
+#                 "store_code" :row[2],
+#                 "last_stock_count": row[4],
+#                 "last_stock_count_date": row[5],
+#                 "sold_qty": row[6],
+#                 "current_qty": row[7],
+#                 "received_qty" : row[8]
+#             }
+#             for row in data
+#         ]
+#
+#         return jsonify(formatted_data)
+#
+#     except Exception as e:
+#         # Handle any errors
+#         print(f"Error: {str(e)}")
+#         return jsonify({"status": "error", "message": str(e)}), 500
+
 @main.route('/get_stock_count_form', methods=['GET'])
 def get_stock_count_form():
     try:
         shop_data = json.loads(session.get('shop'))
         selected_shop = shop_data['name']
-        # Print the selected shop value
         print(f"Selected shop from client: {selected_shop}")
 
         data = get_stock_count_per_shop(selected_shop)
-    #
+
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
-    #
-        # Format the data for the client
+
         formatted_data = [
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "store_code" :row[2],
-                "last_stock_count": row[4],
-                "last_stock_count_date": row[5],
-                "sold_qty": row[6],
-                "current_qty": row[7],
-                "received_qty" : row[8]
+                "item_type": row[2],          # ✅ NEW
+                "store_code": row[3],
+                "last_stock_count": row[5],
+                "last_stock_count_date": row[6],
+                "sold_qty": row[7],
+                "current_qty": row[8],
+                "received_qty": row[9]
             }
             for row in data
         ]
@@ -1135,9 +1201,9 @@ def get_stock_count_form():
         return jsonify(formatted_data)
 
     except Exception as e:
-        # Handle any errors
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @main.route('/get_stock_order_form', methods=['GET'])
