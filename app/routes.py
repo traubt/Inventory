@@ -6358,6 +6358,245 @@ def bom_manufacture_submit():
         }), 500
 
 
+#######################    INTER TRANSFER INVOICE  ##########################
+
+
+VAT_PCT_DEFAULT = 15.0
+
+
+def _safe_int(v):
+    try:
+        return int(v)
+    except Exception:
+        return None
+
+
+def _money2(v):
+    try:
+        return round(float(v or 0), 2)
+    except Exception:
+        return 0.00
+
+
+def _num3(v):
+    try:
+        return round(float(v or 0), 3)
+    except Exception:
+        return 0.000
+
+
+def _generate_invoice_no(prefix="INV"):
+    # Example: INV-20260130-104512-8342
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    rnd = str(int(datetime.now().timestamp()))[-4:]
+    return f"{prefix}-{ts}-{rnd}"
+
+
+@main.route("/invoice/inter-transfer/create", methods=["POST"])
+def create_invoice_inter_transfer():
+    """
+    Creates:
+      - toc_invoice
+      - toc_invoice_item(s)
+      - toc_invoice_commission (optional)
+    for Inter Transfer source.
+    """
+
+    import json
+    from datetime import date
+
+    payload = request.get_json(silent=True) or {}
+
+    # ---------------------------
+    # Required payload fields
+    # ---------------------------
+    source_id = (payload.get("source_id") or "").strip()   # ✅ VARCHAR
+    buyer_blname = (payload.get("buyer_blname") or "").strip()
+    items = payload.get("items") or []
+
+    # Commission (optional)
+    commission_pct = payload.get("commission_pct")  # can be None/""/0
+    commission_basis = (payload.get("commission_basis") or "EXCL").upper()  # EXCL/INCL
+
+    if not source_id:
+        return jsonify({"status": "error", "message": "Missing source_id"}), 400
+
+    if not buyer_blname:
+        return jsonify({"status": "error", "message": "Missing buyer_blname"}), 400
+
+    if not isinstance(items, list) or len(items) == 0:
+        return jsonify({"status": "error", "message": "No invoice items provided"}), 400
+
+    # ---------------------------
+    # Resolve seller details from session
+    # IMPORTANT: session shop uses "customer" like TOC999
+    # ---------------------------
+    shop_data = session.get("shop")
+    seller_customer_code = None  # e.g. "TOC999"
+    seller_blname = None         # e.g. "TOC - Nicolway"
+
+    if shop_data:
+        try:
+            s = json.loads(shop_data)
+            seller_customer_code = (s.get("customer") or "").strip() or None
+            seller_blname = (s.get("blName") or "").strip() or None
+        except Exception:
+            pass
+
+    # Prefer customer code lookup (what you actually have: TOC999)
+    seller_row = None
+    if seller_customer_code:
+        seller_row = TOC_SHOPS.query.filter_by(customer=seller_customer_code).first()
+
+    # Fallback: if session actually has blName
+    if not seller_row and seller_blname:
+        seller_row = TOC_SHOPS.query.filter_by(blName=seller_blname).first()
+
+    if not seller_row:
+        # show what we tried (helps debug)
+        tried = seller_customer_code or seller_blname or "(none)"
+        return jsonify({"status": "error", "message": f"Seller shop not found in toc_shops (customer/blName): {tried}"}), 404
+
+    # Buyer is selected by blName (dropdown)
+    buyer_row = TOC_SHOPS.query.filter_by(blName=buyer_blname).first()
+    if not buyer_row:
+        return jsonify({"status": "error", "message": f"Buyer shop not found in toc_shops: {buyer_blname}"}), 404
+
+    seller_name = seller_row.blName
+    seller_vat_no = str(getattr(seller_row, "vat_no", None)) if getattr(seller_row, "vat_no", None) else None
+
+    bill_to_name = buyer_row.blName
+    bill_to_address = getattr(buyer_row, "address", None)
+    bill_to_vat_no = str(getattr(buyer_row, "vat_no", None)) if getattr(buyer_row, "vat_no", None) else None
+
+    # ---------------------------
+    # created_by from session (if available)
+    # ---------------------------
+    created_by = payload.get("created_by") or None
+    user_data = session.get("user")
+    session_user_id = None
+    session_username = None
+
+    if user_data:
+        try:
+            u = json.loads(user_data)
+            session_user_id = u.get("id")
+            session_username = u.get("username")
+            created_by = created_by or session_user_id
+        except Exception:
+            pass
+
+    # ---------------------------
+    # Build invoice header (matches your toc_invoice DDL fields)
+    # ---------------------------
+    inv = TocInvoice(
+        invoice_no=_generate_invoice_no("INV"),
+        source_type="INTER_TRANSFER",
+        source_id=source_id,          # ✅ VARCHAR
+        invoice_date=date.today(),
+        due_date=None,
+
+        seller_name=seller_name,
+        seller_vat_no=seller_vat_no,
+
+        bill_to_name=bill_to_name,
+        bill_to_address=bill_to_address,
+        bill_to_vat_no=bill_to_vat_no,
+
+        from_shop_name=seller_name,
+        to_shop_name=bill_to_name,
+
+        status="Draft",
+        notes=(payload.get("notes") or None),
+        created_by=created_by
+    )
+
+    # ---------------------------
+    # Build invoice items
+    # ---------------------------
+    vat_pct = float(payload.get("vat_pct") or VAT_PCT_DEFAULT)
+    line_no = 1
+
+    for it in items:
+        sku = (it.get("sku") or "").strip() or None
+        desc = (it.get("description") or "").strip()
+        qty = _num3(it.get("qty"))
+        unit_price_excl = _money2(it.get("unit_price_excl"))
+
+        if not desc:
+            return jsonify({"status": "error", "message": f"Missing description on line {line_no}"}), 400
+        if qty <= 0:
+            return jsonify({"status": "error", "message": f"Qty must be > 0 on line {line_no}"}), 400
+
+        item = TocInvoiceItem(
+            line_no=line_no,
+            code=(it.get("code") or None),
+            sku=sku,
+            description=desc,
+
+            qty=qty,
+            unit=(it.get("unit") or None),
+
+            unit_price_excl=unit_price_excl,
+            discount_pct=_money2(it.get("discount_pct") or 0),
+            tax_pct=vat_pct,
+        )
+
+        item.recalc_line()
+        inv.items.append(item)
+        line_no += 1
+
+    inv.recalc_totals()
+
+    # ---------------------------
+    # Commission (optional)
+    # Table has agent_user_id + pct + amount
+    # We'll compute amount by basis (EXCL/INCL) but only store pct+amount.
+    # ---------------------------
+    pct_val = None
+    try:
+        pct_val = float(commission_pct) if commission_pct not in [None, ""] else None
+    except Exception:
+        pct_val = None
+
+    if pct_val is not None and pct_val > 0:
+        if not session_user_id:
+            return jsonify({"status": "error", "message": "Cannot set commission: missing session user id"}), 400
+
+        base_amount = float(inv.sub_total_excl or 0) if commission_basis == "EXCL" else float(inv.total_incl or 0)
+        comm_amount = round(base_amount * (pct_val / 100.0), 2)
+
+        comm = TocInvoiceCommission(
+            agent_user_id=session_user_id,
+            commission_pct=pct_val,
+            commission_amount=comm_amount,
+            status="Open",
+            note=f"Basis={commission_basis}"  # keep it somewhere useful
+        )
+
+        inv.commissions.append(comm)
+
+    # ---------------------------
+    # Commit
+    # ---------------------------
+    try:
+        db.session.add(inv)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    return jsonify({
+        "status": "success",
+        "invoice_id": inv.invoice_id,
+        "invoice_no": inv.invoice_no,
+        "sub_total_excl": float(inv.sub_total_excl or 0),
+        "tax_total": float(inv.tax_total or 0),
+        "total_incl": float(inv.total_incl or 0),
+        "commission_amount": float(inv.commissions[0].commission_amount) if inv.commissions else 0.0,
+    }), 200
+
+
 
 
 

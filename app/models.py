@@ -696,39 +696,34 @@ class TocBOMManufactureItem(db.Model):
     deducted_qty = db.Column(db.Float)
 
 
-
-
-
 class TocInvoice(db.Model):
     __tablename__ = "toc_invoice"
 
     invoice_id = Column(Integer, primary_key=True)
     invoice_no = Column(String(30), nullable=False, unique=True)
 
-    source_type = Column(String(30), nullable=False)  # 'INTER_TRANSFER', 'SUPPLIER_PO', 'MANUAL'
-    source_id   = Column(Integer, nullable=False)
+    source_type = Column(String(30), nullable=False)   # 'INTER_TRANSFER', 'SUPPLIER_PO', 'MANUAL'
+    source_id = Column(String(60), nullable=False)
 
     invoice_date = Column(Date, nullable=False, default=date.today)
     due_date     = Column(Date, nullable=True)
 
-    seller_type    = Column(String(30), nullable=False, default="SHOP")
-    seller_id      = Column(Integer, nullable=True)
-    seller_name    = Column(String(120), nullable=False)
-    seller_vat_no  = Column(String(50), nullable=True)
-    seller_address = Column(String(255), nullable=True)
+    seller_name   = Column(String(120), nullable=False)
+    seller_vat_no = Column(String(50), nullable=True)
 
-    buyer_type    = Column(String(30), nullable=False, default="SHOP")
-    buyer_id      = Column(Integer, nullable=True)
-    buyer_name    = Column(String(120), nullable=False)
-    buyer_vat_no  = Column(String(50), nullable=True)
-    buyer_address = Column(String(255), nullable=True)
+    # DDL uses bill_to_* (buyer)
+    bill_to_name    = Column(String(120), nullable=False)
+    bill_to_address = Column(String(255), nullable=True)
+    bill_to_vat_no  = Column(String(50), nullable=True)
+
+    # DDL includes these (optional)
+    from_shop_name = Column(String(120), nullable=True)
+    to_shop_name   = Column(String(120), nullable=True)
 
     sub_total_excl = Column(Numeric(12, 2), nullable=False, default=0)
     discount_total = Column(Numeric(12, 2), nullable=False, default=0)
     tax_total      = Column(Numeric(12, 2), nullable=False, default=0)
     total_incl     = Column(Numeric(12, 2), nullable=False, default=0)
-
-    currency = Column(String(10), nullable=False, default="ZAR")
 
     status = Column(String(20), nullable=False, default="Draft")
     notes  = Column(Text, nullable=True)
@@ -741,41 +736,40 @@ class TocInvoice(db.Model):
         "TocInvoiceItem",
         back_populates="invoice",
         cascade="all, delete-orphan",
-        order_by="TocInvoiceItem.line_no"
+        order_by="TocInvoiceItem.line_no",
+        passive_deletes=True,
     )
 
     commissions = relationship(
         "TocInvoiceCommission",
         back_populates="invoice",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (
         Index("idx_source", "source_type", "source_id"),
         Index("idx_invoice_date", "invoice_date"),
         Index("idx_status", "status"),
-        Index("idx_buyer", "buyer_type", "buyer_id"),
-        Index("idx_seller", "seller_type", "seller_id"),
     )
 
     def recalc_totals(self):
-        self.sub_total_excl = sum([float(i.net_excl or 0) for i in self.items])
-        self.discount_total = sum([float(i.discount_amount or 0) for i in self.items])
-        self.tax_total      = sum([float(i.tax_amount or 0) for i in self.items])
-        self.total_incl     = sum([float(i.total_incl or 0) for i in self.items])
+        self.sub_total_excl = sum(float(i.net_excl or 0) for i in self.items)
+        self.discount_total = sum(float(i.discount_amount or 0) for i in self.items)
+        self.tax_total      = sum(float(i.tax_amount or 0) for i in self.items)
+        self.total_incl     = sum(float(i.total_incl or 0) for i in self.items)
 
 
 class TocInvoiceItem(db.Model):
     __tablename__ = "toc_invoice_item"
 
     invoice_item_id = Column(Integer, primary_key=True)
-    invoice_id      = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE"), nullable=False)
+    invoice_id      = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
 
-    line_no     = Column(Integer, nullable=False, default=1)
+    line_no = Column(Integer, nullable=False, default=1)
 
-    product_id  = Column(Integer, nullable=True)
-    sku         = Column(String(60), nullable=True)
     code        = Column(String(50), nullable=True)
+    sku         = Column(String(60), nullable=True)
     description = Column(String(255), nullable=False)
 
     qty  = Column(Numeric(12, 3), nullable=False, default=0)
@@ -797,7 +791,7 @@ class TocInvoiceItem(db.Model):
     __table_args__ = (
         Index("idx_invoice_id", "invoice_id"),
         Index("idx_invoice_line", "invoice_id", "line_no"),
-        Index("idx_sku", "sku"),
+        # NOTE: DDL does NOT define idx_sku, so we won't add it here.
     )
 
     def recalc_line(self):
@@ -822,13 +816,9 @@ class TocInvoiceCommission(db.Model):
     __tablename__ = "toc_invoice_commission"
 
     invoice_commission_id = Column(Integer, primary_key=True)
-    invoice_id            = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE"), nullable=False)
+    invoice_id            = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
 
-    agent_type = Column(String(30), nullable=False, default="USER")  # USER/AGENT/OTHER
-    agent_id   = Column(Integer, nullable=False)
-    agent_name = Column(String(120), nullable=True)
-
-    basis             = Column(String(20), nullable=False, default="EXCL")  # EXCL/INCL
+    agent_user_id     = Column(Integer, nullable=False)  # DDL field name
     commission_pct    = Column(Numeric(6, 3), nullable=True)
     commission_amount = Column(Numeric(12, 2), nullable=False, default=0)
 
@@ -840,16 +830,20 @@ class TocInvoiceCommission(db.Model):
 
     invoice = relationship("TocInvoice", back_populates="commissions")
 
+    basis = Column(String(20), nullable=False, default="EXCL")  # EXCL/INCL
+    agent_name = Column(String(120), nullable=True)  # optional
+
     __table_args__ = (
         Index("idx_invoice", "invoice_id"),
-        Index("idx_agent", "agent_type", "agent_id"),
+        Index("idx_agent", "agent_user_id"),
         Index("idx_status", "status"),
     )
 
     def recalc_amount(self, invoice_subtotal_excl: float, invoice_total_incl: float):
         if self.commission_pct is None:
+            self.commission_amount = 0
             return
         base = invoice_subtotal_excl if (self.basis or "EXCL").upper() == "EXCL" else invoice_total_incl
         pct = float(self.commission_pct or 0)
-        self.commission_amount = round(base * (pct / 100.0), 2)
+        self.commission_amount = round(float(base or 0) * (pct / 100.0), 2)
 

@@ -382,151 +382,208 @@
         $selectBox.append(new Option(shop, shop));
     });
 
+// ======================= INVOICE: seller/buyer + commission + totals =======================
 
+// Keep last goods totals so we don’t keep parsing text
+let _invGoodsTotals = { subtotal: 0, vat: 0, total: 0 };
 
-    // ===== Commission calc =====
-    function calculateCommission() {
-      const pct = parseFloat($("#invCommissionPct").val() || "0") || 0;
-      const basis = ($("#invCommissionBasis").val() || "EXCL").toUpperCase();
+function money(v) {
+  const n = parseFloat(v || 0);
+  return n.toFixed(2);
+}
 
-      // totals are shown as text in the modal
-      const subtotal = parseFloat(($("#invSubtotal").text() || "0").replace(/,/g, "")) || 0;
-      const totalIncl = parseFloat(($("#invTotal").text() || "0").replace(/,/g, "")) || 0;
+function getProductBySku(sku) {
+  return (_products || []).find(p => String(p.item_sku) === String(sku));
+}
 
-      const baseAmount = (basis === "INCL") ? totalIncl : subtotal;
-      const commission = baseAmount * (pct / 100);
+function getInvoiceLinesFromTable() {
+  if (!$.fn.DataTable.isDataTable('#ProductOrderTemplate')) return [];
 
-      $("#invCommissionAmount").val(money(commission));
-    }
+  const dt = $('#ProductOrderTemplate').DataTable();
+  const lines = [];
 
-    // Recalc commission when pct/basis changes
-    $("#invCommissionPct").on("input change", calculateCommission);
-    $("#invCommissionBasis").on("change", calculateCommission);
+  dt.rows().every(function () {
+    const $tr = $(this.node());
 
-    // Also recalc whenever we render invoice lines (modal open / table refresh)
-    const _renderInvoiceLinesOriginal = renderInvoiceLines;
-    renderInvoiceLines = function(lines) {
-      const totals = _renderInvoiceLinesOriginal(lines);
-      calculateCommission();
-      return totals;
-    };
+    const sku  = $tr.find('td').eq(0).text().trim();
+    const desc = $tr.find('td').eq(1).text().trim();
 
+    const sendQty = parseFloat($tr.find('input.send-qty-edit').val()) || 0;
+    if (sendQty <= 0) return;
 
+    const prod = getProductBySku(sku) || {};
+    const unitPrice = parseFloat(prod.cost_price || 0);
 
-    function openGenerateInvoiceModal(showSubmitSuccess = false) {
+    lines.push({
+      sku,
+      desc,
+      qty: sendQty,
+      unit_price: unitPrice,
+      line_total: sendQty * unitPrice
+    });
+  });
 
-      // Seller / Buyer placeholders for now
-      $("#invSellerName").text("Canna Holdings (auto)");
-      $("#invBuyerName").text($("#replenishShop option:selected").text() || "(auto)");
+  return lines;
+}
 
-      // ✅ Build invoice lines from the DataTable and render into modal table + totals
-      const lines = getInvoiceLinesFromTable();
-      renderInvoiceLines(lines);
+function getShopBlNameByCustomer(customerCode) {
+  const s = (_shops || []).find(x =>
+    String(x.customer) === String(customerCode) || String(x.store) === String(customerCode)
+  );
+  return (s && (s.blName || s.mt_shop_name)) ? (s.blName || s.mt_shop_name) : null;
+}
 
-      // ✅ Show submit-success message inside the modal
-      if (showSubmitSuccess) {
-        $("#invItemsSummary").html(`
-          <span class="text-success fw-bold">Order submitted successfully.</span><br>
-          You may close the order after invoice generation.
-        `);
-      } else {
-        $("#invItemsSummary").html(``);
-      }
+function positionCommissionRow(basis) {
+  const $row = $("#invCommissionRow");
+  const $vatRow = $("#invVat").closest(".d-flex");
+  if (!$row.length || !$vatRow.length) return;
 
-      // Show modal
-      const el = document.getElementById("generateInvoiceModal");
-      const modal = new bootstrap.Modal(el);
-      modal.show();
-    }
+  if (basis === "EXCL") {
+    $row.insertBefore($vatRow);
+    $("#invCommissionLabel").text("Commission (Excl VAT)");
+  } else {
+    $row.insertAfter($vatRow);
+    $("#invCommissionLabel").text("Commission (Incl VAT)");
+  }
+}
 
+function recalcCommissionAndTotals() {
+  const pct = parseFloat($("#invCommissionPct").val() || "0") || 0;
+  const basis = ($("#invCommissionBasis").val() || "EXCL").toUpperCase();
 
-    function money(v) {
-      const n = parseFloat(v || 0);
-      return n.toFixed(2);
-    }
+  const subtotal = parseFloat(_invGoodsTotals.subtotal || 0);
+  const totalIncl = parseFloat(_invGoodsTotals.total || 0);
 
-    function getProductBySku(sku) {
-      // Works whether _products is [{item_sku:'', cost_price:...}] or similar
-      return (_products || []).find(p => String(p.item_sku) === String(sku));
-    }
+  const baseAmount = (basis === "INCL") ? totalIncl : subtotal;
+  const commission = baseAmount * (pct / 100);
 
-    function getInvoiceLinesFromTable() {
-      if (!$.fn.DataTable.isDataTable('#ProductOrderTemplate')) return [];
+  $("#invCommissionAmount").val(money(commission));
+  $("#invCommissionValue").text(money(commission));
+  $("#invCommissionRow").show();
 
-      const dt = $('#ProductOrderTemplate').DataTable();
-      const lines = [];
+  positionCommissionRow(basis);
 
-      dt.rows().every(function () {
-        const $tr = $(this.node());
+  const grandTotal = totalIncl + commission;
+  $("#invGrandTotal").text(money(grandTotal));
+}
 
-        // SKU + Description (these two are stable)
-        const sku  = $tr.find('td').eq(0).text().trim();
-        const desc = $tr.find('td').eq(1).text().trim();
+// Live update when user changes % or basis
+$("#invCommissionPct").on("input change", recalcCommissionAndTotals);
+$("#invCommissionBasis").on("change", recalcCommissionAndTotals);
 
-        // ✅ Always read Send Qty by class (works even if columns are hidden/reordered)
-        const sendQty = parseFloat($tr.find('input.send-qty-edit').val()) || 0;
-        if (sendQty <= 0) return;
+function renderInvoiceLines(lines) {
+  const $tbody = $("#invItemsTable tbody");
+  $tbody.empty();
 
-        const prod = getProductBySku(sku) || {};
-        const unitPrice = parseFloat(prod.cost_price || 0);
+  let subtotal = 0;
 
-        lines.push({
-          sku,
-          desc,
-          qty: sendQty,
-          unit_price: unitPrice,
-          line_total: sendQty * unitPrice
-        });
-      });
+  lines.forEach(l => {
+    subtotal += (l.line_total || 0);
 
-      return lines;
-    }
+    $tbody.append(`
+      <tr>
+        <td>${l.sku}</td>
+        <td>${l.desc}</td>
+        <td class="text-end">${l.qty}</td>
+        <td class="text-end">${money(l.unit_price)}</td>
+        <td class="text-end">${money(l.line_total)}</td>
+      </tr>
+    `);
+  });
 
+  const vatRate = 0.15;
+  const vat = subtotal * vatRate;
+  const total = subtotal + vat;
 
-    function renderInvoiceLines(lines) {
-      const $tbody = $("#invItemsTable tbody");
-      $tbody.empty();
+  _invGoodsTotals = { subtotal, vat, total };
 
-      let subtotal = 0;
-      lines.forEach(l => {
-        subtotal += (l.line_total || 0);
+  $("#invSubtotal").text(money(subtotal));
+  $("#invVat").text(money(vat));
+  $("#invTotal").text(money(total));
 
-        $tbody.append(`
-          <tr>
-            <td>${l.sku}</td>
-            <td>${l.desc}</td>
-            <td class="text-end">${l.qty}</td>
-            <td class="text-end">${money(l.unit_price)}</td>
-            <td class="text-end">${money(l.line_total)}</td>
-          </tr>
-        `);
-      });
+  // Reset commission then apply from current inputs
+  $("#invCommissionRow").hide();
+  $("#invCommissionValue").text("0.00");
+  $("#invCommissionAmount").val("0.00");
+  $("#invGrandTotal").text(money(total));
 
-      const vatRate = 0.15;
-      const vat = subtotal * vatRate;
-      const total = subtotal + vat;
+  recalcCommissionAndTotals();
 
-      $("#invSubtotal").text(money(subtotal));
-      $("#invVat").text(money(vat));
-      $("#invTotal").text(money(total));
+  return { subtotal, vat, total };
+}
 
-      return { subtotal, vat, total };
-    }
+function openGenerateInvoiceModal(showSubmitSuccess = false) {
+  // Seller/Buyer from toc_shops.blName
+  const sellerCustomer = "{{shop.customer}}";
+  const sellerName = getShopBlNameByCustomer(sellerCustomer) || sellerCustomer || "(auto)";
+  $("#invSellerName").text(sellerName);
 
+  // Buyer dropdown already shows blName
+  $("#invBuyerName").text($("#replenishShop option:selected").text() || "(auto)");
 
+  const lines = getInvoiceLinesFromTable();
+  renderInvoiceLines(lines);
 
-    // Step 2 confirm button (no backend yet)
-    $("#btnGenerateInvoiceConfirm").on("click", function() {
-      const pct = parseFloat($("#invCommissionPct").val() || "0");
-      console.log("Invoice confirmed (UI only). Commission %:", pct);
+  if (showSubmitSuccess) {
+    $("#invItemsSummary").html(`
+      <span class="text-success fw-bold">Order submitted successfully.</span><br>
+      You may close the order after invoice generation.
+    `);
+  } else {
+    $("#invItemsSummary").html(``);
+  }
 
-      const el = document.getElementById("generateInvoiceModal");
-      const modal = bootstrap.Modal.getInstance(el);
-      if (modal) modal.hide();
+  const el = document.getElementById("generateInvoiceModal");
+  const modal = new bootstrap.Modal(el);
+  modal.show();
+}
 
-      dialog("Invoice", "Step 2 OK: Modal opens and captures commission%. Next step will create invoice in DB.");
+$("#btnGenerateInvoiceConfirm").on("click", async function() {
+
+  const lines = getInvoiceLinesFromTable();
+  if (!lines.length) {
+    dialog("Invoice", "No items with Send Qty > 0");
+    return;
+  }
+
+  const payload = {
+    source_id: $("#orderName").val(),                 // MUST be integer string (see note below)
+    buyer_blname: $("#replenishShop").val(),
+    vat_pct: 15,
+    commission_pct: $("#invCommissionPct").val(),
+    commission_basis: $("#invCommissionBasis").val(),
+    items: lines.map((l, idx) => ({
+      line_no: idx + 1,
+      sku: l.sku,
+      description: l.desc,
+      qty: l.qty,
+      unit_price_excl: l.unit_price
+    }))
+  };
+
+  try {
+    const res = await fetch("/invoice/inter-transfer/create", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
     });
 
+    const out = await res.json();
+    if (out.status !== "success") {
+      dialog("Invoice Error", out.message || "Failed to create invoice");
+      return;
+    }
+
+    // close modal
+    const el = document.getElementById("generateInvoiceModal");
+    const modal = bootstrap.Modal.getInstance(el);
+    if (modal) modal.hide();
+
+    dialog("Invoice Created", `Invoice ${out.invoice_no} was created successfully.`);
+  } catch (err) {
+    dialog("Invoice Error", String(err));
+  }
+});
 
 
 
