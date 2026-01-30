@@ -103,13 +103,26 @@
       <option value="" disabled selected>Select a shop</option>
     </select>
 
-    <!-- ===== Generate Invoice (Step 1 – UI only) ===== -->
-    <div class="form-check mb-0 ms-2">
-      <input class="form-check-input" type="checkbox" id="chkGenerateInvoice">
-      <label class="form-check-label fw-bold" for="chkGenerateInvoice">
-        Generate Invoice
-      </label>
+
+    <!-- ===== Generate Invoice + Print Invoice ===== -->
+    <div class="d-flex align-items-center gap-2 mb-0 ms-2">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="chkGenerateInvoice">
+        <label class="form-check-label fw-bold" for="chkGenerateInvoice">
+          Generate Invoice
+        </label>
+      </div>
+
+      <!-- Print Invoice (disabled until invoice exists) -->
+      <button type="button"
+              id="btnPrintInvoice"
+              class="btn btn-outline-primary btn-sm"
+              disabled
+              title="Print the generated invoice">
+        Print Invoice
+      </button>
     </div>
+
 
     <!-- Additional Inputs (unchanged, still hidden) -->
     <label for="thresholdQty"
@@ -384,6 +397,19 @@
 
 // ======================= INVOICE: seller/buyer + commission + totals =======================
 
+// ✅ Init InvoiceUI (must be inside document.ready - NOT DOMContentLoaded)
+if (window.InvoiceUI) {
+  InvoiceUI.init({
+    printButtonSelector: "#btnPrintInvoice",
+    getSource: () => ({
+      source_type: "INTER_TRANSFER",
+      source_id: ($("#orderName").val() || "").trim()
+    })
+  });
+}
+
+
+
 // Keep last goods totals so we don’t keep parsing text
 let _invGoodsTotals = { subtotal: 0, vat: 0, total: 0 };
 
@@ -580,6 +606,18 @@ $("#btnGenerateInvoiceConfirm").on("click", async function() {
     if (modal) modal.hide();
 
     dialog("Invoice Created", `Invoice ${out.invoice_no} was created successfully.`);
+
+    // ✅ remember last invoice + enable Print Invoice button
+    if (window.InvoiceUI) {
+      InvoiceUI.setLastInvoice({
+        invoice_id: out.invoice_id,
+        invoice_no: out.invoice_no,
+        source_type: "INTER_TRANSFER",
+        source_id: $("#orderName").val()
+      });
+    }
+
+
   } catch (err) {
     dialog("Invoice Error", String(err));
   }
@@ -846,6 +884,8 @@ function savePickingSlip(orderId, shopName) {
             $("#thresholdQty").val(sold_qty);
             $("#replenishQty").val(replenish_qty);
             $("#orderName").val(order_id);
+
+            if (window.InvoiceUI) InvoiceUI.refresh();
 
             // Trigger the "newOrder" button click
             $("#newOrder").trigger("click");
@@ -1219,6 +1259,7 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
 
   <!-- Template Main JS File -->
   <script src="static/assets/js/main.js"></script>
+    <script src="{{ url_for('static', filename='assets/js/invoice.js') }}"></script>
 
 
 

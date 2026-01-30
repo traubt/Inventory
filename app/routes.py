@@ -6597,6 +6597,165 @@ def create_invoice_inter_transfer():
     }), 200
 
 
+@main.route("/invoice/lookup", methods=["GET"])
+def invoice_lookup():
+    source_type = (request.args.get("source_type") or "").strip().upper()
+    source_id   = (request.args.get("source_id") or "").strip()
+
+    if not source_type or not source_id:
+        return jsonify({"status": "error", "message": "Missing source_type or source_id"}), 400
+
+    inv = (TocInvoice.query
+           .filter(TocInvoice.source_type == source_type,
+                   TocInvoice.source_id == source_id)
+           .order_by(TocInvoice.invoice_id.desc())
+           .first())
+
+    if not inv:
+        return jsonify({"status": "error", "message": "Invoice not found"}), 404
+
+    return jsonify({
+        "status": "success",
+        "invoice": {
+            "invoice_id": inv.invoice_id,
+            "invoice_no": inv.invoice_no,
+            "source_type": inv.source_type,
+            "source_id": inv.source_id,
+            "invoice_date": inv.invoice_date.strftime("%Y-%m-%d") if inv.invoice_date else None
+        }
+    })
+
+from flask import render_template_string
+
+@main.route("/invoice/<int:invoice_id>/print", methods=["GET"])
+def invoice_print(invoice_id):
+    inv = TocInvoice.query.get_or_404(invoice_id)
+    items = (TocInvoiceItem.query
+             .filter_by(invoice_id=invoice_id)
+             .order_by(TocInvoiceItem.line_no.asc())
+             .all())
+
+    # If you want to re-pull addresses/VAT from toc_shops (optional, but good):
+    seller_shop = TOC_SHOPS.query.filter_by(blName=inv.seller_name).first()
+    buyer_shop  = TOC_SHOPS.query.filter_by(blName=inv.bill_to_name).first()
+
+    seller_address = (getattr(seller_shop, "address", None) if seller_shop else None) or ""
+    buyer_address  = (getattr(buyer_shop, "address", None) if buyer_shop else None) or (inv.bill_to_address or "")
+
+    seller_vat = (str(getattr(seller_shop, "vat_no", "")) if seller_shop and getattr(seller_shop, "vat_no", None) else (inv.seller_vat_no or ""))
+    buyer_vat  = (str(getattr(buyer_shop, "vat_no", "")) if buyer_shop and getattr(buyer_shop, "vat_no", None) else (inv.bill_to_vat_no or ""))
+
+    html = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice {{ inv.invoice_no }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color:#111; }
+    .top { display:flex; justify-content:space-between; align-items:flex-start; }
+    .title { font-size: 22px; font-weight: 700; }
+    .invno { font-size: 20px; font-weight: 700; }
+    .row { display:flex; gap:40px; margin-top: 10px; }
+    .box { width: 48%; }
+    .box h4 { margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    .muted { color:#555; }
+    table { width:100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 6px 6px; vertical-align: top; }
+    th { text-align:left; font-weight: 700; }
+    td.num, th.num { text-align:right; }
+    .totals { width: 320px; margin-left:auto; margin-top: 16px; }
+    .totals td { border: none; padding: 3px 0; }
+    .totals .label { text-align:right; padding-right: 10px; color:#333; }
+    .totals .val { text-align:right; font-weight:700; }
+    .hr { border-top: 2px solid #111; margin: 10px 0 0 0; }
+    @media print {
+      .noprint { display:none; }
+      body { margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <div class="title">Tax Invoice</div>
+      <div class="muted">Date: {{ inv.invoice_date.strftime("%d/%m/%Y") if inv.invoice_date else "" }}</div>
+    </div>
+    <div class="invno">{{ inv.invoice_no }}</div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row">
+    <div class="box">
+      <h4>Seller</h4>
+      <div><b>{{ inv.seller_name }}</b></div>
+      <div class="muted">{{ seller_address }}</div>
+      {% if seller_vat %}<div class="muted">VAT: {{ seller_vat }}</div>{% endif %}
+    </div>
+
+    <div class="box">
+      <h4>Buyer</h4>
+      <div><b>{{ inv.bill_to_name }}</b></div>
+      <div class="muted">{{ buyer_address }}</div>
+      {% if buyer_vat %}<div class="muted">VAT: {{ buyer_vat }}</div>{% endif %}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:90px;">Code/SKU</th>
+        <th>Description</th>
+        <th class="num" style="width:70px;">Qty</th>
+        <th class="num" style="width:90px;">Unit Price</th>
+        <th class="num" style="width:90px;">Net</th>
+        <th class="num" style="width:70px;">Tax</th>
+        <th class="num" style="width:100px;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.code or it.sku or "" }}</td>
+        <td>{{ it.description }}</td>
+        <td class="num">{{ "%.3f"|format(it.qty or 0) }}</td>
+        <td class="num">{{ "%.2f"|format(it.unit_price_excl or 0) }}</td>
+        <td class="num">{{ "%.2f"|format(it.net_excl or 0) }}</td>
+        <td class="num">{{ "%.2f"|format(it.tax_amount or 0) }}</td>
+        <td class="num">{{ "%.2f"|format(it.total_incl or 0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td class="label">Sub Total</td><td class="val">{{ "%.2f"|format(inv.sub_total_excl or 0) }}</td></tr>
+    <tr><td class="label">Discount</td><td class="val">{{ "%.2f"|format(inv.discount_total or 0) }}</td></tr>
+    <tr><td class="label">Tax</td><td class="val">{{ "%.2f"|format(inv.tax_total or 0) }}</td></tr>
+    <tr><td class="label" style="font-size:13px;">Total</td><td class="val" style="font-size:13px;">{{ "%.2f"|format(inv.total_incl or 0) }}</td></tr>
+  </table>
+
+  <div class="noprint" style="margin-top:18px;">
+    <button onclick="window.print()">Print</button>
+  </div>
+
+  <script>
+    // Optional: auto-open print dialog
+    // window.onload = () => setTimeout(() => window.print(), 300);
+  </script>
+</body>
+</html>
+"""
+    return render_template_string(
+        html,
+        inv=inv,
+        items=items,
+        seller_address=seller_address,
+        buyer_address=buyer_address,
+        seller_vat=seller_vat,
+        buyer_vat=buyer_vat
+    )
 
 
 
