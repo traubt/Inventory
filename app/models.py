@@ -4,6 +4,10 @@ from . import db
 from flask_sqlalchemy import SQLAlchemy
 import datetime
 from datetime import datetime,timezone
+from datetime import datetime, date
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Numeric, Index
+from sqlalchemy.orm import relationship
+from app import db
 
 
 class User(db.Model):
@@ -690,3 +694,162 @@ class TocBOMManufactureItem(db.Model):
     component_sku = db.Column(db.String(50), nullable=False)
     required_qty = db.Column(db.Float)
     deducted_qty = db.Column(db.Float)
+
+
+
+
+
+class TocInvoice(db.Model):
+    __tablename__ = "toc_invoice"
+
+    invoice_id = Column(Integer, primary_key=True)
+    invoice_no = Column(String(30), nullable=False, unique=True)
+
+    source_type = Column(String(30), nullable=False)  # 'INTER_TRANSFER', 'SUPPLIER_PO', 'MANUAL'
+    source_id   = Column(Integer, nullable=False)
+
+    invoice_date = Column(Date, nullable=False, default=date.today)
+    due_date     = Column(Date, nullable=True)
+
+    seller_type    = Column(String(30), nullable=False, default="SHOP")
+    seller_id      = Column(Integer, nullable=True)
+    seller_name    = Column(String(120), nullable=False)
+    seller_vat_no  = Column(String(50), nullable=True)
+    seller_address = Column(String(255), nullable=True)
+
+    buyer_type    = Column(String(30), nullable=False, default="SHOP")
+    buyer_id      = Column(Integer, nullable=True)
+    buyer_name    = Column(String(120), nullable=False)
+    buyer_vat_no  = Column(String(50), nullable=True)
+    buyer_address = Column(String(255), nullable=True)
+
+    sub_total_excl = Column(Numeric(12, 2), nullable=False, default=0)
+    discount_total = Column(Numeric(12, 2), nullable=False, default=0)
+    tax_total      = Column(Numeric(12, 2), nullable=False, default=0)
+    total_incl     = Column(Numeric(12, 2), nullable=False, default=0)
+
+    currency = Column(String(10), nullable=False, default="ZAR")
+
+    status = Column(String(20), nullable=False, default="Draft")
+    notes  = Column(Text, nullable=True)
+
+    created_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    items = relationship(
+        "TocInvoiceItem",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+        order_by="TocInvoiceItem.line_no"
+    )
+
+    commissions = relationship(
+        "TocInvoiceCommission",
+        back_populates="invoice",
+        cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("idx_source", "source_type", "source_id"),
+        Index("idx_invoice_date", "invoice_date"),
+        Index("idx_status", "status"),
+        Index("idx_buyer", "buyer_type", "buyer_id"),
+        Index("idx_seller", "seller_type", "seller_id"),
+    )
+
+    def recalc_totals(self):
+        self.sub_total_excl = sum([float(i.net_excl or 0) for i in self.items])
+        self.discount_total = sum([float(i.discount_amount or 0) for i in self.items])
+        self.tax_total      = sum([float(i.tax_amount or 0) for i in self.items])
+        self.total_incl     = sum([float(i.total_incl or 0) for i in self.items])
+
+
+class TocInvoiceItem(db.Model):
+    __tablename__ = "toc_invoice_item"
+
+    invoice_item_id = Column(Integer, primary_key=True)
+    invoice_id      = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE"), nullable=False)
+
+    line_no     = Column(Integer, nullable=False, default=1)
+
+    product_id  = Column(Integer, nullable=True)
+    sku         = Column(String(60), nullable=True)
+    code        = Column(String(50), nullable=True)
+    description = Column(String(255), nullable=False)
+
+    qty  = Column(Numeric(12, 3), nullable=False, default=0)
+    unit = Column(String(20), nullable=True)
+
+    unit_price_excl = Column(Numeric(12, 2), nullable=False, default=0)
+
+    discount_pct    = Column(Numeric(6, 3), nullable=False, default=0)
+    discount_amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    tax_pct    = Column(Numeric(6, 3), nullable=False, default=0)
+    tax_amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    net_excl   = Column(Numeric(12, 2), nullable=False, default=0)
+    total_incl = Column(Numeric(12, 2), nullable=False, default=0)
+
+    invoice = relationship("TocInvoice", back_populates="items")
+
+    __table_args__ = (
+        Index("idx_invoice_id", "invoice_id"),
+        Index("idx_invoice_line", "invoice_id", "line_no"),
+        Index("idx_sku", "sku"),
+    )
+
+    def recalc_line(self):
+        qty = float(self.qty or 0)
+        unit_price = float(self.unit_price_excl or 0)
+        gross = qty * unit_price
+
+        disc_pct = float(self.discount_pct or 0)
+        disc_amt = round(gross * (disc_pct / 100.0), 2)
+        net = gross - disc_amt
+
+        tax_pct = float(self.tax_pct or 0)
+        tax_amt = round(net * (tax_pct / 100.0), 2)
+
+        self.discount_amount = disc_amt
+        self.net_excl = round(net, 2)
+        self.tax_amount = tax_amt
+        self.total_incl = round(net + tax_amt, 2)
+
+
+class TocInvoiceCommission(db.Model):
+    __tablename__ = "toc_invoice_commission"
+
+    invoice_commission_id = Column(Integer, primary_key=True)
+    invoice_id            = Column(Integer, ForeignKey("toc_invoice.invoice_id", ondelete="CASCADE"), nullable=False)
+
+    agent_type = Column(String(30), nullable=False, default="USER")  # USER/AGENT/OTHER
+    agent_id   = Column(Integer, nullable=False)
+    agent_name = Column(String(120), nullable=True)
+
+    basis             = Column(String(20), nullable=False, default="EXCL")  # EXCL/INCL
+    commission_pct    = Column(Numeric(6, 3), nullable=True)
+    commission_amount = Column(Numeric(12, 2), nullable=False, default=0)
+
+    status    = Column(String(20), nullable=False, default="Open")
+    paid_date = Column(DateTime, nullable=True)
+    note      = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    invoice = relationship("TocInvoice", back_populates="commissions")
+
+    __table_args__ = (
+        Index("idx_invoice", "invoice_id"),
+        Index("idx_agent", "agent_type", "agent_id"),
+        Index("idx_status", "status"),
+    )
+
+    def recalc_amount(self, invoice_subtotal_excl: float, invoice_total_incl: float):
+        if self.commission_pct is None:
+            return
+        base = invoice_subtotal_excl if (self.basis or "EXCL").upper() == "EXCL" else invoice_total_incl
+        pct = float(self.commission_pct or 0)
+        self.commission_amount = round(base * (pct / 100.0), 2)
+

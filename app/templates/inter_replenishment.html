@@ -88,28 +88,66 @@
         <div class="card">
           <div class="card-body">
 
-            <div class="d-flex justify-content-between align-items-center">
-              <!-- Replenish Shop Label, Select, and Additional Inputs -->
-              <div class="d-flex align-items-center gap-2">
-                <label for="replenishShop" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;">Replenish Shop:</label>
-                <select id="replenishShop" class="form-select" style="width: 250px;">
-                  <option value="" disabled selected>Select a shop</option>
-                </select>
+<div class="d-flex justify-content-between align-items-center">
 
-                <!-- Additional Inputs -->
-                <label for="thresholdQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;visibility: hidden;">Sold Qty (days):</label>
-                <input type="number" id="thresholdQty" class="form-control" style="max-width: 150px;visibility: hidden;" min="1" value="0">
+  <!-- Replenish Shop + Invoice -->
+  <div class="d-flex align-items-center gap-3">
 
-                <label for="replenishQty" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;visibility: hidden;">Replenish Qty (Days):</label>
-                <input type="number" id="replenishQty" class="form-control" style="max-width: 150px;visibility: hidden;" min="1" value="0">
-              </div>
+    <label for="replenishShop"
+           class="form-label mb-0"
+           style="white-space: nowrap; font-weight: bold; color: blue;">
+      Replenish Shop:
+    </label>
 
-              <!-- Order Input Floating to the Right -->
-              <div class="d-flex align-items-center gap-2">
-                <label for="orderName" class="form-label mb-0" style="white-space: nowrap; font-weight: bold; color: blue;" >Replenish ID:</label>
-                <input type="text" id="orderName" class="form-control" style="max-width: 200px;" disabled>
-              </div>
-            </div>
+    <select id="replenishShop" class="form-select" style="width: 250px;">
+      <option value="" disabled selected>Select a shop</option>
+    </select>
+
+    <!-- ===== Generate Invoice (Step 1 – UI only) ===== -->
+    <div class="form-check mb-0 ms-2">
+      <input class="form-check-input" type="checkbox" id="chkGenerateInvoice">
+      <label class="form-check-label fw-bold" for="chkGenerateInvoice">
+        Generate Invoice
+      </label>
+    </div>
+
+    <!-- Additional Inputs (unchanged, still hidden) -->
+    <label for="thresholdQty"
+           class="form-label mb-0"
+           style="white-space: nowrap; font-weight: bold; color: blue; visibility: hidden;">
+      Sold Qty (days):
+    </label>
+    <input type="number" id="thresholdQty"
+           class="form-control"
+           style="max-width: 150px; visibility: hidden;"
+           min="1" value="0">
+
+    <label for="replenishQty"
+           class="form-label mb-0"
+           style="white-space: nowrap; font-weight: bold; color: blue; visibility: hidden;">
+      Replenish Qty (Days):
+    </label>
+    <input type="number" id="replenishQty"
+           class="form-control"
+           style="max-width: 150px; visibility: hidden;"
+           min="1" value="0">
+  </div>
+
+  <!-- Replenish ID (right side) -->
+  <div class="d-flex align-items-center gap-2">
+    <label for="orderName"
+           class="form-label mb-0"
+           style="white-space: nowrap; font-weight: bold; color: blue;">
+      Replenish ID:
+    </label>
+    <input type="text" id="orderName"
+           class="form-control"
+           style="max-width: 200px;"
+           disabled>
+  </div>
+
+</div>
+
 
             <div id="tblCtrl" class="d-flex gap-1 mt-3">
               <button class="btn btn-primary" id="newOrder" >Create Order</button>
@@ -194,6 +232,123 @@
 </div>
 
 
+<!-- ===== Generate Invoice Modal (Step 2: UI only) ===== -->
+<div class="modal fade" id="generateInvoiceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Generate Invoice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-3">
+
+          <div class="col-md-6">
+            <div class="border rounded p-2">
+              <div class="fw-bold mb-1">Seller</div>
+              <div id="invSellerName">(auto)</div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="border rounded p-2">
+              <div class="fw-bold mb-1">Buyer</div>
+              <div id="invBuyerName">(auto)</div>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Commission %</label>
+            <input type="number"
+                   class="form-control"
+                   id="invCommissionPct"
+                   min="0" max="100" step="0.01"
+                   placeholder="e.g. 5">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Basis</label>
+            <select class="form-select" id="invCommissionBasis">
+              <option value="EXCL" selected>EXCL VAT</option>
+              <option value="INCL">INCL VAT</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Commission Amount</label>
+            <input type="text" class="form-control" id="invCommissionAmount" value="0.00" readonly>
+          </div>
+
+<div class="col-12">
+  <div class="border rounded p-2">
+    <div class="fw-bold mb-2">Items</div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-2" id="invItemsTable">
+        <thead class="table-light">
+          <tr>
+            <th style="width:120px;">SKU</th>
+            <th>Description</th>
+            <th class="text-end" style="width:110px;">Qty</th>
+            <th class="text-end" style="width:140px;">Unit Price</th>
+            <th class="text-end" style="width:140px;">Line Total</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end">
+      <div style="min-width:320px;">
+        <div class="d-flex justify-content-between">
+          <div class="fw-bold">Subtotal (Excl VAT)</div>
+          <div class="fw-bold" id="invSubtotal">0.00</div>
+        </div>
+<div class="d-flex justify-content-between">
+  <div class="fw-bold">VAT (15%)</div>
+  <div class="fw-bold" id="invVat">0.00</div>
+</div>
+
+<!-- Commission line will move above/below VAT depending on Basis -->
+<div class="d-flex justify-content-between" id="invCommissionRow" style="display:none;">
+  <div class="fw-bold" id="invCommissionLabel">Commission</div>
+  <div class="fw-bold" id="invCommissionValue">0.00</div>
+</div>
+
+<div class="d-flex justify-content-between border-top pt-2 mt-1">
+  <div class="fw-bold">Total (Incl VAT)</div>
+  <div class="fw-bold" id="invTotal">0.00</div>
+</div>
+
+<div class="d-flex justify-content-between">
+  <div class="fw-bold">Grand Total (Incl VAT + Commission)</div>
+  <div class="fw-bold" id="invGrandTotal">0.00</div>
+</div>
+
+      </div>
+    </div>
+
+    <!-- Submit-success message lives here (we keep your existing behavior) -->
+    <div class="text-muted small mt-2" id="invItemsSummary"></div>
+  </div>
+</div>
+
+
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Skip</button>
+        <button type="button" class="btn btn-primary" id="btnGenerateInvoiceConfirm">
+          Generate Invoice
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 
 <script>
@@ -226,6 +381,152 @@
     shops.forEach(shop => {
         $selectBox.append(new Option(shop, shop));
     });
+
+
+
+    // ===== Commission calc =====
+    function calculateCommission() {
+      const pct = parseFloat($("#invCommissionPct").val() || "0") || 0;
+      const basis = ($("#invCommissionBasis").val() || "EXCL").toUpperCase();
+
+      // totals are shown as text in the modal
+      const subtotal = parseFloat(($("#invSubtotal").text() || "0").replace(/,/g, "")) || 0;
+      const totalIncl = parseFloat(($("#invTotal").text() || "0").replace(/,/g, "")) || 0;
+
+      const baseAmount = (basis === "INCL") ? totalIncl : subtotal;
+      const commission = baseAmount * (pct / 100);
+
+      $("#invCommissionAmount").val(money(commission));
+    }
+
+    // Recalc commission when pct/basis changes
+    $("#invCommissionPct").on("input change", calculateCommission);
+    $("#invCommissionBasis").on("change", calculateCommission);
+
+    // Also recalc whenever we render invoice lines (modal open / table refresh)
+    const _renderInvoiceLinesOriginal = renderInvoiceLines;
+    renderInvoiceLines = function(lines) {
+      const totals = _renderInvoiceLinesOriginal(lines);
+      calculateCommission();
+      return totals;
+    };
+
+
+
+    function openGenerateInvoiceModal(showSubmitSuccess = false) {
+
+      // Seller / Buyer placeholders for now
+      $("#invSellerName").text("Canna Holdings (auto)");
+      $("#invBuyerName").text($("#replenishShop option:selected").text() || "(auto)");
+
+      // ✅ Build invoice lines from the DataTable and render into modal table + totals
+      const lines = getInvoiceLinesFromTable();
+      renderInvoiceLines(lines);
+
+      // ✅ Show submit-success message inside the modal
+      if (showSubmitSuccess) {
+        $("#invItemsSummary").html(`
+          <span class="text-success fw-bold">Order submitted successfully.</span><br>
+          You may close the order after invoice generation.
+        `);
+      } else {
+        $("#invItemsSummary").html(``);
+      }
+
+      // Show modal
+      const el = document.getElementById("generateInvoiceModal");
+      const modal = new bootstrap.Modal(el);
+      modal.show();
+    }
+
+
+    function money(v) {
+      const n = parseFloat(v || 0);
+      return n.toFixed(2);
+    }
+
+    function getProductBySku(sku) {
+      // Works whether _products is [{item_sku:'', cost_price:...}] or similar
+      return (_products || []).find(p => String(p.item_sku) === String(sku));
+    }
+
+    function getInvoiceLinesFromTable() {
+      if (!$.fn.DataTable.isDataTable('#ProductOrderTemplate')) return [];
+
+      const dt = $('#ProductOrderTemplate').DataTable();
+      const lines = [];
+
+      dt.rows().every(function () {
+        const $tr = $(this.node());
+
+        // SKU + Description (these two are stable)
+        const sku  = $tr.find('td').eq(0).text().trim();
+        const desc = $tr.find('td').eq(1).text().trim();
+
+        // ✅ Always read Send Qty by class (works even if columns are hidden/reordered)
+        const sendQty = parseFloat($tr.find('input.send-qty-edit').val()) || 0;
+        if (sendQty <= 0) return;
+
+        const prod = getProductBySku(sku) || {};
+        const unitPrice = parseFloat(prod.cost_price || 0);
+
+        lines.push({
+          sku,
+          desc,
+          qty: sendQty,
+          unit_price: unitPrice,
+          line_total: sendQty * unitPrice
+        });
+      });
+
+      return lines;
+    }
+
+
+    function renderInvoiceLines(lines) {
+      const $tbody = $("#invItemsTable tbody");
+      $tbody.empty();
+
+      let subtotal = 0;
+      lines.forEach(l => {
+        subtotal += (l.line_total || 0);
+
+        $tbody.append(`
+          <tr>
+            <td>${l.sku}</td>
+            <td>${l.desc}</td>
+            <td class="text-end">${l.qty}</td>
+            <td class="text-end">${money(l.unit_price)}</td>
+            <td class="text-end">${money(l.line_total)}</td>
+          </tr>
+        `);
+      });
+
+      const vatRate = 0.15;
+      const vat = subtotal * vatRate;
+      const total = subtotal + vat;
+
+      $("#invSubtotal").text(money(subtotal));
+      $("#invVat").text(money(vat));
+      $("#invTotal").text(money(total));
+
+      return { subtotal, vat, total };
+    }
+
+
+
+    // Step 2 confirm button (no backend yet)
+    $("#btnGenerateInvoiceConfirm").on("click", function() {
+      const pct = parseFloat($("#invCommissionPct").val() || "0");
+      console.log("Invoice confirmed (UI only). Commission %:", pct);
+
+      const el = document.getElementById("generateInvoiceModal");
+      const modal = bootstrap.Modal.getInstance(el);
+      if (modal) modal.hide();
+
+      dialog("Invoice", "Step 2 OK: Modal opens and captures commission%. Next step will create invoice in DB.");
+    });
+
 
 
 
@@ -641,8 +942,17 @@ $("#submitOrder").on("click", async function(event) {
 
                 const notificationResult = await notificationResponse.json();
 
-                // Show success dialog
-                dialog("Order Submit", `<p>Order submitted successfully.<br>You may close the order now.</p>`);
+                // Show success dialog OR invoice modal (not both)
+                const wantsInvoice = $("#chkGenerateInvoice").is(":checked");
+
+                if (wantsInvoice) {
+                  // Open invoice modal ONLY (avoid two modals)
+                  openGenerateInvoiceModal(true);
+                } else {
+                  // No invoice requested → show normal success message
+                  dialog("Order Submit", `<p>Order submitted successfully.<br>You may close the order now.</p>`);
+                }
+
             } else {
                 // Handle any errors from the /submit_replenish route
                 dialog("Error", `<p>Error in submitting the order.<br>${result.message}</p>`);
