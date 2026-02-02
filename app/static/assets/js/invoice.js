@@ -1,5 +1,5 @@
 /* static/assets/js/invoice.js
-   Generic Invoice helpers (reusable across modules).
+   Generic Invoice helpers (reusable across modules)
 */
 (function (w) {
   const LS_KEY = "toc_last_invoice";

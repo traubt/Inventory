@@ -846,4 +846,3 @@ class TocInvoiceCommission(db.Model):
         base = invoice_subtotal_excl if (self.basis or "EXCL").upper() == "EXCL" else invoice_total_incl
         pct = float(self.commission_pct or 0)
         self.commission_amount = round(float(base or 0) * (pct / 100.0), 2)
-
