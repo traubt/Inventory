@@ -589,6 +589,52 @@ def distribute_product_to_shops(sku):
     # If successful, return a success message
     return {"status": "success", "message": f"Product {sku} distributed to shops successfully."}
 
+def distribute_component_to_canndo_holdings(sku: str):
+    """
+    Insert a newly created component (CO) into toc_stock for Canndo Holdings only.
+    Safe to re-run (uses INSERT IGNORE to avoid duplicates if already inserted).
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+        INSERT IGNORE INTO toc_stock (
+            shop_id, sku, stock_qty_date, product_name, shop_name, final_stock_qty,
+            stock_count, count_by, last_stock_qty, calc_stock_qty, variance, variance_rsn,
+            rejects_qty, replenish_id, comments, pastel_date
+        )
+        SELECT
+            s.customer       AS shop_id,
+            p.item_sku       AS sku,
+            '2000-01-01'     AS stock_qty_date,
+            p.item_name      AS product_name,
+            s.blName         AS shop_name,
+            0                AS final_stock_qty,
+            0                AS stock_count,
+            'NA'             AS count_by,
+            0                AS last_stock_qty,
+            0                AS calc_stock_qty,
+            0                AS variance,
+            'NA'             AS variance_rsn,
+            0                AS rejects_qty,
+            'NA'             AS replenish_id,
+            'NA'             AS comments,
+            '2020-02-02'     AS pastel_date
+        FROM toc_shops s
+        JOIN toc_product p ON p.item_sku = %s
+        WHERE s.blName = 'Canndo Holdings';
+    """
+
+    try:
+        cursor.execute(query, (sku,))
+        conn.commit()
+    except Exception as err:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
 
 def get_stock_order_form():
     shop_data = json.loads(session.get('shop'))

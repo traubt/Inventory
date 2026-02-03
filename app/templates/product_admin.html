@@ -262,12 +262,13 @@
             <input type="url" class="form-control" id="image_url">
           </div>
 <div class="mb-3">
-    <label for="updateStockOrdInda" class="form-label">Stock Order Indicator</label>
-    <select class="form-select" id="updateStockOrdInda">
-        <option value="1">Physical item</option>
-        <option value="0">Special package</option>
-    </select>
+  <label for="stock_ord_ind" class="form-label">Stock Order Indicator</label>
+  <select class="form-select" id="stock_ord_ind">
+    <option value="1">Physical item</option>
+    <option value="0">Special package</option>
+  </select>
 </div>
+
         </form>
       </div>
       <div class="modal-footer">
@@ -417,19 +418,20 @@ $('#Users').on('click', '.btn-delete', function () {
     $("#submitCreateProduct").on("click", function () {
         // Collect form data
         const productData = {
-            item_sku: $("#item_sku").val(),
-            item_name: $("#item_name").val(),
-            item_type: $('#updateItemType').val(),
-            stat_group: $("#stat_group").val(),
-            acct_group: $("#acct_group").val(),
-            retail_price: $("#retail_price").val(),
-            cost_price: $("#cost_price").val(),
-            wh_price: $("#wh_price").val(),
-            cann_cost_price: $("#cann_cost_price").val(),
-            product_url: $("#product_url").val(),
-            image_url: $("#image_url").val(),
-            stock_ord_ind: $("#stock_ord_ind").val(),
+          item_sku: $("#item_sku").val().trim(),
+          item_name: $("#item_name").val().trim(),
+          item_type: $("#item_type").val(),                 // ✅ FIXED
+          stat_group: $("#stat_group").val(),
+          acct_group: $("#acct_group").val(),
+          retail_price: parseFloat($("#retail_price").val() || "0"),
+          cost_price: parseFloat($("#cost_price").val() || "0"),
+          wh_price: parseFloat($("#wh_price").val() || "0"),
+          cann_cost_price: parseFloat($("#cann_cost_price").val() || "0"),
+          product_url: $("#product_url").val(),
+          image_url: $("#image_url").val(),
+          stock_ord_ind: parseInt($("#stock_ord_ind").val() || "1", 10)  // ✅ FIXED
         };
+
 
         // Validate required fields
         if (!productData.item_sku || !productData.item_name) {

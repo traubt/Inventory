@@ -688,6 +688,8 @@ def create_product():
         # Insert into toc_stock for all shops only product
         if item_type == "PR":
             distribute_product_to_shops(new_product.item_sku)
+        elif item_type == "CO":
+            distribute_component_to_canndo_holdings(new_product.item_sku)
 
         return jsonify({
             "message": "Product created successfully",
