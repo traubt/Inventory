@@ -6262,8 +6262,8 @@ def create_invoice_inter_transfer():
     """
     Creates:
       - toc_invoice
-      - toc_invoice_item(s)
-      - toc_invoice_commission (optional)
+      - toc_invoice_item(s)   (including COMMISSION as a line item if pct>0)
+      - toc_invoice_commission (optional, still recorded for tracking)
     for Inter Transfer source.
     """
 
@@ -6281,7 +6281,6 @@ def create_invoice_inter_transfer():
 
     # Commission (optional)
     commission_pct = payload.get("commission_pct")  # can be None/""/0
-    commission_basis = (payload.get("commission_basis") or "EXCL").upper()  # EXCL/INCL
 
     if not source_id:
         return jsonify({"status": "error", "message": "Missing source_id"}), 400
@@ -6318,9 +6317,11 @@ def create_invoice_inter_transfer():
         seller_row = TOC_SHOPS.query.filter_by(blName=seller_blname).first()
 
     if not seller_row:
-        # show what we tried (helps debug)
         tried = seller_customer_code or seller_blname or "(none)"
-        return jsonify({"status": "error", "message": f"Seller shop not found in toc_shops (customer/blName): {tried}"}), 404
+        return jsonify({
+            "status": "error",
+            "message": f"Seller shop not found in toc_shops (customer/blName): {tried}"
+        }), 404
 
     # Buyer is selected by blName (dropdown)
     buyer_row = TOC_SHOPS.query.filter_by(blName=buyer_blname).first()
@@ -6377,7 +6378,7 @@ def create_invoice_inter_transfer():
     )
 
     # ---------------------------
-    # Build invoice items
+    # Build invoice items (GOODS)
     # ---------------------------
     vat_pct = float(payload.get("vat_pct") or VAT_PCT_DEFAULT)
     line_no = 1
@@ -6411,12 +6412,10 @@ def create_invoice_inter_transfer():
         inv.items.append(item)
         line_no += 1
 
-    inv.recalc_totals()
-
     # ---------------------------
-    # Commission (optional)
-    # Table has agent_user_id + pct + amount
-    # We'll compute amount by basis (EXCL/INCL) but only store pct+amount.
+    # Commission as INVOICE LINE ITEM (EXCL VAT)
+    # - Commission is now just another invoice item
+    # - We still keep toc_invoice_commission for tracking/payments
     # ---------------------------
     pct_val = None
     try:
@@ -6424,21 +6423,46 @@ def create_invoice_inter_transfer():
     except Exception:
         pct_val = None
 
+    commission_excl = 0.0
+    if pct_val is not None and pct_val > 0:
+        # goods subtotal excl vat (net_excl already excludes VAT)
+        goods_subtotal_excl = sum([float(i.net_excl or 0) for i in inv.items])
+        commission_excl = round(goods_subtotal_excl * (pct_val / 100.0), 2)
+
+        # Add commission as a normal invoice row
+        comm_item = TocInvoiceItem(
+            line_no=line_no,
+            code="COMMISSION",
+            sku=None,
+            description=f"Commission ({pct_val:.2f}%)",
+            qty=_num3(1),
+            unit=None,
+            unit_price_excl=_money2(commission_excl),
+            discount_pct=_money2(0),
+            tax_pct=vat_pct,
+        )
+        comm_item.recalc_line()
+        inv.items.append(comm_item)
+        line_no += 1
+
+    # Totals now include commission line item
+    inv.recalc_totals()
+
+    # ---------------------------
+    # Commission tracking row (optional) - still works
+    # Store pct + amount (amount == commission_excl here)
+    # ---------------------------
     if pct_val is not None and pct_val > 0:
         if not session_user_id:
             return jsonify({"status": "error", "message": "Cannot set commission: missing session user id"}), 400
 
-        base_amount = float(inv.sub_total_excl or 0) if commission_basis == "EXCL" else float(inv.total_incl or 0)
-        comm_amount = round(base_amount * (pct_val / 100.0), 2)
-
         comm = TocInvoiceCommission(
             agent_user_id=session_user_id,
             commission_pct=pct_val,
-            commission_amount=comm_amount,
+            commission_amount=_money2(commission_excl),
             status="Open",
-            note=f"Basis={commission_basis}"  # keep it somewhere useful
+            note="Commission stored as invoice line item (EXCL VAT)"
         )
-
         inv.commissions.append(comm)
 
     # ---------------------------
@@ -6458,8 +6482,10 @@ def create_invoice_inter_transfer():
         "sub_total_excl": float(inv.sub_total_excl or 0),
         "tax_total": float(inv.tax_total or 0),
         "total_incl": float(inv.total_incl or 0),
+        # still returned for UI display, but UI will treat it as a line item now
         "commission_amount": float(inv.commissions[0].commission_amount) if inv.commissions else 0.0,
     }), 200
+
 
 
 @main.route("/invoice/lookup", methods=["GET"])

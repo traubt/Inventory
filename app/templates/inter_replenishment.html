@@ -104,24 +104,26 @@
     </select>
 
 
-    <!-- ===== Generate Invoice + Print Invoice ===== -->
-    <div class="d-flex align-items-center gap-2 mb-0 ms-2">
-      <div class="form-check mb-0">
-        <input class="form-check-input" type="checkbox" id="chkGenerateInvoice">
-        <label class="form-check-label fw-bold" for="chkGenerateInvoice">
-          Generate Invoice
-        </label>
-      </div>
+<!-- ===== Generate Invoice + Print Invoice (ONLY Canndo Holdings users) ===== -->
+{% if (user.shop or '') == 'Canndo Holdings' %}
+<div class="d-flex align-items-center gap-2 mb-0 ms-2" id="invoiceControls">
+  <div class="form-check mb-0">
+    <input class="form-check-input" type="checkbox" id="chkGenerateInvoice">
+    <label class="form-check-label fw-bold" for="chkGenerateInvoice">
+      Generate Invoice
+    </label>
+  </div>
 
-      <!-- Print Invoice (disabled until invoice exists) -->
-      <button type="button"
-              id="btnPrintInvoice"
-              class="btn btn-outline-primary btn-sm"
-              disabled
-              title="Print the generated invoice">
-        Print Invoice
-      </button>
-    </div>
+  <button type="button"
+          id="btnPrintInvoice"
+          class="btn btn-outline-primary btn-sm"
+          disabled
+          title="Print the generated invoice">
+    Print Invoice
+  </button>
+</div>
+{% endif %}
+
 
 
     <!-- Additional Inputs (unchanged, still hidden) -->
@@ -272,27 +274,21 @@
             </div>
           </div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Commission %</label>
-            <input type="number"
-                   class="form-control"
-                   id="invCommissionPct"
-                   min="0" max="100" step="0.01"
-                   placeholder="e.g. 5">
-          </div>
+<div class="col-md-6">
+  <label class="form-label fw-bold">Commission %</label>
+  <input type="number"
+         class="form-control"
+         id="invCommissionPct"
+         min="0" max="100" step="0.01"
+         placeholder="e.g. 5">
+</div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Basis</label>
-            <select class="form-select" id="invCommissionBasis">
-              <option value="EXCL" selected>EXCL VAT</option>
-              <option value="INCL">INCL VAT</option>
-            </select>
-          </div>
+<div class="col-md-6">
+  <label class="form-label fw-bold">Commission Amount (Excl VAT)</label>
+  <input type="text" class="form-control" id="invCommissionAmount" value="0.00" readonly>
+  <div class="text-muted small mt-1">Commission will be added as a line item.</div>
+</div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Commission Amount</label>
-            <input type="text" class="form-control" id="invCommissionAmount" value="0.00" readonly>
-          </div>
 
 <div class="col-12">
   <div class="border rounded p-2">
@@ -315,19 +311,15 @@
 
     <div class="d-flex justify-content-end">
       <div style="min-width:320px;">
-        <div class="d-flex justify-content-between">
-          <div class="fw-bold">Subtotal (Excl VAT)</div>
-          <div class="fw-bold" id="invSubtotal">0.00</div>
-        </div>
+
+<div class="d-flex justify-content-between">
+  <div class="fw-bold">Subtotal (Excl VAT)</div>
+  <div class="fw-bold" id="invSubtotal">0.00</div>
+</div>
+
 <div class="d-flex justify-content-between">
   <div class="fw-bold">VAT (15%)</div>
   <div class="fw-bold" id="invVat">0.00</div>
-</div>
-
-<!-- Commission line will move above/below VAT depending on Basis -->
-<div class="d-flex justify-content-between" id="invCommissionRow" style="display:none;">
-  <div class="fw-bold" id="invCommissionLabel">Commission</div>
-  <div class="fw-bold" id="invCommissionValue">0.00</div>
 </div>
 
 <div class="d-flex justify-content-between border-top pt-2 mt-1">
@@ -335,10 +327,6 @@
   <div class="fw-bold" id="invTotal">0.00</div>
 </div>
 
-<div class="d-flex justify-content-between">
-  <div class="fw-bold">Grand Total (Incl VAT + Commission)</div>
-  <div class="fw-bold" id="invGrandTotal">0.00</div>
-</div>
 
       </div>
     </div>
@@ -353,7 +341,7 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Skip</button>
+        <button type="button" class="btn btn-outline-secondary" id="btnInvoiceSkip" data-bs-dismiss="modal">Skip</button>
         <button type="button" class="btn btn-primary" id="btnGenerateInvoiceConfirm">
           Generate Invoice
         </button>
@@ -398,7 +386,7 @@
 // ======================= INVOICE: seller/buyer + commission + totals =======================
 
 // ✅ Init InvoiceUI (must be inside document.ready - NOT DOMContentLoaded)
-if (window.InvoiceUI) {
+if (document.querySelector("#invoiceControls") && window.InvoiceUI) {
   InvoiceUI.init({
     printButtonSelector: "#btnPrintInvoice",
     getSource: () => ({
@@ -407,6 +395,84 @@ if (window.InvoiceUI) {
     })
   });
 }
+
+function autoCloseOrderAfterSubmit() {
+  // close order UI to prevent duplicate submissions
+  $("#closeOrder").trigger("click");
+}
+
+$("#btnInvoiceSkip").on("click", function () {
+  if (window._autoCloseAfterInvoice) {
+    window._autoCloseAfterInvoice = false;
+    autoCloseOrderAfterSubmit();
+  }
+});
+
+
+function calcCommissionExcl(goodsSubtotal) {
+  const pct = parseFloat($("#invCommissionPct").val() || "0") || 0;
+  if (pct <= 0) return 0;
+  return goodsSubtotal * (pct / 100.0);
+}
+
+function renderInvoiceLines(lines) {
+  const $tbody = $("#invItemsTable tbody");
+  $tbody.empty();
+
+  // 1) Render goods lines and calc goods subtotal
+  let goodsSubtotal = 0;
+
+  lines.forEach(l => {
+    goodsSubtotal += (l.line_total || 0);
+
+    $tbody.append(`
+      <tr>
+        <td>${l.sku || ""}</td>
+        <td>${l.desc}</td>
+        <td class="text-end">${l.qty}</td>
+        <td class="text-end">${money(l.unit_price)}</td>
+        <td class="text-end">${money(l.line_total)}</td>
+      </tr>
+    `);
+  });
+
+  // 2) Commission as a line item (EXCL VAT)
+  const commExcl = calcCommissionExcl(goodsSubtotal);
+  $("#invCommissionAmount").val(money(commExcl));
+
+  if (commExcl > 0) {
+    $tbody.append(`
+      <tr>
+        <td></td>
+        <td><b>Commission (${money($("#invCommissionPct").val() || 0)}%)</b></td>
+        <td class="text-end">1</td>
+        <td class="text-end">${money(commExcl)}</td>
+        <td class="text-end">${money(commExcl)}</td>
+      </tr>
+    `);
+  }
+
+  // 3) Totals now include commission line
+  const subtotal = goodsSubtotal + commExcl;
+  const vatRate = 0.15;
+  const vat = subtotal * vatRate;
+  const total = subtotal + vat;
+
+  _invGoodsTotals = { subtotal, vat, total };
+
+  $("#invSubtotal").text(money(subtotal));
+  $("#invVat").text(money(vat));
+  $("#invTotal").text(money(total));
+
+  return { subtotal, vat, total, commission_excl: commExcl };
+}
+
+// Live update when user changes commission %
+$("#invCommissionPct").on("input change", function () {
+  const lines = getInvoiceLinesFromTable();
+  renderInvoiceLines(lines);
+});
+
 
 
 
@@ -572,20 +638,20 @@ $("#btnGenerateInvoiceConfirm").on("click", async function() {
     return;
   }
 
-  const payload = {
-    source_id: $("#orderName").val(),                 // MUST be integer string (see note below)
-    buyer_blname: $("#replenishShop").val(),
-    vat_pct: 15,
-    commission_pct: $("#invCommissionPct").val(),
-    commission_basis: $("#invCommissionBasis").val(),
-    items: lines.map((l, idx) => ({
-      line_no: idx + 1,
-      sku: l.sku,
-      description: l.desc,
-      qty: l.qty,
-      unit_price_excl: l.unit_price
-    }))
-  };
+    const payload = {
+      source_id: $("#orderName").val(),
+      buyer_blname: $("#replenishShop").val(),
+      vat_pct: 15,
+      commission_pct: $("#invCommissionPct").val(),
+      items: lines.map((l, idx) => ({
+        line_no: idx + 1,
+        sku: l.sku,
+        description: l.desc,
+        qty: l.qty,
+        unit_price_excl: l.unit_price
+      }))
+    };
+
 
   try {
     const res = await fetch("/invoice/inter-transfer/create", {
@@ -615,6 +681,11 @@ $("#btnGenerateInvoiceConfirm").on("click", async function() {
         source_type: "INTER_TRANSFER",
         source_id: $("#orderName").val()
       });
+    }
+
+    if (window._autoCloseAfterInvoice) {
+      window._autoCloseAfterInvoice = false;
+      autoCloseOrderAfterSubmit();
     }
 
 
@@ -1039,15 +1110,17 @@ $("#submitOrder").on("click", async function(event) {
                 const notificationResult = await notificationResponse.json();
 
                 // Show success dialog OR invoice modal (not both)
-                const wantsInvoice = $("#chkGenerateInvoice").is(":checked");
+                const hasInvoiceControls = !!document.querySelector("#invoiceControls");
+                const wantsInvoice = hasInvoiceControls && $("#chkGenerateInvoice").is(":checked");
 
                 if (wantsInvoice) {
-                  // Open invoice modal ONLY (avoid two modals)
+                  window._autoCloseAfterInvoice = true;
                   openGenerateInvoiceModal(true);
                 } else {
-                  // No invoice requested → show normal success message
-                  dialog("Order Submit", `<p>Order submitted successfully.<br>You may close the order now.</p>`);
+                  dialog("Order Submit", `<p>Order submitted successfully.<br>Order will now be closed.</p>`);
+                  autoCloseOrderAfterSubmit();
                 }
+
 
             } else {
                 // Handle any errors from the /submit_replenish route
