@@ -896,7 +896,6 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
     conn.close()
     return result
 
-
 def get_stock_count_per_shop(shop):
 
     conn = get_db_connection()
