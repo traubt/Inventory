@@ -380,6 +380,7 @@
     // Populate the select box with options using `blName`
     // Since `shops` is already an array of strings, no need to access `.blName`
     shops.forEach(shop => {
+        if (shop === "Canndo Holdings") return;
         $selectBox.append(new Option(shop, shop));
     });
 
