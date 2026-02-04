@@ -846,3 +846,71 @@ class TocInvoiceCommission(db.Model):
         base = invoice_subtotal_excl if (self.basis or "EXCL").upper() == "EXCL" else invoice_total_incl
         pct = float(self.commission_pct or 0)
         self.commission_amount = round(float(base or 0) * (pct / 100.0), 2)
+
+
+############### Stock transfer (In-Transit)
+
+
+class TocStockTransfer(db.Model):
+    __tablename__ = "toc_stock_transfer"
+
+    transfer_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    source_table = db.Column(db.String(64), nullable=False)
+    order_id = db.Column(db.String(60), nullable=False)
+    tracking_code = db.Column(db.String(80), nullable=True)
+
+    transfer_type = db.Column(db.String(30), nullable=False)
+    from_shop_id = db.Column(db.String(45), nullable=False)
+    to_shop_id = db.Column(db.String(45), nullable=False)
+
+    status = db.Column(db.String(20), nullable=False, default="Draft")
+    created_by = db.Column(db.Integer, db.ForeignKey("toc_users.id", ondelete="SET NULL"), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+
+    # These are fine even though MySQL has CURRENT_TIMESTAMP defaults
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+
+    dispatched_at = db.Column(db.DateTime, nullable=True)
+    received_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("source_table", "order_id", name="uq_source_doc"),
+    )
+
+    items = db.relationship(
+        "TocStockTransferItem",
+        back_populates="transfer",
+        cascade="all, delete-orphan"
+    )
+
+
+class TocStockTransferItem(db.Model):
+    __tablename__ = "toc_stock_transfer_item"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    transfer_id = db.Column(
+        db.Integer,
+        db.ForeignKey("toc_stock_transfer.transfer_id", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False
+    )
+
+    sku = db.Column(db.String(45), nullable=False)
+
+    qty_sent = db.Column(db.Numeric(12, 3), nullable=False, default=0)
+    qty_received = db.Column(db.Numeric(12, 3), nullable=False, default=0)
+
+    note = db.Column(db.String(255), nullable=True)
+
+    transfer = db.relationship("TocStockTransfer", back_populates="items")
+
+    __table_args__ = (
+        db.Index("idx_transfer_id", "transfer_id"),
+        db.Index("idx_sku", "sku"),
+        db.Index("idx_transfer_sku", "transfer_id", "sku"),
+    )
+
+    @property
+    def qty_in_transit(self):
+        return (self.qty_sent or 0) - (self.qty_received or 0)

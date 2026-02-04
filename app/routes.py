@@ -1637,19 +1637,49 @@ def save_replenish():
 
 
 
+# @main.route('/submit_replenish', methods=['POST'])
+# def submit_replenish():
+#     try:
+#         data = request.get_json()
+#
+#
+#         order_id = data.get('order_id', '')
+#
+#         user_name = data.get('user_name', '')
+#
+#         tracking_code = data.get('tracking_code', '')
+#
+#         # Check for order_id and delete existing records
+#         rec = TOCReplenishCtrl.query.filter_by(order_id=order_id).first()
+#
+#         rec.order_status_date = datetime.now()
+#         rec.tracking_code = tracking_code
+#         rec.user = user_name
+#         rec.order_status = "Submitted"
+#
+#         # Commit changes to the database
+#         db.session.commit()
+#
+#         return jsonify({"status": "success", "message": "Data submitted successfully"})
+#
+#     except SQLAlchemyError as e:
+#         db.session.rollback()
+#         print("Database error:", e)
+#         return jsonify({"status": "error", "message": "Failed to save data", "error": str(e)}), 500
+#
+#     except Exception as e:
+#         print("Error:", e)
+#         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
 @main.route('/submit_replenish', methods=['POST'])
 def submit_replenish():
     try:
         data = request.get_json()
 
-
         order_id = data.get('order_id', '')
-
         user_name = data.get('user_name', '')
-
         tracking_code = data.get('tracking_code', '')
 
-        # Check for order_id and delete existing records
         rec = TOCReplenishCtrl.query.filter_by(order_id=order_id).first()
 
         rec.order_status_date = datetime.now()
@@ -1657,7 +1687,19 @@ def submit_replenish():
         rec.user = user_name
         rec.order_status = "Submitted"
 
-        # Commit changes to the database
+        # -------------------------------
+        # NEW: create/update In-Transit transfer header/items
+        # -------------------------------
+        try:
+            user_data = session.get('user')
+            user = json.loads(user_data) if user_data else {}
+            user_id = user.get("id") or None
+
+            _ensure_transfer_header_and_items_from_replenish_ctrl(rec, user_id)
+        except Exception:
+            # Never block core inventory flow
+            _safe_log_exc("Stock transfer bookkeeping failed in submit_replenish")
+
         db.session.commit()
 
         return jsonify({"status": "success", "message": "Data submitted successfully"})
@@ -1670,6 +1712,8 @@ def submit_replenish():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+
 
 
 
@@ -2290,6 +2334,14 @@ def update_count_receive_stock():
             ctrl.order_status = "Completed"
             ctrl.order_status_date = datetime.now(timezone.utc)
 
+        # -------------------------------
+        # NEW: mark transfer received + sync qty_received
+        # -------------------------------
+        try:
+            _mark_transfer_received(replenish_order_id)
+        except Exception:
+            _safe_log_exc("Stock transfer bookkeeping failed in update_count_receive_stock_v2")
+
         db.session.commit()
         return jsonify({"status": "success", "message": "Stock data updated successfully (v2)"})
 
@@ -2302,8 +2354,6 @@ def update_count_receive_stock():
         db.session.rollback()
         logger.exception("Error in update_count_receive_stock_v2:")
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
-
-
 
 
 @main.route('/save_count_receive_stock', methods=['POST'])
@@ -6650,6 +6700,115 @@ def invoice_print(invoice_id):
         buyer_vat=buyer_vat
     )
 
+########################## Stock transfer (In-Transit ) ###################
+
+def _safe_log_exc(msg: str):
+    try:
+        logger.exception(msg)
+    except Exception:
+        print(msg)
+
+def _shop_customer_from_store(store_code: str) -> str | None:
+    """
+    Converts TOC_SHOPS.store -> TOC_SHOPS.customer (your shop_id values in stock tables).
+    """
+    if not store_code:
+        return None
+    s = TOC_SHOPS.query.filter_by(store=store_code).first()
+    return getattr(s, "customer", None) if s else None
+
+def _ensure_transfer_header_and_items_from_replenish_ctrl(ctrl, user_id: int | None):
+    """
+    Creates/updates toc_stock_transfer + items based on TOCReplenishCtrl + TocReplenishOrder lines.
+    This is PURE bookkeeping - does not touch toc_stock quantities.
+    """
+    if not ctrl:
+        return
+
+    # determine transfer type
+    transfer_type = "replenishment" if str(ctrl.sent_from or "") == "001" else "inter_transfer"
+
+    from_customer = _shop_customer_from_store(str(ctrl.sent_from or ""))
+    to_customer = str(ctrl.shop_id or "")
+
+    if not from_customer or not to_customer:
+        # Don't break core flow if shop mapping is missing
+        return
+
+    # Upsert header by (source_table, order_id)
+    t = TocStockTransfer.query.filter_by(source_table="toc_replenish_ctrl", order_id=ctrl.order_id).first()
+    if not t:
+        t = TocStockTransfer(
+            source_table="toc_replenish_ctrl",
+            order_id=ctrl.order_id,
+            transfer_type=transfer_type,
+            from_shop_id=from_customer,
+            to_shop_id=to_customer,
+            status="Draft",
+            created_by=user_id
+        )
+        db.session.add(t)
+        db.session.flush()  # get transfer_id
+
+    # update header fields from ctrl
+    t.tracking_code = ctrl.tracking_code
+    t.transfer_type = transfer_type
+    t.from_shop_id = from_customer
+    t.to_shop_id = to_customer
+
+    # Status mapping:
+    # - ctrl New/Draft => transfer Draft
+    # - ctrl Submitted => transfer Dispatched
+    # - ctrl Completed => transfer Received
+    if ctrl.order_status == "Submitted":
+        t.status = "Dispatched"
+        t.dispatched_at = ctrl.order_status_date or datetime.now(timezone.utc)
+    elif ctrl.order_status == "Completed":
+        t.status = "Received"
+        t.received_at = ctrl.order_status_date or datetime.now(timezone.utc)
+    else:
+        t.status = "Draft"
+
+    # Upsert items based on TocReplenishOrder
+    lines = TocReplenishOrder.query.filter_by(order_id=ctrl.order_id).all()
+    for ln in lines:
+        sku = (ln.sku or "").strip()
+        if not sku:
+            continue
+
+        item = TocStockTransferItem.query.filter_by(transfer_id=t.transfer_id, sku=sku).first()
+        if not item:
+            item = TocStockTransferItem(transfer_id=t.transfer_id, sku=sku)
+            db.session.add(item)
+
+        # qty_sent = replenish_qty from order line
+        item.qty_sent = float(ln.replenish_qty or 0)
+
+        # qty_received only exists after receiving
+        if ln.received_qty is not None:
+            item.qty_received = float(ln.received_qty or 0)
+
+def _mark_transfer_received(order_id: str):
+    """
+    Marks transfer as received, and syncs qty_received from TocReplenishOrder.received_qty.
+    """
+    ctrl = TOCReplenishCtrl.query.filter_by(order_id=order_id).first()
+    if not ctrl:
+        return
+
+    user_data = session.get('user')
+    user = json.loads(user_data) if user_data else {}
+    user_id = user.get("id") or None
+
+    # Ensure exists, then mark received
+    _ensure_transfer_header_and_items_from_replenish_ctrl(ctrl, user_id)
+
+    t = TocStockTransfer.query.filter_by(source_table="toc_replenish_ctrl", order_id=order_id).first()
+    if not t:
+        return
+
+    t.status = "Received"
+    t.received_at = datetime.now(timezone.utc)
 
 
 if __name__ == '__main__':
