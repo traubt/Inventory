@@ -2525,136 +2525,264 @@ def get_db_variance_report(report_type, from_date, to_date, group_by):
 
 def get_stock_value():
 
-    # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Query to retrieve the stock order form
-    query = '''
-            WITH sales_counts AS (
-              SELECT
-                  st.sku,
-                  st.shop_id,
-                  st.stock_qty_date,
-                  COUNT(*) AS count_items
-              FROM toc_stock st
-              JOIN toc_ls_sales_item ti ON st.sku = ti.item_sku
-              JOIN toc_ls_sales ts ON ti.sales_id = ts.sales_id and st.shop_id = ts.store_customer
-              WHERE ts.time_of_sale > st.stock_qty_date
-              GROUP BY st.sku, st.shop_id, st.stock_qty_date
-            )
-            SELECT
-                d.item_sku,
-                d.item_name,
-                st.shop_name,
-                st.shop_id,
-                st.stock_qty_date,
-                st.final_stock_qty as gross_stock_qty,
-                st.stock_transfer as stock_movement,
-                COALESCE(sc.count_items, 0) AS sold_items,
-          --      st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)  AS current_stock,
-          --      ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)  ) * d.cost_price) AS total_cost_price,
-          --      ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0)  ) * d.retail_price) AS total_retail_price
-                st.final_stock_qty  - COALESCE(sc.count_items, 0)  AS current_stock,
-                ROUND((st.final_stock_qty  - COALESCE(sc.count_items, 0)  ) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty  - COALESCE(sc.count_items, 0)  ) * d.retail_price) AS total_retail_price
-            FROM toc_stock st
-            JOIN toc_product d 
-              ON st.sku = d.item_sku
-            LEFT JOIN sales_counts sc 
-              ON st.sku = sc.sku 
-              AND st.shop_id = sc.shop_id
-              AND st.stock_qty_date = sc.stock_qty_date
-            WHERE d.acct_group <> 'Specials'
-              AND d.item_sku <> '9568'  
-            --  and st.shop_name = 'CC - Menlyn'
-              AND st.final_stock_qty - COALESCE(sc.count_items, 0) > 0;
-            '''
+    HEAD_OFFICE_ID = "TOC999"
 
-    # Execute the query with the parameter
-    cursor.execute(query)
+    query = """
+        WITH sales_data AS (
+
+            /* ---------------------------
+               Head Office (TOC999) - WooCommerce
+               --------------------------- */
+            SELECT
+                p.item_sku        AS item_sku,
+                st.shop_id        AS shop_id,
+                st.stock_qty_date AS stock_qty_date,
+                SUM(
+                    CASE
+                        WHEN wo.creation_date > st.stock_qty_date
+                        THEN COALESCE(wi.quantity, 0)
+                        ELSE 0
+                    END
+                ) AS sold_qty
+            FROM toc_product p
+            LEFT JOIN toc_wc_sales_items wi
+                   ON p.item_sku = wi.sku
+            LEFT JOIN toc_wc_sales_order wo
+                   ON wi.order_id = wo.order_id
+                  AND wo.status <> 'wc-pending'
+                  AND wo.order_id NOT IN (
+                      SELECT s.wc_orderid
+                      FROM toc_shipday s
+                      WHERE s.wc_orderid IS NOT NULL
+                  )
+            LEFT JOIN toc_stock st
+                   ON p.item_sku = st.sku
+                  AND st.shop_id = %s
+            GROUP BY p.item_sku, st.shop_id, st.stock_qty_date
+
+            UNION ALL
+
+            /* ---------------------------
+               All other shops - Lightspeed POS
+               --------------------------- */
+            SELECT
+                d.item_sku        AS item_sku,
+                b.store_customer  AS shop_id,
+                st.stock_qty_date AS stock_qty_date,
+                SUM(
+                    CASE
+                        WHEN b.time_of_sale > st.stock_qty_date
+                        THEN COALESCE(a.quantity, 0)
+                        ELSE 0
+                    END
+                ) AS sold_qty
+            FROM toc_product d
+            LEFT JOIN toc_ls_sales_item a
+                   ON d.item_sku = a.item_sku
+            LEFT JOIN toc_ls_sales b
+                   ON a.sales_id = b.sales_id
+            LEFT JOIN toc_stock st
+                   ON d.item_sku = st.sku
+                  AND b.store_customer = st.shop_id
+            WHERE b.store_customer <> %s
+            GROUP BY d.item_sku, b.store_customer, st.stock_qty_date
+        ),
+
+        damaged_data AS (
+            SELECT
+                d.sku,
+                d.shop_id,
+                SUM(d.rcv_damaged) AS total_damaged
+            FROM toc_damaged d
+            INNER JOIN toc_stock st
+                    ON d.sku = st.sku
+                   AND d.shop_id = st.shop_id
+            WHERE d.order_open_date > st.stock_qty_date
+            GROUP BY d.sku, d.shop_id
+        )
+
+        SELECT DISTINCT
+            st.sku AS item_sku,
+            st.product_name AS item_name,
+            st.shop_name,
+            st.shop_id,
+            st.stock_qty_date,
+            COALESCE(st.final_stock_qty, 0) AS gross_stock_qty,
+
+            /* Stock Movement: same concept as stock_count "received_stock" */
+            (COALESCE(st.stock_transfer, 0) - COALESCE(dd.total_damaged, 0)) AS stock_movement,
+
+            /* Sold Items: SUM(quantity) since last stock count */
+            COALESCE(sd.sold_qty, 0) AS sold_items,
+
+            /* Current Stock: same as stock_count */
+            (COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) AS current_stock,
+
+            /* Totals based on current_stock */
+            ROUND((COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) * COALESCE(p.cost_price, 0), 2)   AS total_cost_price,
+            ROUND((COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) * COALESCE(p.retail_price, 0), 2) AS total_retail_price
+
+        FROM toc_stock st
+        JOIN toc_product p
+          ON p.item_sku = st.sku
+         AND p.acct_group NOT IN ('Specials', 'Non stock Item')
+        LEFT JOIN sales_data sd
+          ON sd.item_sku = st.sku
+         AND sd.shop_id = st.shop_id
+         AND sd.stock_qty_date = st.stock_qty_date
+        LEFT JOIN damaged_data dd
+          ON dd.sku = st.sku
+         AND dd.shop_id = st.shop_id
+        WHERE p.item_sku <> '9568'
+          AND (COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) > 0
+        ORDER BY st.shop_name, st.product_name;
+    """
+
+    cursor.execute(query, (HEAD_OFFICE_ID, HEAD_OFFICE_ID))
     result = cursor.fetchall()
 
-    # Fetch column names
     columns = [col[0] for col in cursor.description]
-
-    # Convert result tuples to dictionaries
     result_as_dicts = [dict(zip(columns, row)) for row in result]
 
     cursor.close()
     conn.close()
 
     return result_as_dicts
+
 
 def get_stock_value_per_shop():
 
-    # Connect to the database
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Query to retrieve the stock order form
-    query = '''
-          WITH sales_counts AS (
+    HEAD_OFFICE_ID = "TOC999"
+
+    query = """
+        WITH sales_data AS (
+
+            /* ---------------------------
+               Head Office (TOC999) - WooCommerce
+               --------------------------- */
             SELECT
-                st.sku,
-                st.shop_id,
-                st.stock_qty_date,
-                COUNT(*) AS count_items
-            FROM toc_stock st
-            JOIN toc_ls_sales_item ti 
-              ON st.sku = ti.item_sku
-            JOIN toc_ls_sales ts 
-              ON ti.sales_id = ts.sales_id and st.shop_id = ts.store_customer
-            WHERE ts.time_of_sale > st.stock_qty_date
-            GROUP BY st.sku, st.shop_id, st.stock_qty_date
+                p.item_sku        AS item_sku,
+                st.shop_id        AS shop_id,
+                st.stock_qty_date AS stock_qty_date,
+                SUM(
+                    CASE
+                        WHEN wo.creation_date > st.stock_qty_date
+                        THEN COALESCE(wi.quantity, 0)
+                        ELSE 0
+                    END
+                ) AS sold_qty
+            FROM toc_product p
+            LEFT JOIN toc_wc_sales_items wi
+                   ON p.item_sku = wi.sku
+            LEFT JOIN toc_wc_sales_order wo
+                   ON wi.order_id = wo.order_id
+                  AND wo.status <> 'wc-pending'
+                  AND wo.order_id NOT IN (
+                      SELECT s.wc_orderid
+                      FROM toc_shipday s
+                      WHERE s.wc_orderid IS NOT NULL
+                  )
+            LEFT JOIN toc_stock st
+                   ON p.item_sku = st.sku
+                  AND st.shop_id = %s
+            GROUP BY p.item_sku, st.shop_id, st.stock_qty_date
+
+            UNION ALL
+
+            /* ---------------------------
+               All other shops - Lightspeed POS
+               --------------------------- */
+            SELECT
+                d.item_sku        AS item_sku,
+                b.store_customer  AS shop_id,
+                st.stock_qty_date AS stock_qty_date,
+                SUM(
+                    CASE
+                        WHEN b.time_of_sale > st.stock_qty_date
+                        THEN COALESCE(a.quantity, 0)
+                        ELSE 0
+                    END
+                ) AS sold_qty
+            FROM toc_product d
+            LEFT JOIN toc_ls_sales_item a
+                   ON d.item_sku = a.item_sku
+            LEFT JOIN toc_ls_sales b
+                   ON a.sales_id = b.sales_id
+            LEFT JOIN toc_stock st
+                   ON d.item_sku = st.sku
+                  AND b.store_customer = st.shop_id
+            WHERE b.store_customer <> %s
+            GROUP BY d.item_sku, b.store_customer, st.stock_qty_date
         ),
-        stock_data AS (
+
+        damaged_data AS (
             SELECT
+                d.sku,
+                d.shop_id,
+                SUM(d.rcv_damaged) AS total_damaged
+            FROM toc_damaged d
+            INNER JOIN toc_stock st
+                    ON d.sku = st.sku
+                   AND d.shop_id = st.shop_id
+            WHERE d.order_open_date > st.stock_qty_date
+            GROUP BY d.sku, d.shop_id
+        ),
+
+        stock_data AS (
+            SELECT DISTINCT
                 st.shop_name,
                 st.shop_id,
+                st.sku AS item_sku,
                 st.stock_qty_date,
-                st.final_stock_qty as gross_stock_qty,
-                st.stock_transfer,
-                COALESCE(sc.count_items, 0) AS count_items,
-         --       (st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) ) AS current_stock,
-         --       ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) ) * d.cost_price) AS total_cost_price,
-         --       ROUND((st.final_stock_qty + st.stock_transfer - COALESCE(sc.count_items, 0) ) * d.retail_price) AS total_retail_price
-                (st.final_stock_qty  - COALESCE(sc.count_items, 0) ) AS current_stock,
-                ROUND((st.final_stock_qty  - COALESCE(sc.count_items, 0) ) * d.cost_price) AS total_cost_price,
-                ROUND((st.final_stock_qty  - COALESCE(sc.count_items, 0) ) * d.retail_price) AS total_retail_price
+
+                /* current stock same as stock_count */
+                (COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) AS current_stock,
+
+                /* totals based on current_stock */
+                ROUND((COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) * COALESCE(p.cost_price, 0), 2)   AS total_cost_price,
+                ROUND((COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) * COALESCE(p.retail_price, 0), 2) AS total_retail_price
+
             FROM toc_stock st
-            JOIN toc_product d 
-              ON st.sku = d.item_sku
-            LEFT JOIN sales_counts sc 
-              ON st.sku = sc.sku 
-              AND st.shop_id = sc.shop_id
-              AND st.stock_qty_date = sc.stock_qty_date
-            WHERE d.acct_group <> 'Specials'
-              AND d.item_sku <> '9568'           -- Exclude refund item
-              AND st.final_stock_qty - COALESCE(sc.count_items, 0) > 0
+            JOIN toc_product p
+              ON p.item_sku = st.sku
+             AND p.acct_group NOT IN ('Specials', 'Non stock Item')
+            LEFT JOIN sales_data sd
+              ON sd.item_sku = st.sku
+             AND sd.shop_id = st.shop_id
+             AND sd.stock_qty_date = st.stock_qty_date
+            LEFT JOIN damaged_data dd
+              ON dd.sku = st.sku
+             AND dd.shop_id = st.shop_id
+            WHERE p.item_sku <> '9568'
+              AND (COALESCE(st.final_stock_qty, 0) - COALESCE(sd.sold_qty, 0)) > 0
         )
+
         SELECT
             shop_name,
-            SUM(total_cost_price) AS total_cost_price,
+            SUM(total_cost_price)   AS total_cost_price,
             SUM(total_retail_price) AS total_retail_price
         FROM stock_data
-        GROUP BY shop_name;
-            '''
+        GROUP BY shop_name
+        ORDER BY shop_name;
+    """
 
-    # Execute the query with the parameter
-    cursor.execute(query)
+    cursor.execute(query, (HEAD_OFFICE_ID, HEAD_OFFICE_ID))
     result = cursor.fetchall()
 
-    # Fetch column names
     columns = [col[0] for col in cursor.description]
-
-    # Convert result tuples to dictionaries
     result_as_dicts = [dict(zip(columns, row)) for row in result]
 
     cursor.close()
     conn.close()
 
     return result_as_dicts
+
 
 def get_back_order():
 
