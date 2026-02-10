@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 import datetime
 from datetime import datetime,timezone
 from datetime import datetime, date
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Numeric, Index
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Numeric, Index, Enum
 from sqlalchemy.orm import relationship
 from app import db
 
@@ -914,3 +914,7 @@ class TocStockTransferItem(db.Model):
     @property
     def qty_in_transit(self):
         return (self.qty_sent or 0) - (self.qty_received or 0)
+
+
+
+
