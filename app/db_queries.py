@@ -925,7 +925,7 @@ def get_stock_count_per_shop(shop):
                      ON p.item_sku = wi.sku
               LEFT JOIN toc_wc_sales_order wo
                      ON wi.order_id = wo.order_id
-                    AND wo.status <> 'wc-pending'
+                    AND wo.status = 'wc-completed'
                     AND wo.order_id NOT IN (
                         SELECT s.wc_orderid
                         FROM toc_shipday s
@@ -2550,7 +2550,7 @@ def get_stock_value():
                    ON p.item_sku = wi.sku
             LEFT JOIN toc_wc_sales_order wo
                    ON wi.order_id = wo.order_id
-                  AND wo.status <> 'wc-pending'
+                  AND wo.status = 'wc-completed'
                   AND wo.order_id NOT IN (
                       SELECT s.wc_orderid
                       FROM toc_shipday s
@@ -2733,7 +2733,7 @@ def get_stock_value_per_shop():
                         LEFT JOIN toc_wc_sales_items wi ON p.item_sku = wi.sku
                         LEFT JOIN toc_wc_sales_order wo
                                ON wi.order_id = wo.order_id
-                              AND wo.status <> 'wc-pending'
+                              AND wo.status = 'wc-completed'
                               AND wo.order_id NOT IN (
                                   SELECT s.wc_orderid FROM toc_shipday s WHERE s.wc_orderid IS NOT NULL
                               )
