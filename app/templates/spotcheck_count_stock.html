@@ -176,115 +176,112 @@
           });
         }
 
+function loadStockData(rows) {
+    console.log(rows);
 
-    function loadStockData(rows) {
-        console.log(rows);
+    // Calculate "Current Quantity" for each row before initializing the table
+    rows.forEach(row => {
+        row.in_transit = row.in_transit || 0;
 
-        // Calculate "Current Quantity" for each row before initializing the table
-        rows.forEach(row => {
-            // Perform the calculation for Current Quantity
-            row.current_qty = ((row.last_stock_count || 0) - (row.sold_qty || 0) + (row.received_qty || 0)).toFixed(3);
-        });
+        // ✅ NEW: deduct in_transit from current qty
+        row.current_qty = (
+            (row.last_stock_count || 0)
+            - (row.sold_qty || 0)
+            + (row.received_qty || 0)
+            - (row.in_transit || 0)
+        ).toFixed(3);
+    });
 
-        // Destroy existing DataTable if it exists
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
-        }
-
-        // Initialize DataTable
-        const table = $('#ProductOrderTemplate').DataTable({
-            data: rows,
-            columns: [
-                { title: "SKU", data: "sku" },
-                { title: "Product Name", data: "product_name" },
-                { title: "Last Stock Count", data: "last_stock_count" },
-                { title: "Last Stock Count Date", data: "last_stock_count_date" },
-                { title: "Sold Quantity", data: "sold_qty" },
-                { title: "Stock Movement", data: "received_qty" },
-                {
-                    title: "Current Quantity",
-                    data: "current_qty",
-                    render: function (data, type, row) {
-                        return `<span class="current-qty">${data || 0}</span>`;
-                    }
-                },
-                {
-                    title: "Stock Count",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        const currentStockCount = 0;
-                        return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
-                    }
-                },
-                {
-                    title: "Damaged Stock",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        const currentStockRejected = 0;
-                        return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
-                    }
-                },
-                {
-                  title: "Variance",
-                  data: null,
-                  render: function (data, type, row) {
-                      return `<span class="variance"></span>`;
-                  }
-                },
-    <!--            {-->
-    <!--                title: "Variance Reason",-->
-    <!--                data: null,-->
-    <!--                className: 'editable',-->
-    <!--                render: function (data, type, row) {-->
-    <!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
-    <!--                }-->
-    <!--            },-->
-                {
-                    title: "Comments",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        return `<input type="text" class="comments" value="" />`;
-                    }
-                }
-            ],
-    <!--        pageLength: 300,-->
-            order: [[6, 'desc']],
-            autoWidth: false,
-            paging: false,
-            searching: true,
-            responsive: true,
-            dom: 'frtip',
-        });
-
-        $('#ProductOrderTemplate').show();
-
-        // Update variance dynamically when the current stock count changes
-        $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
-            const row = $(this).closest('tr');
-            const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-            const calculatedQty = parseFloat(row.find('td:nth-child(7)').text()) || 0;
-            const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
-
-            const variance = calculatedQty - countedQty;
-
-            // Update variance
-            row.find('.variance').text(variance);
-
-            // Check if the difference exceeds 10%
-            const threshold = 0.1; // 10%
-            const difference = Math.abs(calculatedQty - countedQty);
-            //if (calculatedQty > 0 && (difference / calculatedQty) > threshold) {
-                // Set border to solid red 1px
-              //  row.find('.current-stock-count').css('border', '5px solid red');
-         //   } else {
-                // Reset border
-            //    row.find('.current-stock-count').css('border', '');
-          //  }
-        });
+    // Destroy existing DataTable if it exists
+    if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+        $('#ProductOrderTemplate').DataTable().destroy();
     }
+
+    // Initialize DataTable
+    const table = $('#ProductOrderTemplate').DataTable({
+        data: rows,
+        columns: [
+            { title: "SKU", data: "sku" },
+            { title: "Product Name", data: "product_name" },
+            { title: "Last Stock Count", data: "last_stock_count" },
+            { title: "Last Stock Count Date", data: "last_stock_count_date" },
+            { title: "Sold Quantity", data: "sold_qty" },
+            { title: "Stock Movement", data: "received_qty" },
+
+            // ✅ NEW COLUMN (right after Stock Movement)
+            {
+                title: "In Transit",
+                data: "in_transit",
+                render: function (data, type, row) {
+                    return `<span class="in-transit">${data || 0}</span>`;
+                }
+            },
+
+            {
+                title: "Current Quantity",
+                data: "current_qty",
+                render: function (data, type, row) {
+                    return `<span class="current-qty">${data || 0}</span>`;
+                }
+            },
+            {
+                title: "Stock Count",
+                data: null,
+                className: 'editable',
+                render: function (data, type, row) {
+                    const currentStockCount = 0;
+                    return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
+                }
+            },
+            {
+                title: "Damaged Stock",
+                data: null,
+                className: 'editable',
+                render: function (data, type, row) {
+                    const currentStockRejected = 0;
+                    return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
+                }
+            },
+            {
+              title: "Variance",
+              data: null,
+              render: function (data, type, row) {
+                  return `<span class="variance"></span>`;
+              }
+            },
+            {
+                title: "Comments",
+                data: null,
+                className: 'editable',
+                render: function (data, type, row) {
+                    return `<input type="text" class="comments" value="" />`;
+                }
+            }
+        ],
+
+        // ✅ Current Quantity moved one column right (was 6, now 7)
+        order: [[7, 'desc']],
+        autoWidth: false,
+        paging: false,
+        searching: true,
+        responsive: true,
+        dom: 'frtip',
+    });
+
+    $('#ProductOrderTemplate').show();
+
+    // Update variance dynamically when the current stock count changes
+    $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
+        const row = $(this).closest('tr');
+        const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
+        const calculatedQty = parseFloat(row.find('td:nth-child(8)').text()) || 0; // ✅ was 7, now 8
+        const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
+
+        const variance = calculatedQty - countedQty;
+        row.find('.variance').text(variance);
+    });
+}
+
 
 // Highlight the row as soon as the user types in "Stock Count".
 // If the field is cleared, remove the highlight.
@@ -296,7 +293,7 @@ $(document).off('input.counted').on('input.counted', '#ProductOrderTemplate .cur
     $row.addClass('counted-row');
 
     // (optional) also show variance immediately
-    const currentQty = parseFloat($row.find('td:nth-child(7)').text()) || 0;
+    const currentQty = parseFloat($row.find('td:nth-child(8)').text()) || 0;
     const variance = round2(currentQty - parseFloat(val || 0));
     $row.find('.variance').text(variance.toFixed(2));
 

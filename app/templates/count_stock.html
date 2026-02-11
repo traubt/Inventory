@@ -171,131 +171,143 @@
         }
 
 
-    function loadStockData(rows) {
-        console.log(rows);
+  function loadStockData(rows) {
+      console.log(rows);
 
-        // Calculate "Current Quantity" for each row before initializing the table
-        rows.forEach(row => {
-            // Perform the calculation for Current Quantity
-            row.current_qty = (row.last_stock_count || 0) - (row.sold_qty || 0) + (row.received_qty || 0);
-        });
+      // Calculate "Current Quantity" for each row before initializing the table
+      rows.forEach(row => {
+          // NEW: In Transit (default 0 for now)
+          row.in_transit = row.in_transit || 0;
 
-        // Destroy existing DataTable if it exists
-        if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
-            $('#ProductOrderTemplate').DataTable().destroy();
-        }
+          // ✅ Current Quantity = last_stock_count - sold + received - in_transit
+            row.current_qty =
+              (row.last_stock_count || 0)
+              - (row.sold_qty || 0)
+              + (row.received_qty || 0)
+              - (row.in_transit || 0);
 
-        // Initialize DataTable
-        const table = $('#ProductOrderTemplate').DataTable({
-            data: rows,
-            columns: [
-                { title: "SKU", data: "sku" },
-                { title: "Product Name", data: "product_name" },
-                { title: "Item Type", data: "item_type" },
-                { title: "Last Stock Count", data: "last_stock_count" },
-                { title: "Last Stock Count Date", data: "last_stock_count_date" },
-                { title: "Sold Quantity", data: "sold_qty" },
-                { title: "Stock Movement", data: "received_qty" },
-                {
-                    title: "Current Quantity",
-                    data: "current_qty",
-                    render: function (data, type, row) {
-                        return `<span class="current-qty">${data || 0}</span>`;
-                    }
-                },
-                {
-                    title: "Stock Count",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        const currentStockCount = 0;
-                        return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
-                    }
-                },
-                {
-                    title: "Damaged Stock",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        const currentStockRejected = 0;
-                        return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
-                    }
-                },
-                {
-                    title: "Variance",
-                    data: "current_qty",
-                    render: function (data, type, row) {
-                        return `<span class="variance">${data || 0}</span>`;
-                    }
-                },
-    <!--            {-->
-    <!--                title: "Variance Reason",-->
-    <!--                data: null,-->
-    <!--                className: 'editable',-->
-    <!--                render: function (data, type, row) {-->
-    <!--                    return `<input type="text" class="variance-reason" value="NA" />`;-->
-    <!--                }-->
-    <!--            },-->
-                {
-                    title: "Comments",
-                    data: null,
-                    className: 'editable',
-                    render: function (data, type, row) {
-                        return `<input type="text" class="comments" value="" />`;
-                    }
-                }
-            ],
-    <!--        pageLength: 300,-->
-            order: [[7, 'desc']],
-            autoWidth: false,
-            paging: false,
-            searching: true,
-            responsive: true,
-            dom: 'frtip',
-        });
+      });
 
-        $('#ProductOrderTemplate').show();
+      // Destroy existing DataTable if it exists
+      if ($.fn.DataTable.isDataTable('#ProductOrderTemplate')) {
+          $('#ProductOrderTemplate').DataTable().destroy();
+      }
 
-        // After table initialization, check variance for each row
-        table.rows().every(function () {
-            const row = this.node();
-            const $row = $(row); // ✅ FIX
-            const data = this.data();
+      // Initialize DataTable
+      const table = $('#ProductOrderTemplate').DataTable({
+          data: rows,
+          columns: [
+              { title: "SKU", data: "sku" },
+              { title: "Product Name", data: "product_name" },
+              { title: "Item Type", data: "item_type" },
+              { title: "Last Stock Count", data: "last_stock_count" },
+              { title: "Last Stock Count Date", data: "last_stock_count_date" },
+              { title: "Sold Quantity", data: "sold_qty" },
 
-            const currentQty = parseFloat(data.current_qty) || 0;
-            const countedQty = parseFloat($row.find('.current-stock-count').val()) || 0;
+              { title: "Stock Movement", data: "received_qty" },
 
-            const variance = round2(currentQty - countedQty);
-            $row.find('.variance').text(variance.toFixed(2));
+              // ✅ NEW COLUMN (right after Stock Movement)
+              {
+                  title: "In Transit",
+                  data: "in_transit",
+                  render: function (data, type, row) {
+                      return `<span class="in-transit">${data || 0}</span>`;
+                  }
+              },
 
-            if (variance !== 0) {
-                $row.find('.current-stock-count').css('border', '5px solid red');
-            }
-        });
+              {
+                  title: "Current Quantity",
+                  data: "current_qty",
+                  render: function (data, type, row) {
+                      return `<span class="current-qty">${data || 0}</span>`;
+                  }
+              },
+              {
+                  title: "Stock Count",
+                  data: null,
+                  className: 'editable',
+                  render: function (data, type, row) {
+                      const currentStockCount = 0;
+                      return `<input type="number" class="current-stock-count" value="${currentStockCount}" min="0" step="1" />`;
+                  }
+              },
+              {
+                  title: "Damaged Stock",
+                  data: null,
+                  className: 'editable',
+                  render: function (data, type, row) {
+                      const currentStockRejected = 0;
+                      return `<input type="number" class="current-stock-rejected" value="${currentStockRejected}" min="0" step="1" />`;
+                  }
+              },
+              {
+                  title: "Variance",
+                  data: "current_qty",
+                  render: function (data, type, row) {
+                      return `<span class="variance">${data || 0}</span>`;
+                  }
+              },
+              {
+                  title: "Comments",
+                  data: null,
+                  className: 'editable',
+                  render: function (data, type, row) {
+                      return `<input type="text" class="comments" value="" />`;
+                  }
+              }
+          ],
+
+          // ✅ Was [[7,'desc']] but Current Quantity moved one column right
+          order: [[8, 'desc']],
+
+          autoWidth: false,
+          paging: false,
+          searching: true,
+          responsive: true,
+          dom: 'frtip',
+      });
+
+      $('#ProductOrderTemplate').show();
+
+      // After table initialization, check variance for each row
+      table.rows().every(function () {
+          const row = this.node();
+          const $row = $(row);
+          const data = this.data();
+
+          const currentQty = parseFloat(data.current_qty) || 0;
+          const countedQty = parseFloat($row.find('.current-stock-count').val()) || 0;
+
+          const variance = round2(currentQty - countedQty);
+          $row.find('.variance').text(variance.toFixed(2));
+
+          if (variance !== 0) {
+              $row.find('.current-stock-count').css('border', '5px solid red');
+          }
+      });
+
+      // Update variance dynamically when the current stock count changes
+      $('#ProductOrderTemplate').off('input.stockcount').on('input.stockcount', '.current-stock-count, .current-stock-rejected', function () {
+          const row = $(this).closest('tr');
+          const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
+
+          // ✅ Current Quantity column moved from 8 → 9
+          const calculatedQty = parseFloat(row.find('td:nth-child(9)').text()) || 0;
+
+          const variance = round2(calculatedQty - countedQty);
+          row.find('.variance').text(variance.toFixed(2));
+
+          const threshold = 0.1; // 10%
+          const difference = Math.abs(calculatedQty - countedQty);
+          if (calculatedQty > 0 && (difference / calculatedQty) > threshold) {
+              row.find('.current-stock-count').css('border', '5px solid red');
+          } else {
+              row.find('.current-stock-count').css('border', '');
+          }
+      });
+  }
 
 
-        // Update variance dynamically when the current stock count changes
-        $('#ProductOrderTemplate').on('input', '.current-stock-count, .current-stock-rejected', function () {
-            const row = $(this).closest('tr');
-            const countedQty = parseFloat(row.find('.current-stock-count').val()) || 0;
-            const calculatedQty = parseFloat(row.find('td:nth-child(8)').text()) || 0;
-            const rejectedQty = parseFloat(row.find('.current-stock-rejected').val()) || 0;
-
-            const variance = round2(calculatedQty - countedQty);
-            row.find('.variance').text(variance.toFixed(2));
-
-            // Check if the difference exceeds 10%
-            const threshold = 0.1; // 10%
-            const difference = Math.abs(calculatedQty - countedQty);
-            if (calculatedQty > 0 && (difference / calculatedQty) > threshold) {
-                // Set border to solid red 1px
-                row.find('.current-stock-count').css('border', '5px solid red');
-            } else {
-                // Reset border
-                row.find('.current-stock-count').css('border', '');
-            }
-        });
-    }
 
 
  $(document).ready(async function() {
@@ -540,7 +552,8 @@ $("#saveOrder").off("click").on("click", async function () {
       last_stock_count: parseFloat(row.find("td:nth-child(4)").text().trim()) || 0,
       last_stock_count_date: row.find("td:nth-child(5)").text().trim(),
       sold_qty: parseFloat(row.find("td:nth-child(6)").text().trim()) || 0,
-      current_qty: parseFloat(row.find("td:nth-child(8)").text().trim()) || 0, // ✅ was 7
+      in_transit: parseFloat(row.find("td:nth-child(8)").text().trim()) || 0,
+      current_qty: parseFloat(row.find("td:nth-child(9)").text().trim()) || 0,
       stock_count: parseFloat(row.find(".current-stock-count").val()) || 0,
       stock_rejected: parseFloat(row.find(".current-stock-rejected").val()) || 0,
       variance: parseFloat(row.find(".variance").text().trim()) || 0,
@@ -1039,7 +1052,7 @@ $('#ProductOrderTemplate').on('change', 'input', function() {
             commentsInput.val(savedItem.comments || "");
 
             // Recalculate variance
-            const currentQty = parseFloat(row.find("td:nth-child(8)").text()) || 0;
+            const currentQty = parseFloat(row.find("td:nth-child(9)").text()) || 0;
             const countedQty = parseFloat(stockCountInput.val()) || 0;
             const variance = round2(currentQty - countedQty);
             row.find('.variance').text(variance.toFixed(2));

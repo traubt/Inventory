@@ -1139,29 +1139,107 @@ def get_product_replenish_form():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+def get_in_transit_by_shop(shop_customer: str):
+    """
+    OUTGOING in-transit for a shop (from_shop_id).
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    q = """
+        SELECT
+            ti.sku,
+            SUM(COALESCE(ti.qty_sent,0) - COALESCE(ti.qty_received,0)) AS in_transit_qty
+        FROM toc_stock_transfer t
+        JOIN toc_stock_transfer_item ti
+          ON ti.transfer_id = t.transfer_id
+        WHERE t.from_shop_id = %s
+          AND t.received_at IS NULL
+        GROUP BY ti.sku
+    """
+    cursor.execute(q, (shop_customer,))
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return {str(r[0]): float(r[1] or 0) for r in rows}
+
+
+
+# @main.route('/get_stock_count_form', methods=['GET'])
+# def get_stock_count_form():
+#     try:
+#         shop_data = json.loads(session.get('shop'))
+#         selected_shop = shop_data['name']
+#         print(f"Selected shop from client: {selected_shop}")
+#
+#         data = get_stock_count_per_shop(selected_shop)
+#
+#         if not data:
+#             return jsonify({"message": "Error fetching stock order form data"}), 500
+#
+#         formatted_data = [
+#             {
+#                 "sku": row[0],
+#                 "product_name": row[1],
+#                 "item_type": row[2],          # ✅ NEW
+#                 "store_code": row[3],
+#                 "last_stock_count": row[5],
+#                 "last_stock_count_date": row[6],
+#                 "sold_qty": row[7],
+#                 "current_qty": row[8],
+#                 "received_qty": row[9]
+#             }
+#             for row in data
+#         ]
+#
+#         return jsonify(formatted_data)
+#
+#     except Exception as e:
+#         print(f"Error: {str(e)}")
+#         return jsonify({"status": "error", "message": str(e)}), 500
+
 @main.route('/get_stock_count_form', methods=['GET'])
 def get_stock_count_form():
     try:
-        shop_data = json.loads(session.get('shop'))
+        shop_data_raw = session.get('shop')
+        if not shop_data_raw:
+            return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+        shop_data = json.loads(shop_data_raw)
         selected_shop = shop_data['name']
         print(f"Selected shop from client: {selected_shop}")
 
         data = get_stock_count_per_shop(selected_shop)
-
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
+
+        # ✅ shop_customer comes from the result itself (row[3])
+        shop_customer = str(data[0][3]) if data and data[0] and data[0][3] else None
+
+        in_transit_map = {}
+        if shop_customer:
+            try:
+                in_transit_map = get_in_transit_by_shop(shop_customer)
+            except Exception as ex:
+                # do not break stock count if in-transit fails
+                print(f"In-transit query failed: {ex}")
+                in_transit_map = {}
 
         formatted_data = [
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "item_type": row[2],          # ✅ NEW
+                "item_type": row[2],
                 "store_code": row[3],
                 "last_stock_count": row[5],
                 "last_stock_count_date": row[6],
                 "sold_qty": row[7],
                 "current_qty": row[8],
-                "received_qty": row[9]
+                "received_qty": row[9],
+
+                # ✅ NEW FIELD
+                "in_transit": float(in_transit_map.get(str(row[0]), 0))
             }
             for row in data
         ]
@@ -1171,6 +1249,7 @@ def get_stock_count_form():
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 
