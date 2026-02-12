@@ -2348,7 +2348,7 @@ def update_count_receive_stock():
 
             # --- 6) Apply sending shop updates ---
             # ✅ FIX: movement at sender must reflect full sent qty
-            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - out_qty
+            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - out_qty - rcv_damaged
             sending_stock.audit_count = send_new
 
             # --- 7) Update the replenishment line ---
