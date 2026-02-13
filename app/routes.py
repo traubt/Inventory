@@ -4492,61 +4492,98 @@ from sqlalchemy import bindparam
 from datetime import datetime, timedelta
 from sqlalchemy import text, bindparam
 
-@main.route('/get_stock_movement', methods=['POST'])
-def get_stock_movement():
-    data = request.json
+from sqlalchemy import text, bindparam
+from datetime import datetime, timedelta
 
-    shop = data.get('shop')
-    items = data.get('items', [])
-    fromDate = data.get('fromDate')
-    toDate = data.get('toDate')
+from sqlalchemy import text, bindparam
+from datetime import datetime, timedelta
+
+from datetime import datetime, timedelta
+from sqlalchemy import text, bindparam
+
+@main.route('/get_stock_movement', methods=['GET', 'POST'])
+def get_stock_movement():
+
+    # Accept both POST JSON and GET querystring
+    payload = request.get_json(silent=True) if request.method == "POST" else request.args
+
+    shop = payload.get('shop')
+    items = payload.get('items')
+    fromDate = payload.get('fromDate')
+    toDate = payload.get('toDate')
+
+    # Normalize items -> list[str]
+    if isinstance(items, str):
+        items = [x.strip() for x in items.split(",") if x.strip()]
+    elif items is None:
+        items = []
 
     if not shop or not items or not fromDate or not toDate:
         return jsonify({"error": "Missing required parameters"}), 400
 
     # Make toDate inclusive
-    # We'll query: >= fromDate AND < toDate + 1 day
     try:
         toDateExclusive = (datetime.strptime(toDate, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
     except Exception:
         toDateExclusive = toDate
 
-    # TOC999 = Cannafoods International
     is_head_office = (shop == "TOC999")
 
+    # What the UI expects
+    columns = [
+        {"title": "id"},
+        {"title": "creation_date"},
+        {"title": "shop_id"},
+        {"title": "sku"},
+        {"title": "product_name"},
+        {"title": "stock_count"},
+        {"title": "shop_name"},
+        {"title": "comments"},
+    ]
+
     if is_head_office:
+        # ✅ Show:
+        #   - non WC rows always
+        #   - WC rows only when wo.status = 'wc-completed'
         sql = text("""
-            SELECT
-                a.id,
-                a.creation_date,
-                a.shop_id,
-                a.sku,
-                a.product_name,
-                a.stock_count,
-                a.shop_name,
-                a.comments
-            FROM toc_stock_audit a
-            LEFT JOIN toc_wc_sales_order wo
-              ON wo.order_id = CASE
-                    WHEN a.comments LIKE 'WC sale %'
-                    THEN CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(a.comments, 'WC sale ', -1), ';', 1) AS UNSIGNED)
-                    ELSE NULL
-                END
-            WHERE a.shop_id = :shop
-              AND a.sku IN :items
-              AND a.creation_date >= :fromDate
-              AND a.creation_date < :toDateExclusive
-              AND (
-                    a.comments NOT LIKE 'WC sale %'
-                    OR wo.status = 'wc-completed'
-                  )
-            ORDER BY a.sku ASC, a.creation_date DESC
+            (
+              SELECT
+                a.id, a.creation_date, a.shop_id, a.sku, a.product_name,
+                a.stock_count, a.shop_name, a.comments
+              FROM toc_stock_audit a
+              WHERE a.shop_id = :shop
+                AND a.sku IN :items
+                AND a.creation_date >= :fromDate
+                AND a.creation_date < :toDateExclusive
+                AND a.comments NOT LIKE 'WC sale %'
+            )
+            UNION ALL
+            (
+              SELECT
+                a.id, a.creation_date, a.shop_id, a.sku, a.product_name,
+                a.stock_count, a.shop_name, a.comments
+              FROM toc_stock_audit a
+              JOIN toc_wc_sales_order wo
+                ON wo.order_id = CAST(
+                      SUBSTRING_INDEX(
+                        SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+                        ';', 1
+                      ) AS UNSIGNED
+                   )
+              WHERE a.shop_id = :shop
+                AND a.sku IN :items
+                AND a.creation_date >= :fromDate
+                AND a.creation_date < :toDateExclusive
+                AND a.comments LIKE 'WC sale %'
+                AND wo.status = 'wc-completed'
+            )
+            ORDER BY sku ASC, creation_date DESC
         """).bindparams(bindparam("items", expanding=True))
     else:
-        # No change for other shops
         sql = text("""
             SELECT
-                id, creation_date, shop_id, sku, product_name, stock_count, shop_name, comments
+              id, creation_date, shop_id, sku, product_name,
+              stock_count, shop_name, comments
             FROM toc_stock_audit
             WHERE shop_id = :shop
               AND sku IN :items
@@ -4562,8 +4599,18 @@ def get_stock_movement():
         "toDateExclusive": toDateExclusive
     }).fetchall()
 
-    results_dict = [dict(row._mapping) for row in results]
-    return jsonify(results_dict)
+    rows = []
+    for r in results:
+        d = dict(r._mapping)
+
+        # Optional: make sure datetime serializes cleanly for JS
+        if isinstance(d.get("creation_date"), datetime):
+            d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+
+        rows.append(d)
+
+    # ✅ THIS is what your stock_movement.html expects
+    return jsonify({"columns": columns, "data": rows})
 
 
 
