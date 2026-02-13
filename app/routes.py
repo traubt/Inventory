@@ -4490,41 +4490,81 @@ def stock_movement():
 from sqlalchemy import bindparam
 
 from datetime import datetime, timedelta
-from sqlalchemy import bindparam, text
+from sqlalchemy import text, bindparam
 
-@main.route("/get_stock_movement")
+@main.route('/get_stock_movement', methods=['POST'])
 def get_stock_movement():
-    shop = request.args.get("shop")
-    items = tuple(request.args.get("items").split(","))
-    fromDate = request.args.get("fromDate")      # 'YYYY-MM-DD'
-    toDate = request.args.get("toDate")          # 'YYYY-MM-DD'
+    data = request.json
 
-    # Make the "to" date inclusive: use next day as an exclusive upper bound
-    toDate_exclusive = (datetime.strptime(toDate, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    shop = data.get('shop')
+    items = data.get('items', [])
+    fromDate = data.get('fromDate')
+    toDate = data.get('toDate')
 
-    sql = text("""
-        SELECT id, creation_date, shop_id, sku, product_name, stock_count, shop_name, comments
-        FROM toc_stock_audit
-        WHERE shop_id = :shop
-          AND sku IN :items
-          AND creation_date >= :fromDate
-          AND creation_date < :toDateExclusive
-        ORDER BY sku ASC, creation_date DESC
-    """).bindparams(bindparam("items", expanding=True))
+    if not shop or not items or not fromDate or not toDate:
+        return jsonify({"error": "Missing required parameters"}), 400
 
-    result = db.session.execute(sql, {
+    # Make toDate inclusive
+    # We'll query: >= fromDate AND < toDate + 1 day
+    try:
+        toDateExclusive = (datetime.strptime(toDate, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    except Exception:
+        toDateExclusive = toDate
+
+    # TOC999 = Cannafoods International
+    is_head_office = (shop == "TOC999")
+
+    if is_head_office:
+        sql = text("""
+            SELECT
+                a.id,
+                a.creation_date,
+                a.shop_id,
+                a.sku,
+                a.product_name,
+                a.stock_count,
+                a.shop_name,
+                a.comments
+            FROM toc_stock_audit a
+            LEFT JOIN toc_wc_sales_order wo
+              ON wo.order_id = CASE
+                    WHEN a.comments LIKE 'WC sale %'
+                    THEN CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(a.comments, 'WC sale ', -1), ';', 1) AS UNSIGNED)
+                    ELSE NULL
+                END
+            WHERE a.shop_id = :shop
+              AND a.sku IN :items
+              AND a.creation_date >= :fromDate
+              AND a.creation_date < :toDateExclusive
+              AND (
+                    a.comments NOT LIKE 'WC sale %'
+                    OR wo.status = 'wc-completed'
+                  )
+            ORDER BY a.sku ASC, a.creation_date DESC
+        """).bindparams(bindparam("items", expanding=True))
+    else:
+        # No change for other shops
+        sql = text("""
+            SELECT
+                id, creation_date, shop_id, sku, product_name, stock_count, shop_name, comments
+            FROM toc_stock_audit
+            WHERE shop_id = :shop
+              AND sku IN :items
+              AND creation_date >= :fromDate
+              AND creation_date < :toDateExclusive
+            ORDER BY sku ASC, creation_date DESC
+        """).bindparams(bindparam("items", expanding=True))
+
+    results = db.session.execute(sql, {
         "shop": shop,
         "items": items,
         "fromDate": fromDate,
-        "toDateExclusive": toDate_exclusive
-    }).mappings().all()
+        "toDateExclusive": toDateExclusive
+    }).fetchall()
 
-    rows = [dict(r) for r in result]
-    if not rows:
-        return jsonify({"columns": [], "data": []})
+    results_dict = [dict(row._mapping) for row in results]
+    return jsonify(results_dict)
 
-    columns = [{"title": col} for col in rows[0].keys()]
-    return jsonify({"columns": columns, "data": rows})
 
 
 ############################## END ONLINE SALES GOOGLE API section######################################
