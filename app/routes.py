@@ -1250,9 +1250,6 @@ def get_stock_count_form():
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-
-
 @main.route('/get_stock_order_form', methods=['GET'])
 def get_stock_order_form():
     try:
@@ -1261,20 +1258,20 @@ def get_stock_order_form():
             return jsonify({"status": "error", "message": "Not logged in"}), 401
 
         shop_data = json.loads(shop_data_raw)
-        selected_shop = shop_data['name']
+        selected_shop = shop_data.get('name', '')
         print(f"Selected shop from client: {selected_shop}")
 
-        # ✅ Use the working stock-count dataset (matches the Order Stock screen columns)
-        data = get_stock_count_per_shop(selected_shop)
+        # ✅ Non-stock items list only (no shop-specific stock logic)
+        data = get_stock_order()
 
-        if not data:
+        if data is None:
             return jsonify({"message": "Error fetching stock order form data"}), 500
 
         formatted_data = [
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "store_code": row[3],             # not shown in UI, but harmless to include
+                "store_code": row[3],
                 "last_stock_count": row[5],
                 "last_stock_count_date": row[6],
                 "sold_qty": row[7],
@@ -1289,8 +1286,6 @@ def get_stock_order_form():
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
 
 @main.route('/get_receive_stock_form', methods=['GET'])
 def get_receive_stock_form():

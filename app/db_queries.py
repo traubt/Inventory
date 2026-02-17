@@ -893,6 +893,54 @@ def get_replenish_order_form(order_id, shop, threshold, replenish):
     conn.close()
     return result
 
+def get_stock_order():
+    """
+    Returns ONLY products where toc_product.stat_group = 'Non stock Item'.
+
+    Output columns match the old stock-count format so the UI mapping stays stable:
+      0 sku
+      1 product_name
+      2 item_type
+      3 store_code
+      4 shop_name
+      5 last_stock_count
+      6 last_stock_count_date
+      7 sold_qty
+      8 current_qty
+      9 received_qty
+    """
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT
+            p.item_sku AS sku,
+            p.item_name AS product_name,
+            p.item_type AS item_type,
+
+            '' AS store_code,
+            '' AS shop_name,
+
+            0 AS last_stock_count,
+            NULL AS last_stock_count_date,
+            0 AS sold_qty,
+            0 AS current_qty,
+            0 AS received_qty
+        FROM toc_product p
+        WHERE p.stat_group = 'Non stock Item'
+        ORDER BY p.item_name
+    """
+
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return rows
+
+
 def get_stock_count_per_shop(shop):
 
     conn = get_db_connection()
