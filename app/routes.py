@@ -1256,27 +1256,30 @@ def get_stock_count_form():
 @main.route('/get_stock_order_form', methods=['GET'])
 def get_stock_order_form():
     try:
-        shop_data = json.loads(session.get('shop'))
+        shop_data_raw = session.get('shop')
+        if not shop_data_raw:
+            return jsonify({"status": "error", "message": "Not logged in"}), 401
+
+        shop_data = json.loads(shop_data_raw)
         selected_shop = shop_data['name']
-        # Print the selected shop value
         print(f"Selected shop from client: {selected_shop}")
 
-        data = get_stock_order_per_shop(selected_shop)
-    #
+        # ✅ Use the working stock-count dataset (matches the Order Stock screen columns)
+        data = get_stock_count_per_shop(selected_shop)
+
         if not data:
             return jsonify({"message": "Error fetching stock order form data"}), 500
-    #
-        # Format the data for the client
+
         formatted_data = [
             {
                 "sku": row[0],
                 "product_name": row[1],
-                "store_code" :row[2],
-                "last_stock_count": row[4],
-                "last_stock_count_date": row[5],
-                "sold_qty": row[6],
-                "current_qty": row[7],
-                "received_qty" : row[8]
+                "store_code": row[3],             # not shown in UI, but harmless to include
+                "last_stock_count": row[5],
+                "last_stock_count_date": row[6],
+                "sold_qty": row[7],
+                "current_qty": row[8],
+                "received_qty": row[9],
             }
             for row in data
         ]
@@ -1284,9 +1287,9 @@ def get_stock_order_form():
         return jsonify(formatted_data)
 
     except Exception as e:
-        # Handle any errors
         print(f"Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @main.route('/get_receive_stock_form', methods=['GET'])
