@@ -50,7 +50,7 @@
             <select id="finishedSku" class="form-select">
               <option value="">-- Select Product --</option>
               {% for p in finished_products %}
-                <option value="{{ p.sku }}">{{ p.sku }} — {{ p.name }}</option>
+                <option value="{{ p.sku }}">{{ p.name }} — {{ p.sku }}</option>
               {% endfor %}
             </select>
           </div>
