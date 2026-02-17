@@ -2286,13 +2286,13 @@ def update_count_receive_stock():
         for row in table:
             sku           = row.get('sku', '')
             product_name  = row.get('product_name', '')
-            sent_qty      = float(row.get('sent_qty', 0) or 0)           # what left source
+            sent_qty      = float(row.get('sent_qty', 0) or 0)           # what left source (FULL sent)
             received_qty  = float(row.get('received_qty', 0) or 0)       # what arrived at dest (may include damaged)
             rcv_damaged   = float(row.get('received_damaged', 0) or 0)
             variance      = float(row.get('variance', 0) or 0)
             comments      = row.get('comments', '')
 
-            # Safety: sender should always lose SENT qty (including damaged)
+            # Safety: sender should always lose FULL SENT qty (including damaged)
             out_qty = sent_qty if sent_qty > 0 else received_qty
 
             # --- 1) Receiving shop record ---
@@ -2332,12 +2332,12 @@ def update_count_receive_stock():
                 sending_stock.final_stock_qty if sending_stock.final_stock_qty is not None else 0.0
             )
 
-            # ✅ FIX: sending shop loses FULL sent qty (including damaged)
+            # Sender loses FULL sent qty (damaged included in out_qty)
             send_new = send_prior - out_qty
 
             # --- 5) Apply receiving shop updates ---
-            # Keep original behavior: movement shown at receiver is received_qty (you already like this)
-            recv_stock.stock_transfer = (recv_stock.stock_transfer or 0) + received_qty
+            # ✅ FIX: receiver movement should be NET (not full received if some damaged)
+            recv_stock.stock_transfer = (recv_stock.stock_transfer or 0) + net_in
             recv_stock.rcv_damaged = rcv_damaged
             recv_stock.rejects_qty = float(repl_line.rejected_qty or 0)
 
@@ -2345,8 +2345,8 @@ def update_count_receive_stock():
             recv_stock.audit_count = recv_new
 
             # --- 6) Apply sending shop updates ---
-            # ✅ FIX: movement at sender must reflect full sent qty
-            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - out_qty - rcv_damaged
+            # ✅ FIX: sender movement must be FULL sent qty only (do NOT subtract damaged again)
+            sending_stock.stock_transfer = (sending_stock.stock_transfer or 0) - out_qty
             sending_stock.audit_count = send_new
 
             # --- 7) Update the replenishment line ---
@@ -2381,17 +2381,15 @@ def update_count_receive_stock():
                 ))
 
             # --- 10) AUDIT rows for both shops ---
-            # Receiving audit (shows running after receipt)
             log_stock_audit_entry(
                 shop_id=shop,
                 sku=sku,
                 product_name=product_name,
                 stock_count=recv_new,
                 shop_name=shop_name,
-                comments=f"Transfer IN: +{received_qty} (damaged {rcv_damaged}) • order {replenish_order_id}"
+                comments=f"Transfer IN: +{net_in} (received {received_qty}, damaged {rcv_damaged}) • order {replenish_order_id}"
             )
 
-            # Sending audit (shows running after shipment) ✅ uses out_qty
             send_shop_name = getattr(sending_stock, "shop_name", None) or "Source"
             log_stock_audit_entry(
                 shop_id=sending_stock.shop_id,
@@ -2412,15 +2410,15 @@ def update_count_receive_stock():
             ctrl.order_status_date = datetime.now(timezone.utc)
 
         # -------------------------------
-        # NEW: mark transfer received + sync qty_received
+        # Mark transfer received + sync qty_received
         # -------------------------------
         try:
             _mark_transfer_received(replenish_order_id)
         except Exception:
-            _safe_log_exc("Stock transfer bookkeeping failed in update_count_receive_stock_v2")
+            _safe_log_exc("Stock transfer bookkeeping failed in update_count_receive_stock")
 
         db.session.commit()
-        return jsonify({"status": "success", "message": "Stock data updated successfully (v2)"})
+        return jsonify({"status": "success", "message": "Stock data updated successfully"})
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -2429,8 +2427,10 @@ def update_count_receive_stock():
 
     except Exception as e:
         db.session.rollback()
-        logger.exception("Error in update_count_receive_stock_v2:")
+        logger.exception("Error in update_count_receive_stock:")
         return jsonify({"status": "error", "message": "An unexpected error occurred", "error": str(e)}), 500
+
+
 
 
 @main.route('/save_count_receive_stock', methods=['POST'])
