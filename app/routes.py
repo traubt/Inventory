@@ -4501,6 +4501,9 @@ from sqlalchemy import text, bindparam
 
 @main.route('/get_stock_movement', methods=['GET', 'POST'])
 def get_stock_movement():
+    from sqlalchemy import text, bindparam
+    from datetime import datetime, timedelta
+    import json
 
     # Accept both POST JSON and GET querystring
     payload = request.get_json(silent=True) if request.method == "POST" else request.args
@@ -4527,7 +4530,6 @@ def get_stock_movement():
 
     is_head_office = (shop == "TOC999")
 
-    # What the UI expects
     columns = [
         {"title": "id"},
         {"title": "creation_date"},
@@ -4539,45 +4541,7 @@ def get_stock_movement():
         {"title": "comments"},
     ]
 
-    if is_head_office:
-        # ✅ Show:
-        #   - non WC rows always
-        #   - WC rows only when wo.status = 'wc-completed'
-        sql = text("""
-            (
-              SELECT
-                a.id, a.creation_date, a.shop_id, a.sku, a.product_name,
-                a.stock_count, a.shop_name, a.comments
-              FROM toc_stock_audit a
-              WHERE a.shop_id = :shop
-                AND a.sku IN :items
-                AND a.creation_date >= :fromDate
-                AND a.creation_date < :toDateExclusive
-                AND a.comments NOT LIKE 'WC sale %'
-            )
-            UNION ALL
-            (
-              SELECT
-                a.id, a.creation_date, a.shop_id, a.sku, a.product_name,
-                a.stock_count, a.shop_name, a.comments
-              FROM toc_stock_audit a
-              JOIN toc_wc_sales_order wo
-                ON wo.order_id = CAST(
-                      SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
-                        ';', 1
-                      ) AS UNSIGNED
-                   )
-              WHERE a.shop_id = :shop
-                AND a.sku IN :items
-                AND a.creation_date >= :fromDate
-                AND a.creation_date < :toDateExclusive
-                AND a.comments LIKE 'WC sale %'
-                AND wo.status = 'wc-completed'
-            )
-            ORDER BY sku ASC, creation_date DESC
-        """).bindparams(bindparam("items", expanding=True))
-    else:
+    if not is_head_office:
         sql = text("""
             SELECT
               id, creation_date, shop_id, sku, product_name,
@@ -4587,8 +4551,70 @@ def get_stock_movement():
               AND sku IN :items
               AND creation_date >= :fromDate
               AND creation_date < :toDateExclusive
-            ORDER BY sku ASC, creation_date DESC
+            ORDER BY sku ASC, creation_date DESC, id DESC
         """).bindparams(bindparam("items", expanding=True))
+
+        results = db.session.execute(sql, {
+            "shop": shop,
+            "items": items,
+            "fromDate": fromDate,
+            "toDateExclusive": toDateExclusive
+        }).fetchall()
+
+        rows = []
+        for r in results:
+            d = dict(r._mapping)
+            if isinstance(d.get("creation_date"), datetime):
+                d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+            rows.append(d)
+
+        return jsonify({"columns": columns, "data": rows})
+
+    # ----------------------------
+    # TOC999 (Head Office) logic:
+    # Fetch ALL rows once, attach WC status,
+    # then compute a synthetic balance that ignores hidden WC rows.
+    # ----------------------------
+    sql = text("""
+        SELECT
+          a.id,
+          a.creation_date,
+          a.shop_id,
+          a.sku,
+          a.product_name,
+          a.stock_count,
+          a.shop_name,
+          a.comments,
+
+          -- Extract order_id ONLY for WC sale rows
+          CASE
+            WHEN a.comments LIKE 'WC sale %' THEN CAST(
+                SUBSTRING_INDEX(
+                  SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+                  ';', 1
+                ) AS UNSIGNED
+            )
+            ELSE NULL
+          END AS wc_order_id,
+
+          wo.status AS wc_status
+        FROM toc_stock_audit a
+        LEFT JOIN toc_wc_sales_order wo
+          ON wo.order_id = CASE
+              WHEN a.comments LIKE 'WC sale %' THEN CAST(
+                  SUBSTRING_INDEX(
+                    SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+                    ';', 1
+                  ) AS UNSIGNED
+              )
+              ELSE NULL
+          END
+        WHERE a.shop_id = :shop
+          AND a.sku IN :items
+          AND a.creation_date >= :fromDate
+          AND a.creation_date < :toDateExclusive
+        ORDER BY a.sku ASC, a.creation_date DESC, a.id DESC
+    """).bindparams(bindparam("items", expanding=True))
 
     results = db.session.execute(sql, {
         "shop": shop,
@@ -4597,18 +4623,84 @@ def get_stock_movement():
         "toDateExclusive": toDateExclusive
     }).fetchall()
 
-    rows = []
-    for r in results:
-        d = dict(r._mapping)
+    # Convert to dict rows + keep datetime as datetime for now
+    all_rows = [dict(r._mapping) for r in results]
 
-        # Optional: make sure datetime serializes cleanly for JS
-        if isinstance(d.get("creation_date"), datetime):
-            d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+    # Group per SKU (because balances are per SKU)
+    by_sku = {}
+    for d in all_rows:
+        by_sku.setdefault(str(d["sku"]), []).append(d)
 
-        rows.append(d)
+    output_rows = []
 
-    # ✅ THIS is what your stock_movement.html expects
-    return jsonify({"columns": columns, "data": rows})
+    for sku, rows in by_sku.items():
+        # rows already sorted DESC by creation_date/id due to SQL
+
+        # 1) compute delta for each row in the FULL list
+        # delta(row_i) = stock_count_i - stock_count_(i+1)
+        # (i is newer than i+1)
+        for i in range(len(rows)):
+            if i < len(rows) - 1:
+                rows[i]["__delta"] = (rows[i]["stock_count"] or 0) - (rows[i+1]["stock_count"] or 0)
+            else:
+                rows[i]["__delta"] = None  # oldest in range
+
+        # 2) filter rows to DISPLAY:
+        # non-WC always, WC only if completed
+        displayed = []
+        for r in rows:
+            is_wc = isinstance(r.get("comments"), str) and r["comments"].startswith("WC sale ")
+            if not is_wc:
+                displayed.append(r)
+            else:
+                if r.get("wc_status") == "wc-completed":
+                    displayed.append(r)
+
+        # 3) recompute synthetic running balance across displayed rows only
+        # Keep top displayed balance as-is, then walk down using ONLY displayed deltas.
+        if displayed:
+            displayed[0]["__synthetic_stock_count"] = displayed[0]["stock_count"]
+
+            for j in range(1, len(displayed)):
+                prev = displayed[j - 1]
+                prev_synth = prev.get("__synthetic_stock_count")
+                prev_delta = prev.get("__delta")
+
+                # If delta missing (edge case), fall back to original
+                if prev_synth is None or prev_delta is None:
+                    displayed[j]["__synthetic_stock_count"] = displayed[j]["stock_count"]
+                else:
+                    # older = newer - delta(newer)
+                    displayed[j]["__synthetic_stock_count"] = prev_synth - prev_delta
+
+        # 4) build output rows (same columns as UI expects)
+        for r in displayed:
+            d = {
+                "id": r["id"],
+                "creation_date": r["creation_date"],
+                "shop_id": r["shop_id"],
+                "sku": r["sku"],
+                "product_name": r["product_name"],
+                "stock_count": r.get("__synthetic_stock_count", r["stock_count"]),
+                "shop_name": r["shop_name"],
+                "comments": r["comments"],
+            }
+
+            if isinstance(d.get("creation_date"), datetime):
+                d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+
+            output_rows.append(d)
+
+    # Final order: sku ASC, creation_date DESC (same as SQL)
+    output_rows.sort(key=lambda x: (str(x["sku"]), x["creation_date"]), reverse=False)
+    # But within each sku we need creation_date DESC, so we re-sort properly:
+    output_rows.sort(key=lambda x: (str(x["sku"]), x["creation_date"]), reverse=False)
+    # Safer: stable two-pass sort
+    output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
+    output_rows.sort(key=lambda x: str(x["sku"]))
+
+    return jsonify({"columns": columns, "data": output_rows})
+
 
 
 
