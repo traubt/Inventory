@@ -198,7 +198,7 @@ def get_recent_sales_b2b(shop_name, from_date, to_date):
             SELECT
                 COALESCE(NULLIF(TRIM(wo.customer_name), ''), CONCAT('ID ', wo.customer_id)) AS customer_name,
                 wo.customer_email,
-                ROUND(SUM(wi.total_amount) / 1.15 / 1.15, 2) AS total_spent_excl_vat,
+                ROUND(SUM(wi.total_amount) , 2) AS total_spent_excl_vat,
                 COUNT(DISTINCT wo.order_id) AS total_orders,
                 MAX(wo.order_date) AS last_order_date
             FROM toc_wc_sales_order wo
