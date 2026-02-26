@@ -4485,16 +4485,6 @@ def stock_movement():
     )
 
 
-from sqlalchemy import bindparam
-
-from datetime import datetime, timedelta
-from sqlalchemy import text, bindparam
-
-from sqlalchemy import text, bindparam
-from datetime import datetime, timedelta
-
-from sqlalchemy import text, bindparam
-from datetime import datetime, timedelta
 
 from datetime import datetime, timedelta
 from sqlalchemy import text, bindparam
@@ -4633,6 +4623,21 @@ def get_stock_movement():
 
     output_rows = []
 
+    def _parse_reset_value(comments: str):
+        if not comments:
+            return None
+        c = comments.strip()
+        if not c.lower().startswith("reset count"):
+            return None
+        # supports "Reset Count: 20.0" (and minor variations)
+        try:
+            val_part = c.split(":", 1)[1].strip()
+            # remove anything after the number (just in case)
+            val_str = val_part.split(" ", 1)[0].strip()
+            return float(val_str)
+        except Exception:
+            return None
+
     for sku, rows in by_sku.items():
         # rows already sorted DESC by creation_date/id due to SQL
 
@@ -4649,6 +4654,11 @@ def get_stock_movement():
         # non-WC always, WC only if completed
         displayed = []
         for r in rows:
+            # mark reset rows
+            reset_val = _parse_reset_value(r.get("comments") or "")
+            if reset_val is not None:
+                r["__reset_value"] = reset_val
+
             is_wc = isinstance(r.get("comments"), str) and r["comments"].startswith("WC sale ")
             if not is_wc:
                 displayed.append(r)
@@ -4659,19 +4669,28 @@ def get_stock_movement():
         # 3) recompute synthetic running balance across displayed rows only
         # Keep top displayed balance as-is, then walk down using ONLY displayed deltas.
         if displayed:
-            displayed[0]["__synthetic_stock_count"] = displayed[0]["stock_count"]
+            # first row: if it's a reset row, force it
+            if displayed[0].get("__reset_value") is not None:
+                displayed[0]["__synthetic_stock_count"] = displayed[0]["__reset_value"]
+            else:
+                displayed[0]["__synthetic_stock_count"] = displayed[0]["stock_count"]
 
             for j in range(1, len(displayed)):
+                cur = displayed[j]
+
+                # ✅ Reset Count overrides the stock_count at that row
+                if cur.get("__reset_value") is not None:
+                    cur["__synthetic_stock_count"] = cur["__reset_value"]
+                    continue
+
                 prev = displayed[j - 1]
                 prev_synth = prev.get("__synthetic_stock_count")
                 prev_delta = prev.get("__delta")
 
-                # If delta missing (edge case), fall back to original
                 if prev_synth is None or prev_delta is None:
-                    displayed[j]["__synthetic_stock_count"] = displayed[j]["stock_count"]
+                    cur["__synthetic_stock_count"] = cur["stock_count"]
                 else:
-                    # older = newer - delta(newer)
-                    displayed[j]["__synthetic_stock_count"] = prev_synth - prev_delta
+                    cur["__synthetic_stock_count"] = prev_synth - prev_delta
 
         # 4) build output rows (same columns as UI expects)
         for r in displayed:
