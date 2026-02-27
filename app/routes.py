@@ -253,6 +253,40 @@ def log_stock_audit_entry(*, shop_id, sku, product_name, stock_count, shop_name,
         # raise if you prefer a hard fail.
         logger.exception(f"Stock Audit insert failed for {shop_id}/{sku}: {e}")
 
+from datetime import datetime
+
+def ensure_stock_row(shop_id: str, sku: str, product_name: str = None):
+    """
+    Guarantees toc_stock row exists for (shop_id, sku).
+    """
+    stock = TocStock.query.filter_by(shop_id=shop_id, sku=sku).first()
+    if stock:
+        # Keep product_name in sync if provided
+        if product_name and (not stock.product_name or stock.product_name != product_name):
+            stock.product_name = product_name
+        return stock
+
+    stock = TocStock(
+        shop_id=shop_id,
+        sku=sku,
+        product_name=product_name,
+        final_stock_qty=0,
+        stock_transfer=0,
+        stock_qty_date=datetime.utcnow()
+    )
+    db.session.add(stock)
+    return stock
+
+
+def distribute_stock_row_to_all_shops(sku: str, product_name: str = None):
+    """
+    Creates toc_stock rows for ALL shops (store != '001') using shop_id='TOC###'.
+    """
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    for s in shops:
+        sid = f"TOC{s.store}"   # important: toc_stock uses TOC###
+        ensure_stock_row(sid, sku, product_name)
+
 @main.app_context_processor
 def inject_360_defaults():
     """
@@ -685,11 +719,14 @@ def create_product():
         db.session.add(new_product)
         db.session.commit()
 
-        # Insert into toc_stock for all shops only product
-        if item_type == "PR":
-            distribute_product_to_shops(new_product.item_sku)
-        elif item_type == "CO":
-            distribute_component_to_canndo_holdings(new_product.item_sku)
+        # ✅ HARD FIX: ensure toc_stock row exists for ALL shops (incl TOC888)
+        try:
+            distribute_stock_row_to_all_shops(new_product.item_sku, new_product.item_name)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Don't fail product creation, but do log it
+            print(f"[WARN] Stock distribution failed for SKU {new_product.item_sku}: {e}")
 
         return jsonify({
             "message": "Product created successfully",
