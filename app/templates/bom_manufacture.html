@@ -47,12 +47,20 @@
         <div class="row mb-3">
           <div class="col-md-6">
             <label class="form-label">Finished Product</label>
+
+            <!-- NEW: Search box -->
+            <input type="text" id="finishedSkuSearch" class="form-control mb-2"
+                   placeholder="Search product (name or SKU)...">
+
             <select id="finishedSku" class="form-select">
               <option value="">-- Select Product --</option>
               {% for p in finished_products %}
                 <option value="{{ p.sku }}">{{ p.name }} — {{ p.sku }}</option>
               {% endfor %}
             </select>
+
+            <!-- NEW: optional helper text -->
+            <small class="text-muted">Type to jump to the first matching product.</small>
           </div>
 
           <div class="col-md-3">
@@ -174,6 +182,59 @@ $("#loadComponents").on("click", function () {
 
             $("#componentsCard").removeClass("d-none");
         });
+});
+
+// =========================================================
+// FINISHED PRODUCT: Sort A→Z + Search-to-select
+// =========================================================
+function sortFinishedProducts() {
+  const sel = document.getElementById("finishedSku");
+  if (!sel) return;
+
+  const options = Array.from(sel.options);
+  const placeholder = options.shift(); // first option: "-- Select Product --"
+
+  options.sort((a, b) => (a.text || "").localeCompare(b.text || "", undefined, { sensitivity: "base" }));
+
+  sel.innerHTML = "";
+  sel.appendChild(placeholder);
+  options.forEach(o => sel.appendChild(o));
+}
+
+function attachFinishedProductSearch() {
+  const input = document.getElementById("finishedSkuSearch");
+  const sel = document.getElementById("finishedSku");
+  if (!input || !sel) return;
+
+  input.addEventListener("input", function () {
+    const q = (this.value || "").trim().toLowerCase();
+    if (!q) return;
+
+    // Find first option that contains the text (name or sku)
+    const match = Array.from(sel.options).find(opt =>
+      opt.value && (opt.text || "").toLowerCase().includes(q)
+    );
+
+    if (match) {
+      sel.value = match.value;
+
+      // Try to scroll the selected option into view (helps on long lists)
+      try { sel.options[sel.selectedIndex].scrollIntoView({ block: "nearest" }); } catch (e) {}
+    }
+  });
+
+  // Quality-of-life: press Enter to move focus to qty
+  input.addEventListener("keydown", function(e){
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("manuQty")?.focus();
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  sortFinishedProducts();
+  attachFinishedProductSearch();
 });
 
 // =========================================================
