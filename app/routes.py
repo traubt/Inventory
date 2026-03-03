@@ -280,11 +280,20 @@ def ensure_stock_row(shop_id: str, sku: str, product_name: str = None):
 
 def distribute_stock_row_to_all_shops(sku: str, product_name: str = None):
     """
-    Creates toc_stock rows for ALL shops (store != '001') using shop_id='TOC###'.
+    Creates toc_stock rows for ALL active shops using toc_shops.customer (shop_id).
+    This supports both TOC### and CCC### shop ids.
     """
-    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    shops = (
+        TOC_SHOPS.query
+        .filter(TOC_SHOPS.store != '001')
+        .filter(TOC_SHOPS.actv_ind == 1)
+        .filter(TOC_SHOPS.customer.isnot(None))
+        .filter(TOC_SHOPS.customer != '')
+        .all()
+    )
+
     for s in shops:
-        sid = f"TOC{s.store}"   # important: toc_stock uses TOC###
+        sid = s.customer.strip()   # ✅ this is the real toc_stock.shop_id (TOC008 / CCC004 / etc)
         ensure_stock_row(sid, sku, product_name)
 
 @main.app_context_processor
