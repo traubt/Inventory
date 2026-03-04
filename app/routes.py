@@ -4531,15 +4531,10 @@ def stock_movement():
     )
 
 
-
-from datetime import datetime, timedelta
-from sqlalchemy import text, bindparam
-
 @main.route('/get_stock_movement', methods=['GET', 'POST'])
 def get_stock_movement():
     from sqlalchemy import text, bindparam
     from datetime import datetime, timedelta
-    import json
 
     # Accept both POST JSON and GET querystring
     payload = request.get_json(silent=True) if request.method == "POST" else request.args
@@ -4566,6 +4561,7 @@ def get_stock_movement():
 
     is_head_office = (shop == "TOC999")
 
+    # What the UI expects
     columns = [
         {"title": "id"},
         {"title": "creation_date"},
@@ -4577,6 +4573,9 @@ def get_stock_movement():
         {"title": "comments"},
     ]
 
+    # ----------------------------------------------------------
+    # Non-Head-Office: return raw audit rows (no special logic)
+    # ----------------------------------------------------------
     if not is_head_office:
         sql = text("""
             SELECT
@@ -4606,11 +4605,17 @@ def get_stock_movement():
 
         return jsonify({"columns": columns, "data": rows})
 
-    # ----------------------------
-    # TOC999 (Head Office) logic:
-    # Fetch ALL rows once, attach WC status,
-    # then compute a synthetic balance that ignores hidden WC rows.
-    # ----------------------------
+    # ----------------------------------------------------------
+    # TOC999 (Head Office): robust recalculation
+    #  - Include non-WC always
+    #  - Include WC only if wo.status = 'wc-completed'
+    #  - Exclude WC rows that belong to Shipday (toc_shipday.wc_orderid = wo.order_id)
+    #  - Recompute running stock_count per SKU in ASC order:
+    #       Reset Count -> absolute set
+    #       WC sale -> subtract qty
+    #    (Falls back to original audit stock_count when it can't parse movement)
+    # ----------------------------------------------------------
+
     sql = text("""
         SELECT
           a.id,
@@ -4618,11 +4623,10 @@ def get_stock_movement():
           a.shop_id,
           a.sku,
           a.product_name,
-          a.stock_count,
+          a.stock_count AS original_stock_count,
           a.shop_name,
           a.comments,
 
-          -- Extract order_id ONLY for WC sale rows
           CASE
             WHEN a.comments LIKE 'WC sale %' THEN CAST(
                 SUBSTRING_INDEX(
@@ -4633,7 +4637,9 @@ def get_stock_movement():
             ELSE NULL
           END AS wc_order_id,
 
-          wo.status AS wc_status
+          wo.status AS wc_status,
+          sd.wc_orderid AS shipday_order_id
+
         FROM toc_stock_audit a
         LEFT JOIN toc_wc_sales_order wo
           ON wo.order_id = CASE
@@ -4645,11 +4651,13 @@ def get_stock_movement():
               )
               ELSE NULL
           END
+        LEFT JOIN toc_shipday sd
+          ON sd.wc_orderid = wo.order_id
         WHERE a.shop_id = :shop
           AND a.sku IN :items
           AND a.creation_date >= :fromDate
           AND a.creation_date < :toDateExclusive
-        ORDER BY a.sku ASC, a.creation_date DESC, a.id DESC
+        ORDER BY a.sku ASC, a.creation_date ASC, a.id ASC
     """).bindparams(bindparam("items", expanding=True))
 
     results = db.session.execute(sql, {
@@ -4659,15 +4667,7 @@ def get_stock_movement():
         "toDateExclusive": toDateExclusive
     }).fetchall()
 
-    # Convert to dict rows + keep datetime as datetime for now
     all_rows = [dict(r._mapping) for r in results]
-
-    # Group per SKU (because balances are per SKU)
-    by_sku = {}
-    for d in all_rows:
-        by_sku.setdefault(str(d["sku"]), []).append(d)
-
-    output_rows = []
 
     def _parse_reset_value(comments: str):
         if not comments:
@@ -4675,92 +4675,102 @@ def get_stock_movement():
         c = comments.strip()
         if not c.lower().startswith("reset count"):
             return None
-        # supports "Reset Count: 20.0" (and minor variations)
         try:
             val_part = c.split(":", 1)[1].strip()
-            # remove anything after the number (just in case)
             val_str = val_part.split(" ", 1)[0].strip()
             return float(val_str)
         except Exception:
             return None
 
+    def _parse_wc_qty(comments: str):
+        # Example: "WC sale 667647; qty=2.0; device=WooCommerce; staff="
+        if not comments or "qty=" not in comments:
+            return None
+        try:
+            val_str = comments.split("qty=", 1)[1].split(";", 1)[0].strip()
+            return float(val_str)
+        except Exception:
+            return None
+
+    def _movement_qty(row):
+        """
+        Signed movement applied at this row (when iterating ASC / oldest->newest):
+          - WC sale -> negative qty
+        (Extend later for transfers/manufacture if needed)
+        """
+        c = (row.get("comments") or "").strip()
+        if c.startswith("WC sale "):
+            q = _parse_wc_qty(c)
+            return -q if q is not None else None
+        return None
+
+    # Group rows per SKU
+    by_sku = {}
+    for r in all_rows:
+        by_sku.setdefault(str(r["sku"]), []).append(r)
+
+    output_rows = []
+
     for sku, rows in by_sku.items():
-        # rows already sorted DESC by creation_date/id due to SQL
+        # rows are ASC (oldest->newest)
 
-        # 1) compute delta for each row in the FULL list
-        # delta(row_i) = stock_count_i - stock_count_(i+1)
-        # (i is newer than i+1)
-        for i in range(len(rows)):
-            if i < len(rows) - 1:
-                rows[i]["__delta"] = (rows[i]["stock_count"] or 0) - (rows[i+1]["stock_count"] or 0)
-            else:
-                rows[i]["__delta"] = None  # oldest in range
-
-        # 2) filter rows to DISPLAY:
-        # non-WC always, WC only if completed
+        # 1) Filter rows to DISPLAY
         displayed = []
         for r in rows:
-            # mark reset rows
-            reset_val = _parse_reset_value(r.get("comments") or "")
-            if reset_val is not None:
-                r["__reset_value"] = reset_val
+            c = (r.get("comments") or "")
+            is_wc = c.startswith("WC sale ")
 
-            is_wc = isinstance(r.get("comments"), str) and r["comments"].startswith("WC sale ")
             if not is_wc:
                 displayed.append(r)
-            else:
-                if r.get("wc_status") == "wc-completed":
-                    displayed.append(r)
+                continue
 
-        # 3) recompute synthetic running balance across displayed rows only
-        # Keep top displayed balance as-is, then walk down using ONLY displayed deltas.
-        if displayed:
-            # first row: if it's a reset row, force it
-            if displayed[0].get("__reset_value") is not None:
-                displayed[0]["__synthetic_stock_count"] = displayed[0]["__reset_value"]
-            else:
-                displayed[0]["__synthetic_stock_count"] = displayed[0]["stock_count"]
+            # WC rows: only completed
+            if r.get("wc_status") != "wc-completed":
+                continue
 
-            for j in range(1, len(displayed)):
-                cur = displayed[j]
+            # Exclude Shipday WC orders
+            if r.get("shipday_order_id") is not None:
+                continue
 
-                # ✅ Reset Count overrides the stock_count at that row
-                if cur.get("__reset_value") is not None:
-                    cur["__synthetic_stock_count"] = cur["__reset_value"]
-                    continue
+            displayed.append(r)
 
-                prev = displayed[j - 1]
-                prev_synth = prev.get("__synthetic_stock_count")
-                prev_delta = prev.get("__delta")
-
-                if prev_synth is None or prev_delta is None:
-                    cur["__synthetic_stock_count"] = cur["stock_count"]
-                else:
-                    cur["__synthetic_stock_count"] = prev_synth - prev_delta
-
-        # 4) build output rows (same columns as UI expects)
+        # 2) Recompute running stock_count in ASC order
+        running = None
         for r in displayed:
+            reset_val = _parse_reset_value(r.get("comments") or "")
+            if reset_val is not None:
+                running = reset_val
+                r["stock_count"] = running
+                continue
+
+            mv = _movement_qty(r)
+
+            if running is not None and mv is not None:
+                running = running + mv
+                r["stock_count"] = running
+                continue
+
+            # Fallback anchor (prevents nonsense if movement can't be parsed)
+            running = float(r.get("original_stock_count") or 0)
+            r["stock_count"] = running
+
+        # 3) Output in DESC order for UI (newest first)
+        for r in reversed(displayed):
             d = {
                 "id": r["id"],
                 "creation_date": r["creation_date"],
                 "shop_id": r["shop_id"],
                 "sku": r["sku"],
                 "product_name": r["product_name"],
-                "stock_count": r.get("__synthetic_stock_count", r["stock_count"]),
+                "stock_count": r.get("stock_count", r.get("original_stock_count")),
                 "shop_name": r["shop_name"],
                 "comments": r["comments"],
             }
-
             if isinstance(d.get("creation_date"), datetime):
                 d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
-
             output_rows.append(d)
 
-    # Final order: sku ASC, creation_date DESC (same as SQL)
-    output_rows.sort(key=lambda x: (str(x["sku"]), x["creation_date"]), reverse=False)
-    # But within each sku we need creation_date DESC, so we re-sort properly:
-    output_rows.sort(key=lambda x: (str(x["sku"]), x["creation_date"]), reverse=False)
-    # Safer: stable two-pass sort
+    # Final ordering: sku ASC, creation_date DESC
     output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
     output_rows.sort(key=lambda x: str(x["sku"]))
 
