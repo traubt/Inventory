@@ -4535,6 +4535,7 @@ def stock_movement():
 def get_stock_movement():
     from sqlalchemy import text, bindparam
     from datetime import datetime, timedelta
+    import re
 
     # Accept both POST JSON and GET querystring
     payload = request.get_json(silent=True) if request.method == "POST" else request.args
@@ -4606,16 +4607,22 @@ def get_stock_movement():
         return jsonify({"columns": columns, "data": rows})
 
     # ----------------------------------------------------------
-    # TOC999 (Head Office): robust recalculation
-    #  - Include non-WC always
-    #  - Include WC only if wo.status = 'wc-completed'
-    #  - Exclude WC rows that belong to Shipday (toc_shipday.wc_orderid = wo.order_id)
-    #  - Recompute running stock_count per SKU in ASC order:
-    #       Reset Count -> absolute set
-    #       WC sale -> subtract qty
-    #    (Falls back to original audit stock_count when it can't parse movement)
+    # TOC999 (Head Office): deterministic recalculation
+    #
+    # DISPLAY RULES:
+    #  - Non-WC rows always included
+    #  - WC rows included only if wo.status='wc-completed'
+    #  - WC rows excluded if the WC order exists in toc_shipday (sd.wc_orderid = wo.order_id)
+    #
+    # BALANCE RULES (per SKU, ASC time):
+    #  - "Reset Count: X" => running = X  (absolute override)
+    #  - WC sale qty=N    => running = running - N
+    #  - Transfer OUT:-N  => running = running - N
+    #  - Transfer IN: (received R, damaged D) => running = running + (R - D)
+    #
+    # If we cannot parse a movement and we already have running, we keep running unchanged
+    # (we do NOT snap back to original_stock_count, to avoid jumps).
     # ----------------------------------------------------------
-
     sql = text("""
         SELECT
           a.id,
@@ -4669,6 +4676,11 @@ def get_stock_movement():
 
     all_rows = [dict(r._mapping) for r in results]
 
+    # -------------------------
+    # Parsers
+    # -------------------------
+    _re_float = r"(-?\d+(?:\.\d+)?)"
+
     def _parse_reset_value(comments: str):
         if not comments:
             return None
@@ -4683,7 +4695,7 @@ def get_stock_movement():
             return None
 
     def _parse_wc_qty(comments: str):
-        # Example: "WC sale 667647; qty=2.0; device=WooCommerce; staff="
+        # "WC sale 667647; qty=2.0; ..."
         if not comments or "qty=" not in comments:
             return None
         try:
@@ -4692,16 +4704,74 @@ def get_stock_movement():
         except Exception:
             return None
 
-    def _movement_qty(row):
+    def _parse_transfer_out_qty(comments: str):
+        # Examples:
+        # "Transfer OUT: -20.0 → TOC - Cresta ..."
+        # "Transfer OUT: -5.0 -> CC - Menlyn ..."
+        if not comments:
+            return None
+        c = comments.strip()
+        if not c.lower().startswith("transfer out"):
+            return None
+
+        m = re.search(r"transfer out\s*:\s*" + _re_float, c, flags=re.IGNORECASE)
+        if not m:
+            return None
+
+        val = float(m.group(1))
+        # comments typically store negative already; we want magnitude as movement out
+        return abs(val)
+
+    def _parse_transfer_in_received_damaged(comments: str):
+        # Example:
+        # "Transfer IN: +5.0 (received 10.0, damaged 5.0) • order ..."
+        # Some rows might have different spacing; we use regex for received/damaged.
+        if not comments:
+            return None
+        c = comments.strip()
+        if not c.lower().startswith("transfer in"):
+            return None
+
+        rec = re.search(r"received\s*" + _re_float, c, flags=re.IGNORECASE)
+        dmg = re.search(r"damaged\s*" + _re_float, c, flags=re.IGNORECASE)
+
+        if not rec:
+            return None
+
+        received = float(rec.group(1))
+        damaged = float(dmg.group(1)) if dmg else 0.0
+        return received, damaged
+
+    def _movement_delta(row):
         """
-        Signed movement applied at this row (when iterating ASC / oldest->newest):
-          - WC sale -> negative qty
-        (Extend later for transfers/manufacture if needed)
+        Returns signed delta to apply to running (ASC oldest->newest).
+        None => unknown/ignore (no change to running).
         """
         c = (row.get("comments") or "").strip()
+
+        # Reset handled outside (absolute)
+        if c.lower().startswith("reset count"):
+            return None
+
+        # WC sale
         if c.startswith("WC sale "):
             q = _parse_wc_qty(c)
-            return -q if q is not None else None
+            return (-q) if q is not None else None
+
+        # Transfer OUT
+        if c.lower().startswith("transfer out"):
+            q = _parse_transfer_out_qty(c)
+            return (-q) if q is not None else None
+
+        # Transfer IN
+        if c.lower().startswith("transfer in"):
+            parsed = _parse_transfer_in_received_damaged(c)
+            if parsed:
+                received, damaged = parsed
+                return (received - damaged)
+            return None
+
+        # Unknown type
         return None
 
     # Group rows per SKU
@@ -4714,7 +4784,7 @@ def get_stock_movement():
     for sku, rows in by_sku.items():
         # rows are ASC (oldest->newest)
 
-        # 1) Filter rows to DISPLAY
+        # 1) Filter rows to DISPLAY for TOC999
         displayed = []
         for r in rows:
             c = (r.get("comments") or "")
@@ -4734,24 +4804,25 @@ def get_stock_movement():
 
             displayed.append(r)
 
-        # 2) Recompute running stock_count in ASC order
+        # 2) Deterministic running balance in ASC order
         running = None
         for r in displayed:
-            reset_val = _parse_reset_value(r.get("comments") or "")
+            comments = r.get("comments") or ""
+
+            reset_val = _parse_reset_value(comments)
             if reset_val is not None:
                 running = reset_val
                 r["stock_count"] = running
                 continue
 
-            mv = _movement_qty(r)
+            # If we don't have a baseline yet, initialize from audit value
+            if running is None:
+                running = float(r.get("original_stock_count") or 0.0)
 
-            if running is not None and mv is not None:
-                running = running + mv
-                r["stock_count"] = running
-                continue
+            delta = _movement_delta(r)
+            if delta is not None:
+                running = running + delta
 
-            # Fallback anchor (prevents nonsense if movement can't be parsed)
-            running = float(r.get("original_stock_count") or 0)
             r["stock_count"] = running
 
         # 3) Output in DESC order for UI (newest first)
