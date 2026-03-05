@@ -4531,6 +4531,322 @@ def stock_movement():
     )
 
 
+# @main.route('/get_stock_movement', methods=['GET', 'POST'])
+# def get_stock_movement():
+#     from sqlalchemy import text, bindparam
+#     from datetime import datetime, timedelta
+#     import re
+#
+#     # Accept both POST JSON and GET querystring
+#     payload = request.get_json(silent=True) if request.method == "POST" else request.args
+#
+#     shop = payload.get('shop')
+#     items = payload.get('items')
+#     fromDate = payload.get('fromDate')
+#     toDate = payload.get('toDate')
+#
+#     # Normalize items -> list[str]
+#     if isinstance(items, str):
+#         items = [x.strip() for x in items.split(",") if x.strip()]
+#     elif items is None:
+#         items = []
+#
+#     if not shop or not items or not fromDate or not toDate:
+#         return jsonify({"error": "Missing required parameters"}), 400
+#
+#     # Make toDate inclusive
+#     try:
+#         toDateExclusive = (datetime.strptime(toDate, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+#     except Exception:
+#         toDateExclusive = toDate
+#
+#     is_head_office = (shop == "TOC999")
+#
+#     # What the UI expects
+#     columns = [
+#         {"title": "id"},
+#         {"title": "creation_date"},
+#         {"title": "shop_id"},
+#         {"title": "sku"},
+#         {"title": "product_name"},
+#         {"title": "stock_count"},
+#         {"title": "shop_name"},
+#         {"title": "comments"},
+#     ]
+#
+#     # ----------------------------------------------------------
+#     # Non-Head-Office: return raw audit rows (no special logic)
+#     # ----------------------------------------------------------
+#     if not is_head_office:
+#         sql = text("""
+#             SELECT
+#               id, creation_date, shop_id, sku, product_name,
+#               stock_count, shop_name, comments
+#             FROM toc_stock_audit
+#             WHERE shop_id = :shop
+#               AND sku IN :items
+#               AND creation_date >= :fromDate
+#               AND creation_date < :toDateExclusive
+#             ORDER BY sku ASC, creation_date DESC, id DESC
+#         """).bindparams(bindparam("items", expanding=True))
+#
+#         results = db.session.execute(sql, {
+#             "shop": shop,
+#             "items": items,
+#             "fromDate": fromDate,
+#             "toDateExclusive": toDateExclusive
+#         }).fetchall()
+#
+#         rows = []
+#         for r in results:
+#             d = dict(r._mapping)
+#             if isinstance(d.get("creation_date"), datetime):
+#                 d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+#             rows.append(d)
+#
+#         return jsonify({"columns": columns, "data": rows})
+#
+#     # ----------------------------------------------------------
+#     # TOC999 (Head Office): deterministic recalculation
+#     #
+#     # DISPLAY RULES:
+#     #  - Non-WC rows always included
+#     #  - WC rows included only if wo.status='wc-completed'
+#     #  - WC rows excluded if the WC order exists in toc_shipday (sd.wc_orderid = wo.order_id)
+#     #
+#     # BALANCE RULES (per SKU, ASC time):
+#     #  - "Reset Count: X" => running = X  (absolute override)
+#     #  - WC sale qty=N    => running = running - N
+#     #  - Transfer OUT:-N  => running = running - N
+#     #  - Transfer IN: (received R, damaged D) => running = running + (R - D)
+#     #
+#     # If we cannot parse a movement and we already have running, we keep running unchanged
+#     # (we do NOT snap back to original_stock_count, to avoid jumps).
+#     # ----------------------------------------------------------
+#     sql = text("""
+#         SELECT
+#           a.id,
+#           a.creation_date,
+#           a.shop_id,
+#           a.sku,
+#           a.product_name,
+#           a.stock_count AS original_stock_count,
+#           a.shop_name,
+#           a.comments,
+#
+#           CASE
+#             WHEN a.comments LIKE 'WC sale %' THEN CAST(
+#                 SUBSTRING_INDEX(
+#                   SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+#                   ';', 1
+#                 ) AS UNSIGNED
+#             )
+#             ELSE NULL
+#           END AS wc_order_id,
+#
+#           wo.status AS wc_status,
+#           sd.wc_orderid AS shipday_order_id
+#
+#         FROM toc_stock_audit a
+#         LEFT JOIN toc_wc_sales_order wo
+#           ON wo.order_id = CASE
+#               WHEN a.comments LIKE 'WC sale %' THEN CAST(
+#                   SUBSTRING_INDEX(
+#                     SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+#                     ';', 1
+#                   ) AS UNSIGNED
+#               )
+#               ELSE NULL
+#           END
+#         LEFT JOIN toc_shipday sd
+#           ON sd.wc_orderid = wo.order_id
+#         WHERE a.shop_id = :shop
+#           AND a.sku IN :items
+#           AND a.creation_date >= :fromDate
+#           AND a.creation_date < :toDateExclusive
+#         ORDER BY a.sku ASC, a.creation_date ASC, a.id ASC
+#     """).bindparams(bindparam("items", expanding=True))
+#
+#     results = db.session.execute(sql, {
+#         "shop": shop,
+#         "items": items,
+#         "fromDate": fromDate,
+#         "toDateExclusive": toDateExclusive
+#     }).fetchall()
+#
+#     all_rows = [dict(r._mapping) for r in results]
+#
+#     # -------------------------
+#     # Parsers
+#     # -------------------------
+#     _re_float = r"(-?\d+(?:\.\d+)?)"
+#
+#     def _parse_reset_value(comments: str):
+#         if not comments:
+#             return None
+#         c = comments.strip()
+#         if not c.lower().startswith("reset count"):
+#             return None
+#         try:
+#             val_part = c.split(":", 1)[1].strip()
+#             val_str = val_part.split(" ", 1)[0].strip()
+#             return float(val_str)
+#         except Exception:
+#             return None
+#
+#     def _parse_wc_qty(comments: str):
+#         # "WC sale 667647; qty=2.0; ..."
+#         if not comments or "qty=" not in comments:
+#             return None
+#         try:
+#             val_str = comments.split("qty=", 1)[1].split(";", 1)[0].strip()
+#             return float(val_str)
+#         except Exception:
+#             return None
+#
+#     def _parse_transfer_out_qty(comments: str):
+#         # Examples:
+#         # "Transfer OUT: -20.0 → TOC - Cresta ..."
+#         # "Transfer OUT: -5.0 -> CC - Menlyn ..."
+#         if not comments:
+#             return None
+#         c = comments.strip()
+#         if not c.lower().startswith("transfer out"):
+#             return None
+#
+#         m = re.search(r"transfer out\s*:\s*" + _re_float, c, flags=re.IGNORECASE)
+#         if not m:
+#             return None
+#
+#         val = float(m.group(1))
+#         # comments typically store negative already; we want magnitude as movement out
+#         return abs(val)
+#
+#     def _parse_transfer_in_received_damaged(comments: str):
+#         # Example:
+#         # "Transfer IN: +5.0 (received 10.0, damaged 5.0) • order ..."
+#         # Some rows might have different spacing; we use regex for received/damaged.
+#         if not comments:
+#             return None
+#         c = comments.strip()
+#         if not c.lower().startswith("transfer in"):
+#             return None
+#
+#         rec = re.search(r"received\s*" + _re_float, c, flags=re.IGNORECASE)
+#         dmg = re.search(r"damaged\s*" + _re_float, c, flags=re.IGNORECASE)
+#
+#         if not rec:
+#             return None
+#
+#         received = float(rec.group(1))
+#         damaged = float(dmg.group(1)) if dmg else 0.0
+#         return received, damaged
+#
+#     def _movement_delta(row):
+#         """
+#         Returns signed delta to apply to running (ASC oldest->newest).
+#         None => unknown/ignore (no change to running).
+#         """
+#         c = (row.get("comments") or "").strip()
+#
+#         # Reset handled outside (absolute)
+#         if c.lower().startswith("reset count"):
+#             return None
+#
+#         # WC sale
+#         if c.startswith("WC sale "):
+#             q = _parse_wc_qty(c)
+#             return (-q) if q is not None else None
+#
+#         # Transfer OUT
+#         if c.lower().startswith("transfer out"):
+#             q = _parse_transfer_out_qty(c)
+#             return (-q) if q is not None else None
+#
+#         # Transfer IN
+#         if c.lower().startswith("transfer in"):
+#             parsed = _parse_transfer_in_received_damaged(c)
+#             if parsed:
+#                 received, damaged = parsed
+#                 return (received - damaged)
+#             return None
+#
+#         # Unknown type
+#         return None
+#
+#     # Group rows per SKU
+#     by_sku = {}
+#     for r in all_rows:
+#         by_sku.setdefault(str(r["sku"]), []).append(r)
+#
+#     output_rows = []
+#
+#     for sku, rows in by_sku.items():
+#         # rows are ASC (oldest->newest)
+#
+#         # 1) Filter rows to DISPLAY for TOC999
+#         displayed = []
+#         for r in rows:
+#             c = (r.get("comments") or "")
+#             is_wc = c.startswith("WC sale ")
+#
+#             if not is_wc:
+#                 displayed.append(r)
+#                 continue
+#
+#             # WC rows: only completed
+#             if r.get("wc_status") != "wc-completed":
+#                 continue
+#
+#             # Exclude Shipday WC orders
+#             if r.get("shipday_order_id") is not None:
+#                 continue
+#
+#             displayed.append(r)
+#
+#         # 2) Deterministic running balance in ASC order
+#         running = None
+#         for r in displayed:
+#             comments = r.get("comments") or ""
+#
+#             reset_val = _parse_reset_value(comments)
+#             if reset_val is not None:
+#                 running = reset_val
+#                 r["stock_count"] = running
+#                 continue
+#
+#             # If we don't have a baseline yet, initialize from audit value
+#             if running is None:
+#                 running = float(r.get("original_stock_count") or 0.0)
+#
+#             delta = _movement_delta(r)
+#             if delta is not None:
+#                 running = running + delta
+#
+#             r["stock_count"] = running
+#
+#         # 3) Output in DESC order for UI (newest first)
+#         for r in reversed(displayed):
+#             d = {
+#                 "id": r["id"],
+#                 "creation_date": r["creation_date"],
+#                 "shop_id": r["shop_id"],
+#                 "sku": r["sku"],
+#                 "product_name": r["product_name"],
+#                 "stock_count": r.get("stock_count", r.get("original_stock_count")),
+#                 "shop_name": r["shop_name"],
+#                 "comments": r["comments"],
+#             }
+#             if isinstance(d.get("creation_date"), datetime):
+#                 d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+#             output_rows.append(d)
+#
+#     # Final ordering: sku ASC, creation_date DESC
+#     output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
+#     output_rows.sort(key=lambda x: str(x["sku"]))
+#
+#     return jsonify({"columns": columns, "data": output_rows})
+
 @main.route('/get_stock_movement', methods=['GET', 'POST'])
 def get_stock_movement():
     from sqlalchemy import text, bindparam
@@ -4607,23 +4923,28 @@ def get_stock_movement():
         return jsonify({"columns": columns, "data": rows})
 
     # ----------------------------------------------------------
-    # TOC999 (Head Office): deterministic recalculation
+    # TOC999 (Head Office): simple + maintainable algorithm
     #
-    # DISPLAY RULES:
-    #  - Non-WC rows always included
-    #  - WC rows included only if wo.status='wc-completed'
-    #  - WC rows excluded if the WC order exists in toc_shipday (sd.wc_orderid = wo.order_id)
-    #
-    # BALANCE RULES (per SKU, ASC time):
-    #  - "Reset Count: X" => running = X  (absolute override)
-    #  - WC sale qty=N    => running = running - N
-    #  - Transfer OUT:-N  => running = running - N
-    #  - Transfer IN: (received R, damaged D) => running = running + (R - D)
-    #
-    # If we cannot parse a movement and we already have running, we keep running unchanged
-    # (we do NOT snap back to original_stock_count, to avoid jumps).
+    # 1) Order by toc_stock_audit.creation_date (UTC) ONLY
+    # 2) Reset Count: X => running := X
+    # 3) WC sale rows included ONLY if Woo current status == 'wc-completed'
+    # 4) Exclude WC sale rows if order exists in toc_shipday
+    # 5) Compute running per SKU from oldest->newest
+    # 6) Return rows newest->oldest for UI
     # ----------------------------------------------------------
-    sql = text("""
+
+    # Lookback so we can catch the last reset BEFORE fromDate
+    LOOKBACK_DAYS = 21
+    try:
+        fromDateMinus = (datetime.strptime(fromDate, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    except Exception:
+        fromDateMinus = fromDate
+
+    # Woo DB/table (adjust if needed)
+    WC_DB_SCHEMA = "tasteofc_wp268"
+    WC_ORDER_STATS_TABLE = "wpf7_wc_order_stats"
+
+    sql = text(f"""
         SELECT
           a.id,
           a.creation_date,
@@ -4644,12 +4965,13 @@ def get_stock_movement():
             ELSE NULL
           END AS wc_order_id,
 
-          wo.status AS wc_status,
+          os.status AS wc_status_src,
           sd.wc_orderid AS shipday_order_id
 
         FROM toc_stock_audit a
-        LEFT JOIN toc_wc_sales_order wo
-          ON wo.order_id = CASE
+
+        LEFT JOIN {WC_DB_SCHEMA}.{WC_ORDER_STATS_TABLE} os
+          ON os.order_id = CASE
               WHEN a.comments LIKE 'WC sale %' THEN CAST(
                   SUBSTRING_INDEX(
                     SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
@@ -4658,11 +4980,21 @@ def get_stock_movement():
               )
               ELSE NULL
           END
+
         LEFT JOIN toc_shipday sd
-          ON sd.wc_orderid = wo.order_id
+          ON sd.wc_orderid = CASE
+              WHEN a.comments LIKE 'WC sale %' THEN CAST(
+                  SUBSTRING_INDEX(
+                    SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+                    ';', 1
+                  ) AS UNSIGNED
+              )
+              ELSE NULL
+          END
+
         WHERE a.shop_id = :shop
           AND a.sku IN :items
-          AND a.creation_date >= :fromDate
+          AND a.creation_date >= :fromDateMinus
           AND a.creation_date < :toDateExclusive
         ORDER BY a.sku ASC, a.creation_date ASC, a.id ASC
     """).bindparams(bindparam("items", expanding=True))
@@ -4670,7 +5002,7 @@ def get_stock_movement():
     results = db.session.execute(sql, {
         "shop": shop,
         "items": items,
-        "fromDate": fromDate,
+        "fromDateMinus": fromDateMinus,
         "toDateExclusive": toDateExclusive
     }).fetchall()
 
@@ -4705,39 +5037,28 @@ def get_stock_movement():
             return None
 
     def _parse_transfer_out_qty(comments: str):
-        # Examples:
-        # "Transfer OUT: -20.0 → TOC - Cresta ..."
-        # "Transfer OUT: -5.0 -> CC - Menlyn ..."
+        # "Transfer OUT: -20.0 -> ..."
         if not comments:
             return None
         c = comments.strip()
         if not c.lower().startswith("transfer out"):
             return None
-
         m = re.search(r"transfer out\s*:\s*" + _re_float, c, flags=re.IGNORECASE)
         if not m:
             return None
-
-        val = float(m.group(1))
-        # comments typically store negative already; we want magnitude as movement out
-        return abs(val)
+        return abs(float(m.group(1)))
 
     def _parse_transfer_in_received_damaged(comments: str):
-        # Example:
-        # "Transfer IN: +5.0 (received 10.0, damaged 5.0) • order ..."
-        # Some rows might have different spacing; we use regex for received/damaged.
+        # "Transfer IN: +5.0 (received 10.0, damaged 5.0) ..."
         if not comments:
             return None
         c = comments.strip()
         if not c.lower().startswith("transfer in"):
             return None
-
         rec = re.search(r"received\s*" + _re_float, c, flags=re.IGNORECASE)
         dmg = re.search(r"damaged\s*" + _re_float, c, flags=re.IGNORECASE)
-
         if not rec:
             return None
-
         received = float(rec.group(1))
         damaged = float(dmg.group(1)) if dmg else 0.0
         return received, damaged
@@ -4745,25 +5066,25 @@ def get_stock_movement():
     def _movement_delta(row):
         """
         Returns signed delta to apply to running (ASC oldest->newest).
-        None => unknown/ignore (no change to running).
+        None => unknown/ignore (no change).
         """
         c = (row.get("comments") or "").strip()
 
-        # Reset handled outside (absolute)
+        # Reset handled separately (absolute)
         if c.lower().startswith("reset count"):
             return None
 
-        # WC sale
+        # WC sale => subtract qty (ONLY if included row)
         if c.startswith("WC sale "):
             q = _parse_wc_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer OUT
+        # Transfer OUT => subtract magnitude
         if c.lower().startswith("transfer out"):
             q = _parse_transfer_out_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer IN
+        # Transfer IN => add (received - damaged)
         if c.lower().startswith("transfer in"):
             parsed = _parse_transfer_in_received_damaged(c)
             if parsed:
@@ -4771,8 +5092,15 @@ def get_stock_movement():
                 return (received - damaged)
             return None
 
-        # Unknown type
         return None
+
+    # Date filtering window (we compute with lookback but output only the requested window)
+    try:
+        from_dt = datetime.strptime(fromDate, "%Y-%m-%d")
+        to_excl_dt = datetime.strptime(toDateExclusive, "%Y-%m-%d")
+    except Exception:
+        from_dt = None
+        to_excl_dt = None
 
     # Group rows per SKU
     by_sku = {}
@@ -4782,9 +5110,9 @@ def get_stock_movement():
     output_rows = []
 
     for sku, rows in by_sku.items():
-        # rows are ASC (oldest->newest)
+        # rows already sorted ASC by SQL
 
-        # 1) Filter rows to DISPLAY for TOC999
+        # 1) Filter DISPLAY rows (WC based on Woo *current* status)
         displayed = []
         for r in rows:
             c = (r.get("comments") or "")
@@ -4794,17 +5122,20 @@ def get_stock_movement():
                 displayed.append(r)
                 continue
 
-            # WC rows: only completed
-            if r.get("wc_status") != "wc-completed":
+            # WC sale: include ONLY if Woo says completed
+            if r.get("wc_status_src") != "wc-completed":
                 continue
 
-            # Exclude Shipday WC orders
+            # Exclude Shipday orders from TOC999
             if r.get("shipday_order_id") is not None:
                 continue
 
             displayed.append(r)
 
-        # 2) Deterministic running balance in ASC order
+        if not displayed:
+            continue
+
+        # 2) Deterministic running balance in ASC order (using audit UTC timeline)
         running = None
         for r in displayed:
             comments = r.get("comments") or ""
@@ -4812,10 +5143,9 @@ def get_stock_movement():
             reset_val = _parse_reset_value(comments)
             if reset_val is not None:
                 running = reset_val
-                r["stock_count"] = running
+                r["calc_stock_count"] = running
                 continue
 
-            # If we don't have a baseline yet, initialize from audit value
             if running is None:
                 running = float(r.get("original_stock_count") or 0.0)
 
@@ -4823,17 +5153,22 @@ def get_stock_movement():
             if delta is not None:
                 running = running + delta
 
-            r["stock_count"] = running
+            r["calc_stock_count"] = running
 
-        # 3) Output in DESC order for UI (newest first)
-        for r in reversed(displayed):
+        # 3) Output only rows within requested window (but keep calc from lookback)
+        for r in reversed(displayed):  # newest first
+            cd = r.get("creation_date")
+            if isinstance(cd, datetime) and from_dt and to_excl_dt:
+                if not (cd >= from_dt and cd < to_excl_dt):
+                    continue
+
             d = {
                 "id": r["id"],
                 "creation_date": r["creation_date"],
                 "shop_id": r["shop_id"],
                 "sku": r["sku"],
                 "product_name": r["product_name"],
-                "stock_count": r.get("stock_count", r.get("original_stock_count")),
+                "stock_count": r.get("calc_stock_count", r.get("original_stock_count")),
                 "shop_name": r["shop_name"],
                 "comments": r["comments"],
             }
@@ -4841,13 +5176,11 @@ def get_stock_movement():
                 d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
             output_rows.append(d)
 
-    # Final ordering: sku ASC, creation_date DESC
+    # Final ordering for UI: sku ASC, creation_date DESC
     output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
     output_rows.sort(key=lambda x: str(x["sku"]))
 
     return jsonify({"columns": columns, "data": output_rows})
-
-
 
 
 ############################## END ONLINE SALES GOOGLE API section######################################
