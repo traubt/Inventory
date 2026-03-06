@@ -961,6 +961,8 @@ def get_stock_count_per_shop(shop):
                   SUM(
                     CASE
                       WHEN wo.creation_date > st.stock_qty_date
+                           AND wos.status = 'wc-completed'
+                           AND sd.wc_orderid IS NULL
                       THEN COALESCE(wi.quantity, 0)
                       ELSE 0
                     END
@@ -970,12 +972,10 @@ def get_stock_count_per_shop(shop):
                      ON p.item_sku = wi.sku
               LEFT JOIN toc_wc_sales_order wo
                      ON wi.order_id = wo.order_id
-                    AND wo.status = 'wc-completed'
-                    AND wo.order_id NOT IN (
-                        SELECT s.wc_orderid
-                        FROM toc_shipday s
-                        WHERE s.wc_orderid IS NOT NULL
-                    )
+              LEFT JOIN tasteofc_wp268.wpf7_wc_order_stats wos
+                     ON wo.order_id = wos.order_id
+              LEFT JOIN toc_shipday sd
+                     ON wo.order_id = sd.wc_orderid
               LEFT JOIN toc_stock st
                      ON p.item_sku = st.sku
                     AND st.shop_id = %s
@@ -996,7 +996,7 @@ def get_stock_count_per_shop(shop):
             )
             SELECT DISTINCT
                 st.sku AS item_sku,
-                st.product_name AS item_name,
+                COALESCE(st.product_name, p.item_name) AS item_name,
                 p.item_type AS item_type,
                 st.shop_id AS store_customer,
                 st.shop_name,
@@ -1004,13 +1004,14 @@ def get_stock_count_per_shop(shop):
                 st.stock_qty_date AS last_stock_count_date,
                 COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
                 COALESCE(st.final_stock_qty, 0) - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
-                COALESCE(st.stock_transfer,0)  AS received_stock
+                COALESCE(st.stock_transfer, 0) AS received_stock
             FROM toc_stock st
             JOIN toc_product p
               ON p.item_sku = st.sku
              AND p.acct_group NOT IN ('Specials', 'Non stock Item')
             LEFT JOIN sales_data s
               ON st.sku = s.item_sku
+             AND st.stock_qty_date = s.stock_qty_date
             LEFT JOIN damaged_data dd
               ON st.sku = dd.sku AND st.shop_id = dd.shop_id
             WHERE st.shop_id = %s
