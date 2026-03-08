@@ -3418,91 +3418,15 @@ def get_final_product_stock_holding_report():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
     query = """
-        WITH base_stock AS (
-            SELECT
-                st.shop_id,
-                st.sku,
-                COALESCE(st.product_name, p.item_name) AS item_name,
-                p.item_type,
-                st.stock_qty_date,
-                COALESCE(st.final_stock_qty, 0) AS final_stock_qty
-            FROM toc_stock st
-            INNER JOIN toc_product p
-                ON p.item_sku = st.sku
-            WHERE st.shop_id <> 'ONL001'
-              AND p.acct_group NOT IN ('Specials', 'Non stock Item')
-              AND COALESCE(p.item_type, '') <> 'CO'
-        ),
-
-        wc_sales_999 AS (
-            SELECT
-                bs.shop_id,
-                bs.sku,
-                SUM(COALESCE(wi.quantity, 0)) AS sold_qty
-            FROM base_stock bs
-            INNER JOIN toc_wc_sales_items wi
-                ON wi.sku = bs.sku
-            INNER JOIN toc_wc_sales_order wo
-                ON wo.order_id = wi.order_id
-               AND wo.creation_date > bs.stock_qty_date
-            INNER JOIN tasteofc_wp268.wpf7_wc_order_stats wos
-                ON wos.order_id = wo.order_id
-               AND wos.status = 'wc-completed'
-            LEFT JOIN toc_shipday sd
-                ON sd.wc_orderid = wo.order_id
-            WHERE bs.shop_id = 'TOC999'
-              AND sd.wc_orderid IS NULL
-            GROUP BY bs.shop_id, bs.sku
-        ),
-
-        pos_sales_other AS (
-            SELECT
-                bs.shop_id,
-                bs.sku,
-                SUM(COALESCE(lsi.quantity, 0)) AS sold_qty
-            FROM base_stock bs
-            INNER JOIN toc_ls_sales ls
-                ON ls.store_customer = bs.shop_id
-               AND ls.time_of_sale > bs.stock_qty_date
-            INNER JOIN toc_ls_sales_item lsi
-                ON lsi.sales_id = ls.sales_id
-               AND lsi.item_sku = bs.sku
-            WHERE bs.shop_id NOT IN ('TOC999', 'TOC888')
-            GROUP BY bs.shop_id, bs.sku
-        ),
-
-        current_stock AS (
-            SELECT
-                bs.sku,
-                bs.item_name,
-                bs.shop_id,
-                CASE
-                    WHEN bs.shop_id = 'TOC999'
-                        THEN bs.final_stock_qty - COALESCE(wc.sold_qty, 0)
-                    WHEN bs.shop_id = 'TOC888'
-                        THEN bs.final_stock_qty
-                    ELSE
-                        bs.final_stock_qty - COALESCE(pos.sold_qty, 0)
-                END AS current_qty
-            FROM base_stock bs
-            LEFT JOIN wc_sales_999 wc
-                ON wc.shop_id = bs.shop_id
-               AND wc.sku = bs.sku
-            LEFT JOIN pos_sales_other pos
-                ON pos.shop_id = bs.shop_id
-               AND pos.sku = bs.sku
-        )
-
         SELECT
             sku AS `SKU`,
-            MAX(item_name) AS `Description`,
-            ROUND(SUM(CASE WHEN shop_id IN ('TOC999','TOC888') THEN current_qty ELSE 0 END), 2) AS `HQ (Cannafoods + Canndo) - Qty`,
-            ROUND(SUM(CASE WHEN shop_id NOT IN ('TOC999','TOC888') THEN current_qty ELSE 0 END), 2) AS `All Shops - Qty`,
-            ROUND(SUM(current_qty), 2) AS `Total (Whole Company) - Qty`
-        FROM current_stock
-        GROUP BY sku
-        HAVING ROUND(SUM(current_qty), 2) <> 0
-        ORDER BY MAX(item_name);
+            description AS `Description`,
+            hq_qty AS `HQ (Cannafoods + Canndo) - Qty`,
+            all_shops_qty AS `All Shops - Qty`,
+            total_qty AS `Total (Whole Company) - Qty`,
+            last_refresh_ts AS `Last Refresh`
+        FROM toc_final_product_stock_holding_current
+        ORDER BY description
     """
 
     cursor.execute(query)
