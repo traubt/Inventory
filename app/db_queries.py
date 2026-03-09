@@ -3424,6 +3424,7 @@ def get_final_product_stock_holding_report():
             hq_qty AS `HQ (Cannafoods + Canndo) - Qty`,
             all_shops_qty AS `All Shops - Qty`,
             total_qty AS `Total (Whole Company) - Qty`,
+            retro_sale_days,
             last_refresh_ts AS `Last Refresh`
         FROM toc_final_product_stock_holding_current
         ORDER BY description
