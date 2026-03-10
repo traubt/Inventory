@@ -2755,7 +2755,7 @@ def get_variance_report():
         elif report_type == "Consolidated Damaged Returns":
             data = get_consolidated_damaged_return(from_date, to_date)
         elif report_type == "Consolidated Final Product Stock Holding Report":
-            data = get_final_product_stock_holding_report()
+            data = get_final_product_stock_holding_report(group_by)
         elif report_type == "Spotcheck Count Variance":
             data = get_spotcheck_variance_report(from_date, to_date)
         elif report_type == "Consolidated Variance Report":

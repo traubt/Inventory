@@ -395,6 +395,41 @@ $(document).ready(function () {
       //alert(`View ${selectedReport}`);
     });
 
+
+const defaultGroupOptions = `
+<option value="none">Don't Group</option>
+<option value="day">Day</option>
+<option value="month">Month</option>
+<option value="user">User</option>
+<option value="shop">Shop</option>
+`;
+
+const finalProductGroupOptions = `
+<option value="none">Don't Group</option>
+<option value="account_group">Account Group</option>
+`;
+
+function updateGroupByOptions() {
+    const selectedReport = document.querySelector('input[name="varianceReport"]:checked')?.value;
+    const groupSelect = document.getElementById("groupBy");
+
+    if (!groupSelect) return;
+
+    if (selectedReport === "Consolidated Final Product Stock Holding Report") {
+        groupSelect.innerHTML = finalProductGroupOptions;
+    } else {
+        groupSelect.innerHTML = defaultGroupOptions;
+    }
+}
+
+$(document).ready(function () {
+    updateGroupByOptions();
+
+    $('input[name="varianceReport"]').on('change', function () {
+        updateGroupByOptions();
+    });
+});
+
 </script>
 
 

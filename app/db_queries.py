@@ -3413,22 +3413,43 @@ def get_spotcheck_variance_report(from_date, to_date):
     return result_as_dicts
 
 
-def get_final_product_stock_holding_report():
+def get_final_product_stock_holding_report(group_by='none'):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-    query = """
-        SELECT
-            sku AS `SKU`,
-            description AS `Description`,
-            hq_qty AS `HQ (Cannafoods + Canndo) - Qty`,
-            all_shops_qty AS `All Shops - Qty`,
-            total_qty AS `Total (Whole Company) - Qty`,
-            retro_sale_days,
-            last_refresh_ts AS `Last Refresh`
-        FROM toc_final_product_stock_holding_current
-        ORDER BY description
-    """
+    if group_by == 'account_group':
+        query = """
+            SELECT
+                COALESCE(account_group, 'Unassigned') AS `Account Group`,
+                ROUND(SUM(hq_qty), 2) AS `HQ (Cannafoods + Canndo) - Qty`,
+                ROUND(SUM(hq_cost_value), 2) AS `HQ Cost Value`,
+                ROUND(SUM(all_shops_qty), 2) AS `All Shops - Qty`,
+                ROUND(SUM(all_shops_cost_value), 2) AS `All Shops Cost Value`,
+                ROUND(SUM(total_qty), 2) AS `Total (Whole Company) - Qty`,
+                ROUND(SUM(all_shops_cost_value + hq_cost_value), 2) AS `Total (Whole Company) - Cost`,
+                ROUND(AVG(NULLIF(retro_sale_days, 999)), 2) AS `retro_sale_days`,
+                MAX(last_refresh_ts) AS `Last Refresh`
+            FROM toc_final_product_stock_holding_current
+            GROUP BY COALESCE(account_group, 'Unassigned')
+            ORDER BY COALESCE(account_group, 'Unassigned')
+        """
+    else:
+        query = """
+            SELECT
+                sku AS `SKU`,
+                description AS `Description`,
+                account_group AS `Account Group`,
+                hq_qty AS `HQ (Cannafoods + Canndo) - Qty`,
+                hq_cost_value AS `HQ Cost Value`,
+                all_shops_qty AS `All Shops - Qty`,
+                all_shops_cost_value AS `All Shops Cost Value`,
+                total_qty AS `Total (Whole Company) - Qty`,
+                (all_shops_cost_value + hq_cost_value) AS `Total (Whole Company) - Cost`,
+                retro_sale_days AS `retro_sale_days`,
+                last_refresh_ts AS `Last Refresh`
+            FROM toc_final_product_stock_holding_current
+            ORDER BY description
+        """
 
     cursor.execute(query)
     result = cursor.fetchall()
