@@ -4939,31 +4939,43 @@ def get_stock_movement():
         return jsonify({"columns": columns, "data": rows})
 
     # ----------------------------------------------------------
-    # TOC999 (Head Office): simple + maintainable algorithm
+    # TOC999 (Head Office)
     #
-    # 1) Order by toc_stock_audit.creation_date (UTC) ONLY
-    # 2) Reset Count: X => running := X
-    # 3) WC sale rows included ONLY if Woo current status == 'wc-completed'
-    # 4) Exclude WC sale rows if order exists in toc_shipday
-    # 5) Compute running per SKU from oldest->newest
-    # 6) Return rows newest->oldest for UI
+    # Rules:
+    # 1) Use effective creation date for WC completed rows:
+    #       completed_comment_date + 2 hours
+    #    otherwise fall back to toc_stock_audit.creation_date
+    # 2) Include non-WC always
+    # 3) Include WC only if Woo current status = wc-completed
+    # 4) Exclude WC rows if order exists in toc_shipday
+    # 5) Compute running balance per SKU in ASC order using effective creation date
     # ----------------------------------------------------------
 
-    # Lookback so we can catch the last reset BEFORE fromDate
     LOOKBACK_DAYS = 21
     try:
         fromDateMinus = (datetime.strptime(fromDate, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     except Exception:
         fromDateMinus = fromDate
 
-    # Woo DB/table (adjust if needed)
     WC_DB_SCHEMA = "tasteofc_wp268"
     WC_ORDER_STATS_TABLE = "wpf7_wc_order_stats"
+    WC_COMMENTS_TABLE = "wpf7_comments"
 
     sql = text(f"""
         SELECT
           a.id,
-          a.creation_date,
+
+          -- Effective creation date:
+          -- for WC-completed rows use completed note time + 2 hours
+          CASE
+            WHEN a.comments LIKE 'WC sale %'
+                 AND os.status = 'wc-completed'
+                 AND wc_comp.completed_comment_date IS NOT NULL
+              THEN DATE_ADD(wc_comp.completed_comment_date, INTERVAL 2 HOUR)
+            ELSE a.creation_date
+          END AS creation_date,
+
+          a.creation_date AS original_creation_date,
           a.shop_id,
           a.sku,
           a.product_name,
@@ -4982,12 +4994,37 @@ def get_stock_movement():
           END AS wc_order_id,
 
           os.status AS wc_status_src,
-          sd.wc_orderid AS shipday_order_id
+          sd.wc_orderid AS shipday_order_id,
+          wc_comp.completed_comment_date
 
         FROM toc_stock_audit a
 
         LEFT JOIN {WC_DB_SCHEMA}.{WC_ORDER_STATS_TABLE} os
           ON os.order_id = CASE
+              WHEN a.comments LIKE 'WC sale %' THEN CAST(
+                  SUBSTRING_INDEX(
+                    SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
+                    ';', 1
+                  ) AS UNSIGNED
+              )
+              ELSE NULL
+          END
+
+        LEFT JOIN (
+            SELECT
+                c.comment_post_ID AS order_id,
+                MAX(c.comment_date) AS completed_comment_date
+            FROM {WC_DB_SCHEMA}.{WC_COMMENTS_TABLE} c
+            WHERE c.comment_type = 'order_note'
+              AND (
+                    c.comment_content LIKE 'Order status changed from % to Completed.%'
+                 OR c.comment_content LIKE 'Order status changed from % to completed.%'
+                 OR c.comment_content LIKE 'Status changed from % to Completed.%'
+                 OR c.comment_content LIKE 'Status changed from % to completed.%'
+              )
+            GROUP BY c.comment_post_ID
+        ) wc_comp
+          ON wc_comp.order_id = CASE
               WHEN a.comments LIKE 'WC sale %' THEN CAST(
                   SUBSTRING_INDEX(
                     SUBSTRING_INDEX(a.comments, 'WC sale ', -1),
@@ -5012,7 +5049,8 @@ def get_stock_movement():
           AND a.sku IN :items
           AND a.creation_date >= :fromDateMinus
           AND a.creation_date < :toDateExclusive
-        ORDER BY a.sku ASC, a.creation_date ASC, a.id ASC
+
+        ORDER BY a.sku ASC, creation_date ASC, a.id ASC
     """).bindparams(bindparam("items", expanding=True))
 
     results = db.session.execute(sql, {
@@ -5043,7 +5081,6 @@ def get_stock_movement():
             return None
 
     def _parse_wc_qty(comments: str):
-        # "WC sale 667647; qty=2.0; ..."
         if not comments or "qty=" not in comments:
             return None
         try:
@@ -5053,7 +5090,6 @@ def get_stock_movement():
             return None
 
     def _parse_transfer_out_qty(comments: str):
-        # "Transfer OUT: -20.0 -> ..."
         if not comments:
             return None
         c = comments.strip()
@@ -5065,7 +5101,6 @@ def get_stock_movement():
         return abs(float(m.group(1)))
 
     def _parse_transfer_in_received_damaged(comments: str):
-        # "Transfer IN: +5.0 (received 10.0, damaged 5.0) ..."
         if not comments:
             return None
         c = comments.strip()
@@ -5086,21 +5121,21 @@ def get_stock_movement():
         """
         c = (row.get("comments") or "").strip()
 
-        # Reset handled separately (absolute)
+        # Reset handled separately
         if c.lower().startswith("reset count"):
             return None
 
-        # WC sale => subtract qty (ONLY if included row)
+        # WC sale
         if c.startswith("WC sale "):
             q = _parse_wc_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer OUT => subtract magnitude
+        # Transfer OUT
         if c.lower().startswith("transfer out"):
             q = _parse_transfer_out_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer IN => add (received - damaged)
+        # Transfer IN
         if c.lower().startswith("transfer in"):
             parsed = _parse_transfer_in_received_damaged(c)
             if parsed:
@@ -5110,7 +5145,7 @@ def get_stock_movement():
 
         return None
 
-    # Date filtering window (we compute with lookback but output only the requested window)
+    # Output date window uses the EFFECTIVE creation_date
     try:
         from_dt = datetime.strptime(fromDate, "%Y-%m-%d")
         to_excl_dt = datetime.strptime(toDateExclusive, "%Y-%m-%d")
@@ -5119,6 +5154,7 @@ def get_stock_movement():
         to_excl_dt = None
 
     # Group rows per SKU
+    # Group rows per SKU
     by_sku = {}
     for r in all_rows:
         by_sku.setdefault(str(r["sku"]), []).append(r)
@@ -5126,9 +5162,10 @@ def get_stock_movement():
     output_rows = []
 
     for sku, rows in by_sku.items():
-        # rows already sorted ASC by SQL
+        # Safety: re-sort in Python by EFFECTIVE creation_date ASC, id ASC
+        rows.sort(key=lambda x: (x.get("creation_date"), x.get("id")))
 
-        # 1) Filter DISPLAY rows (WC based on Woo *current* status)
+        # 1) Filter rows to display
         displayed = []
         for r in rows:
             c = (r.get("comments") or "")
@@ -5138,11 +5175,11 @@ def get_stock_movement():
                 displayed.append(r)
                 continue
 
-            # WC sale: include ONLY if Woo says completed
+            # WC sale: include only if Woo current status says completed
             if r.get("wc_status_src") != "wc-completed":
                 continue
 
-            # Exclude Shipday orders from TOC999
+            # Exclude Shipday orders
             if r.get("shipday_order_id") is not None:
                 continue
 
@@ -5151,28 +5188,43 @@ def get_stock_movement():
         if not displayed:
             continue
 
-        # 2) Deterministic running balance in ASC order (using audit UTC timeline)
-        running = None
-        for r in displayed:
-            comments = r.get("comments") or ""
-
-            reset_val = _parse_reset_value(comments)
+        # 2) Find latest reset row in the working set
+        last_reset_idx = None
+        for idx, r in enumerate(displayed):
+            reset_val = _parse_reset_value(r.get("comments") or "")
             if reset_val is not None:
-                running = reset_val
+                last_reset_idx = idx
+
+        # If there is a reset, compute strictly from that reset forward
+        # Otherwise anchor from first displayed original stock and continue forward
+        if last_reset_idx is not None:
+            calc_rows = displayed[last_reset_idx:]
+            running = _parse_reset_value(calc_rows[0].get("comments") or "")
+            calc_rows[0]["calc_stock_count"] = running
+
+            for r in calc_rows[1:]:
+                delta = _movement_delta(r)
+                if delta is not None:
+                    running = running + delta
                 r["calc_stock_count"] = running
-                continue
 
-            if running is None:
-                running = float(r.get("original_stock_count") or 0.0)
+            # rows before the reset keep original stock (mainly lookback rows)
+            for r in displayed[:last_reset_idx]:
+                r["calc_stock_count"] = r.get("original_stock_count")
 
-            delta = _movement_delta(r)
-            if delta is not None:
-                running = running + delta
+        else:
+            # No reset found: anchor from first row original stock_count
+            running = float(displayed[0].get("original_stock_count") or 0.0)
+            displayed[0]["calc_stock_count"] = running
 
-            r["calc_stock_count"] = running
+            for r in displayed[1:]:
+                delta = _movement_delta(r)
+                if delta is not None:
+                    running = running + delta
+                r["calc_stock_count"] = running
 
-        # 3) Output only rows within requested window (but keep calc from lookback)
-        for r in reversed(displayed):  # newest first
+        # 3) Output only requested date window, newest first
+        for r in reversed(displayed):
             cd = r.get("creation_date")
             if isinstance(cd, datetime) and from_dt and to_excl_dt:
                 if not (cd >= from_dt and cd < to_excl_dt):
@@ -5188,9 +5240,12 @@ def get_stock_movement():
                 "shop_name": r["shop_name"],
                 "comments": r["comments"],
             }
+
             if isinstance(d.get("creation_date"), datetime):
                 d["creation_date"] = d["creation_date"].strftime("%Y-%m-%d %H:%M:%S")
+
             output_rows.append(d)
+
 
     # Final ordering for UI: sku ASC, creation_date DESC
     output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
