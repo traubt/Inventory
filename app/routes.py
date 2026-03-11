@@ -4894,7 +4894,6 @@ def get_stock_movement():
 
     is_head_office = (shop == "TOC999")
 
-    # What the UI expects
     columns = [
         {"title": "id"},
         {"title": "creation_date"},
@@ -4907,7 +4906,7 @@ def get_stock_movement():
     ]
 
     # ----------------------------------------------------------
-    # Non-Head-Office: return raw audit rows (no special logic)
+    # Non-Head-Office: raw audit rows
     # ----------------------------------------------------------
     if not is_head_office:
         sql = text("""
@@ -4939,19 +4938,10 @@ def get_stock_movement():
         return jsonify({"columns": columns, "data": rows})
 
     # ----------------------------------------------------------
-    # TOC999 (Head Office)
-    #
-    # Rules:
-    # 1) Use effective creation date for WC completed rows:
-    #       completed_comment_date + 2 hours
-    #    otherwise fall back to toc_stock_audit.creation_date
-    # 2) Include non-WC always
-    # 3) Include WC only if Woo current status = wc-completed
-    # 4) Exclude WC rows if order exists in toc_shipday
-    # 5) Compute running balance per SKU in ASC order using effective creation date
+    # TOC999 logic
     # ----------------------------------------------------------
 
-    LOOKBACK_DAYS = 21
+    LOOKBACK_DAYS = 120
     try:
         fromDateMinus = (datetime.strptime(fromDate, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     except Exception:
@@ -4965,8 +4955,6 @@ def get_stock_movement():
         SELECT
           a.id,
 
-          -- Effective creation date:
-          -- for WC-completed rows use completed note time + 2 hours
           CASE
             WHEN a.comments LIKE 'WC sale %'
                  AND os.status = 'wc-completed'
@@ -5062,9 +5050,6 @@ def get_stock_movement():
 
     all_rows = [dict(r._mapping) for r in results]
 
-    # -------------------------
-    # Parsers
-    # -------------------------
     _re_float = r"(-?\d+(?:\.\d+)?)"
 
     def _parse_reset_value(comments: str):
@@ -5084,8 +5069,7 @@ def get_stock_movement():
         if not comments or "qty=" not in comments:
             return None
         try:
-            val_str = comments.split("qty=", 1)[1].split(";", 1)[0].strip()
-            return float(val_str)
+            return float(comments.split("qty=", 1)[1].split(";", 1)[0].strip())
         except Exception:
             return None
 
@@ -5115,27 +5099,19 @@ def get_stock_movement():
         return received, damaged
 
     def _movement_delta(row):
-        """
-        Returns signed delta to apply to running (ASC oldest->newest).
-        None => unknown/ignore (no change).
-        """
         c = (row.get("comments") or "").strip()
 
-        # Reset handled separately
         if c.lower().startswith("reset count"):
             return None
 
-        # WC sale
         if c.startswith("WC sale "):
             q = _parse_wc_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer OUT
         if c.lower().startswith("transfer out"):
             q = _parse_transfer_out_qty(c)
             return (-q) if q is not None else None
 
-        # Transfer IN
         if c.lower().startswith("transfer in"):
             parsed = _parse_transfer_in_received_damaged(c)
             if parsed:
@@ -5145,7 +5121,6 @@ def get_stock_movement():
 
         return None
 
-    # Output date window uses the EFFECTIVE creation_date
     try:
         from_dt = datetime.strptime(fromDate, "%Y-%m-%d")
         to_excl_dt = datetime.strptime(toDateExclusive, "%Y-%m-%d")
@@ -5153,8 +5128,6 @@ def get_stock_movement():
         from_dt = None
         to_excl_dt = None
 
-    # Group rows per SKU
-    # Group rows per SKU
     by_sku = {}
     for r in all_rows:
         by_sku.setdefault(str(r["sku"]), []).append(r)
@@ -5162,10 +5135,8 @@ def get_stock_movement():
     output_rows = []
 
     for sku, rows in by_sku.items():
-        # Safety: re-sort in Python by EFFECTIVE creation_date ASC, id ASC
         rows.sort(key=lambda x: (x.get("creation_date"), x.get("id")))
 
-        # 1) Filter rows to display
         displayed = []
         for r in rows:
             c = (r.get("comments") or "")
@@ -5175,11 +5146,9 @@ def get_stock_movement():
                 displayed.append(r)
                 continue
 
-            # WC sale: include only if Woo current status says completed
             if r.get("wc_status_src") != "wc-completed":
                 continue
 
-            # Exclude Shipday orders
             if r.get("shipday_order_id") is not None:
                 continue
 
@@ -5188,42 +5157,75 @@ def get_stock_movement():
         if not displayed:
             continue
 
-        # 2) Find latest reset row in the working set
-        last_reset_idx = None
+        # earliest reset BEFORE or WITHIN requested period
+        anchor_idx = None
         for idx, r in enumerate(displayed):
             reset_val = _parse_reset_value(r.get("comments") or "")
-            if reset_val is not None:
-                last_reset_idx = idx
+            cd = r.get("creation_date")
+            if reset_val is not None and isinstance(cd, datetime) and from_dt and cd < from_dt:
+                anchor_idx = idx
 
-        # If there is a reset, compute strictly from that reset forward
-        # Otherwise anchor from first displayed original stock and continue forward
-        if last_reset_idx is not None:
-            calc_rows = displayed[last_reset_idx:]
-            running = _parse_reset_value(calc_rows[0].get("comments") or "")
-            calc_rows[0]["calc_stock_count"] = running
+        # if no reset before fromDate, take the earliest reset inside the working set
+        if anchor_idx is None:
+            for idx, r in enumerate(displayed):
+                reset_val = _parse_reset_value(r.get("comments") or "")
+                if reset_val is not None:
+                    anchor_idx = idx
+                    break
 
-            for r in calc_rows[1:]:
+        if anchor_idx is not None:
+            calc_rows = displayed[anchor_idx:]
+
+            # start from the anchor reset
+            running = None
+
+            for i, r in enumerate(calc_rows):
+                comments = r.get("comments") or ""
+                reset_val = _parse_reset_value(comments)
+
+                # ✅ EVERY reset row overrides running absolutely
+                if reset_val is not None:
+                    running = reset_val
+                    r["calc_stock_count"] = running
+                    continue
+
+                # safety fallback: first non-reset after anchor with no running yet
+                if running is None:
+                    running = float(r.get("original_stock_count") or 0.0)
+
                 delta = _movement_delta(r)
                 if delta is not None:
                     running = running + delta
+
                 r["calc_stock_count"] = running
 
-            # rows before the reset keep original stock (mainly lookback rows)
-            for r in displayed[:last_reset_idx]:
+            # older rows before anchor keep original values
+            for r in displayed[:anchor_idx]:
                 r["calc_stock_count"] = r.get("original_stock_count")
 
         else:
-            # No reset found: anchor from first row original stock_count
-            running = float(displayed[0].get("original_stock_count") or 0.0)
-            displayed[0]["calc_stock_count"] = running
+            # no reset found at all in lookback window
+            running = None
 
-            for r in displayed[1:]:
+            for i, r in enumerate(displayed):
+                comments = r.get("comments") or ""
+                reset_val = _parse_reset_value(comments)
+
+                # ✅ reset row overrides absolutely
+                if reset_val is not None:
+                    running = reset_val
+                    r["calc_stock_count"] = running
+                    continue
+
+                if running is None:
+                    running = float(r.get("original_stock_count") or 0.0)
+
                 delta = _movement_delta(r)
                 if delta is not None:
                     running = running + delta
+
                 r["calc_stock_count"] = running
 
-        # 3) Output only requested date window, newest first
         for r in reversed(displayed):
             cd = r.get("creation_date")
             if isinstance(cd, datetime) and from_dt and to_excl_dt:
@@ -5246,8 +5248,6 @@ def get_stock_movement():
 
             output_rows.append(d)
 
-
-    # Final ordering for UI: sku ASC, creation_date DESC
     output_rows.sort(key=lambda x: x["creation_date"], reverse=True)
     output_rows.sort(key=lambda x: str(x["sku"]))
 
