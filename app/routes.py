@@ -2676,6 +2676,18 @@ def variance_report():
     roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
     return render_template('variance_report.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
 
+@main.route('/planning_report')
+def planning_report():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+    shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
+    list_of_shops = [shop.blName for shop in shops]
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+    return render_template('planning_report.html', user=user, shop=shop, shops=list_of_shops, roles=roles_list)
+
 
 from flask import request, jsonify
 
@@ -2756,6 +2768,8 @@ def get_variance_report():
             data = get_consolidated_damaged_return(from_date, to_date)
         elif report_type == "Consolidated Final Product Stock Holding Report":
             data = get_final_product_stock_holding_report(group_by)
+        elif report_type == "Consolidated Component Stock Holding Report":
+            data = get_component_stock_holding_report()
         elif report_type == "Spotcheck Count Variance":
             data = get_spotcheck_variance_report(from_date, to_date)
         elif report_type == "Consolidated Variance Report":

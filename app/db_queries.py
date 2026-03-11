@@ -3422,11 +3422,11 @@ def get_final_product_stock_holding_report(group_by='none'):
             SELECT
                 COALESCE(account_group, 'Unassigned') AS `Account Group`,
                 ROUND(SUM(hq_qty), 2) AS `HQ (Cannafoods + Canndo) - Qty`,
-                ROUND(SUM(hq_cost_value), 2) AS `HQ Cost Value`,
+            --    ROUND(SUM(hq_cost_value), 2) AS `HQ Cost Value`,
                 ROUND(SUM(all_shops_qty), 2) AS `All Shops - Qty`,
-                ROUND(SUM(all_shops_cost_value), 2) AS `All Shops Cost Value`,
+            --    ROUND(SUM(all_shops_cost_value), 2) AS `All Shops Cost Value`,
                 ROUND(SUM(total_qty), 2) AS `Total (Whole Company) - Qty`,
-                ROUND(SUM(all_shops_cost_value + hq_cost_value), 2) AS `Total (Whole Company) - Cost`,
+            --    ROUND(SUM(all_shops_cost_value + hq_cost_value), 2) AS `Total (Whole Company) - Cost`,
                 ROUND(AVG(NULLIF(retro_sale_days, 999)), 2) AS `retro_sale_days`,
                 MAX(last_refresh_ts) AS `Last Refresh`
             FROM toc_final_product_stock_holding_current
@@ -3440,16 +3440,91 @@ def get_final_product_stock_holding_report(group_by='none'):
                 description AS `Description`,
                 account_group AS `Account Group`,
                 hq_qty AS `HQ (Cannafoods + Canndo) - Qty`,
-                hq_cost_value AS `HQ Cost Value`,
+            --    hq_cost_value AS `HQ Cost Value`,
                 all_shops_qty AS `All Shops - Qty`,
-                all_shops_cost_value AS `All Shops Cost Value`,
+            --    all_shops_cost_value AS `All Shops Cost Value`,
                 total_qty AS `Total (Whole Company) - Qty`,
-                (all_shops_cost_value + hq_cost_value) AS `Total (Whole Company) - Cost`,
+            --    (all_shops_cost_value + hq_cost_value) AS `Total (Whole Company) - Cost`,
                 retro_sale_days AS `retro_sale_days`,
                 last_refresh_ts AS `Last Refresh`
             FROM toc_final_product_stock_holding_current
             ORDER BY description
         """
+
+    cursor.execute(query)
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+def get_component_stock_holding_report():
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+    query = """
+        WITH component_stock AS (
+            SELECT
+                st.sku,
+                COALESCE(st.product_name, p.item_name) AS description,
+                COALESCE(st.final_stock_qty, 0) AS stock_qty
+            FROM toc_stock st
+            JOIN toc_product p
+              ON p.item_sku COLLATE utf8mb4_unicode_ci = st.sku COLLATE utf8mb4_unicode_ci
+            WHERE st.shop_id = 'TOC888'
+              AND p.item_type = 'CO'
+        ),
+
+        component_usage AS (
+            SELECT
+                bc.component_sku AS sku,
+                bm.creation_date,
+                SUM(COALESCE(bm.qty, 0) * COALESCE(bc.quantity, 0)) AS component_used_qty
+            FROM toc_bom_manufacture bm
+            JOIN toc_bom_components bc
+              ON CAST(bm.item_sku AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(bc.bom_id AS CHAR) COLLATE utf8mb4_unicode_ci
+            GROUP BY bc.component_sku, bm.creation_date
+        ),
+
+        ranked_usage AS (
+            SELECT
+                cu.sku,
+                cu.creation_date,
+                cu.component_used_qty,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cu.sku
+                    ORDER BY cu.creation_date DESC
+                ) AS rn,
+                SUM(cu.component_used_qty) OVER (
+                    PARTITION BY cu.sku
+                    ORDER BY cu.creation_date DESC
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS running_used_qty
+            FROM component_usage cu
+        ),
+
+        retro_calc AS (
+            SELECT
+                cs.sku,
+                MIN(ru.rn) AS retro_manufacture_days
+            FROM component_stock cs
+            LEFT JOIN ranked_usage ru
+              ON cs.sku COLLATE utf8mb4_unicode_ci = ru.sku COLLATE utf8mb4_unicode_ci
+             AND ru.running_used_qty >= cs.stock_qty
+            GROUP BY cs.sku
+        )
+
+        SELECT
+            cs.sku AS `SKU`,
+            cs.description AS `Description`,
+            ROUND(cs.stock_qty, 2) AS `Total (in Canndo) - Qty`,
+            COALESCE(rc.retro_manufacture_days, 999) AS `retro_manufacture_days`
+        FROM component_stock cs
+        LEFT JOIN retro_calc rc
+          ON cs.sku COLLATE utf8mb4_unicode_ci = rc.sku COLLATE utf8mb4_unicode_ci
+        ORDER BY cs.description
+    """
 
     cursor.execute(query)
     result = cursor.fetchall()
