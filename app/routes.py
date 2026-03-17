@@ -124,6 +124,61 @@ def secure_filename(filename: str) -> str:
 
     return filename
 
+def create_default_shop_hours(shop_name: str):
+    """
+    Create default toc_shops_hours rows for a new shop.
+    Defaults:
+      - Monday to Sunday
+      - open_hour   = 09:00:00
+      - closing_hour = 18:00:00
+    """
+    if not shop_name:
+        raise ValueError("shop_name is required")
+
+    days_of_week = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+    ]
+
+    default_open = "09:00:00"
+    default_close = "18:00:00"
+
+    for day in days_of_week:
+        existing = db.session.execute(
+            text("""
+                SELECT 1
+                FROM toc_shops_hours
+                WHERE shop_name = :shop_name
+                  AND day_of_week = :day_of_week
+                LIMIT 1
+            """),
+            {
+                "shop_name": shop_name,
+                "day_of_week": day
+            }
+        ).fetchone()
+
+        if not existing:
+            db.session.execute(
+                text("""
+                    INSERT INTO toc_shops_hours
+                        (shop_name, day_of_week, open_hour, closing_hour)
+                    VALUES
+                        (:shop_name, :day_of_week, :open_hour, :closing_hour)
+                """),
+                {
+                    "shop_name": shop_name,
+                    "day_of_week": day,
+                    "open_hour": default_open,
+                    "closing_hour": default_close
+                }
+            )
+
 def update_grv_flags(po_id):
     grv = BbGrv.query.filter_by(po_id=po_id).first()
     if not grv:
@@ -295,6 +350,27 @@ def distribute_stock_row_to_all_shops(sku: str, product_name: str = None):
     for s in shops:
         sid = s.customer.strip()   # ✅ this is the real toc_stock.shop_id (TOC008 / CCC004 / etc)
         ensure_stock_row(sid, sku, product_name)
+
+def distribute_all_items_to_shop(shop_id: str, shop_type: str):
+    """
+    Create toc_stock rows for ONE shop against all relevant SKUs.
+
+    Rules:
+    - Shop      -> all finished products (item_type = 'PR')
+    - Warehouse -> all components      (item_type = 'CO')
+    """
+    if not shop_id:
+        raise ValueError("shop_id is required")
+
+    normalized_type = (shop_type or "Shop").strip()
+
+    if normalized_type == "Warehouse":
+        products = TocProduct.query.filter_by(item_type='CO').all()
+    else:
+        products = TocProduct.query.filter_by(item_type='PR').all()
+
+    for product in products:
+        ensure_stock_row(shop_id, product.item_sku, product.item_name)
 
 @main.app_context_processor
 def inject_360_defaults():
@@ -7616,6 +7692,184 @@ def _mark_transfer_received(order_id: str):
     t.status = "Received"
     t.received_at = datetime.now(timezone.utc)
 
+
+############################# Admin shops #########################
+
+@main.route('/admin_shops')
+def admin_shops():
+    user_data = session.get('user')
+    user = json.loads(user_data)
+    shop_data = session.get('shop')
+    shop = json.loads(shop_data)
+
+    roles = TocRole.query.all()
+    roles_list = [{'role': role.role, 'exclusions': role.exclusions} for role in roles]
+
+    shops = TOC_SHOPS.query.order_by(TOC_SHOPS.blName.asc()).all()
+
+    return render_template(
+        'shops_admin.html',
+        user=user,
+        shop=shop,
+        roles=roles_list,
+        shops=shops
+    )
+
+
+@main.route('/api/shops', methods=['POST'])
+def create_shop():
+    data = request.get_json()
+
+    if not data or not data.get('blName'):
+        return jsonify({"message": "Missing required field: blName"}), 400
+
+    existing_shop = TOC_SHOPS.query.filter_by(blName=data.get('blName')).first()
+    if existing_shop:
+        return jsonify({"message": "Shop already exists"}), 400
+
+    try:
+        new_shop = TOC_SHOPS(
+            blName=data.get('blName'),
+            blId=data.get('blId'),
+            shop_type=data.get('shop_type', 'Shop'),
+            country=data.get('country'),
+            timezone=data.get('timezone'),
+            store=data.get('store'),
+            customer=data.get('customer'),
+            mt_shop_name=data.get('mt_shop_name'),
+            actv_ind=data.get('actv_ind', 1),
+            tier=data.get('tier'),
+            longitude=data.get('longitude'),
+            latitude=data.get('latitude'),
+            address=data.get('address'),
+            phone=data.get('phone'),
+            zip=data.get('zip'),
+            city=data.get('city'),
+            state=data.get('state'),
+            vat_no=data.get('vat_no')
+        )
+
+        db.session.add(new_shop)
+        db.session.flush()   # keep shop pending but available in this transaction
+
+        # Populate toc_stock for the new shop
+        shop_id = (new_shop.customer or "").strip()
+        if not shop_id:
+            raise ValueError("Customer / shop_id is required to populate toc_stock")
+
+        distribute_all_items_to_shop(
+            shop_id=shop_id,
+            shop_type=new_shop.shop_type
+        )
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Shop created successfully and stock rows initialized for {new_shop.shop_type}",
+            "shop": new_shop.blName
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Failed to create shop: {str(e)}"}), 500
+
+
+@main.route('/api/shops', methods=['POST'])
+def create_shop():
+    data = request.get_json()
+
+    if not data or not data.get('blName'):
+        return jsonify({"message": "Missing required field: blName"}), 400
+
+    existing_shop = TOC_SHOPS.query.filter_by(blName=data.get('blName')).first()
+    if existing_shop:
+        return jsonify({"message": "Shop already exists"}), 400
+
+    try:
+        new_shop = TOC_SHOPS(
+            blName=data.get('blName'),
+            blId=data.get('blId'),
+            shop_type=data.get('shop_type', 'Shop'),
+            country=data.get('country'),
+            timezone=data.get('timezone'),
+            store=data.get('store'),
+            customer=data.get('customer'),
+            mt_shop_name=data.get('mt_shop_name'),
+            actv_ind=data.get('actv_ind', 1),
+            tier=data.get('tier'),
+            longitude=data.get('longitude'),
+            latitude=data.get('latitude'),
+            address=data.get('address'),
+            phone=data.get('phone'),
+            zip=data.get('zip'),
+            city=data.get('city'),
+            state=data.get('state'),
+            vat_no=data.get('vat_no')
+        )
+
+        db.session.add(new_shop)
+        db.session.flush()
+
+        # 1. Populate toc_stock
+        shop_id = (new_shop.customer or "").strip()
+        if not shop_id:
+            raise ValueError("Customer / shop_id is required to populate toc_stock")
+
+        distribute_all_items_to_shop(
+            shop_id=shop_id,
+            shop_type=new_shop.shop_type
+        )
+
+        # 2. Populate toc_shops_hours
+        create_default_shop_hours(new_shop.blName)
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Shop created successfully, stock rows initialized, and default shop hours created",
+            "shop": new_shop.blName
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Failed to create shop: {str(e)}"}), 500
+
+
+@main.route('/api/shops/<string:blName>', methods=['PUT'])
+def update_shop(blName):
+    shop = TOC_SHOPS.query.filter_by(blName=blName).first()
+
+    if not shop:
+        return jsonify({"message": "Shop not found"}), 404
+
+    data = request.get_json()
+
+    try:
+        # shop.blId = data.get('blId')
+        shop.shop_type = data.get('shop_type', 'Shop')
+        shop.country = data.get('country')
+        shop.timezone = data.get('timezone')
+        # shop.store = data.get('store')
+        # shop.customer = data.get('customer')
+        shop.mt_shop_name = data.get('mt_shop_name')
+        shop.actv_ind = data.get('actv_ind', 1)
+        shop.tier = data.get('tier')
+        shop.longitude = data.get('longitude')
+        shop.latitude = data.get('latitude')
+        shop.address = data.get('address')
+        shop.phone = data.get('phone')
+        shop.zip = data.get('zip')
+        shop.city = data.get('city')
+        shop.state = data.get('state')
+        shop.vat_no = data.get('vat_no')
+
+        db.session.commit()
+
+        return jsonify({"message": "Shop updated successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Failed to update shop: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

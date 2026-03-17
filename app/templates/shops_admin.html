@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+  <title>Shops Admin</title>
+
+  <link href="static/assets/img/favicon.png" rel="icon">
+  <link href="static/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <link href="static/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="static/assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="static/assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+  <link href="static/assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="static/assets/css/style.css" rel="stylesheet">
+
+  <script src="static/assets/js/functions.js"></script>
+
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+</head>
+
+<body>
+
+  {% include 'header-bar.html' %}
+  {% include 'side-bar.html' %}
+
+  <main id="main" class="main">
+
+    <div class="pagetitle">
+      <h1>Admin</h1>
+      <nav>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="#">Home</a></li>
+          <li class="breadcrumb-item">Pages</li>
+          <li class="breadcrumb-item active">Shops Admin</li>
+        </ol>
+      </nav>
+    </div>
+
+    <section class="section">
+      <div class="row">
+        <div class="col-lg-12">
+
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Shops</h5>
+              </div>
+
+              <div class="d-flex gap-1 mt-3">
+                <button class="btn btn-primary" id="getShops">Get Shops</button>
+                <button class="btn btn-primary" id="createShop">Create Shop</button>
+              </div>
+
+              <div class="table-responsive mt-4">
+                <table id="ShopsTable" class="display table table-striped" style="width:100%">
+                  <thead></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Create Shop Modal -->
+  <div class="modal fade" id="createShopModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Shop</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="createShopForm">
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Shop Name (blName) *</label>
+                <input type="text" class="form-control" id="blName" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">blId</label>
+                <input type="number" class="form-control" id="blId">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Shop Type</label>
+                <select class="form-select" id="shop_type">
+                  <option value="Shop">Shop</option>
+                  <option value="Warehouse">Warehouse</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Country</label>
+                <input type="text" class="form-control" id="country">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Timezone</label>
+                <input type="text" class="form-control" id="timezone">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Store</label>
+                <input type="text" class="form-control" id="store">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Customer</label>
+                <input type="text" class="form-control" id="customer">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">MT Shop Name</label>
+                <input type="text" class="form-control" id="mt_shop_name">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Active Indicator</label>
+                <select class="form-select" id="actv_ind">
+                  <option value="1">Active</option>
+                  <option value="0">Inactive</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Tier</label>
+                <input type="text" class="form-control" id="tier">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Longitude</label>
+                <input type="text" class="form-control" id="longitude">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Latitude</label>
+                <input type="text" class="form-control" id="latitude">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Address</label>
+              <input type="text" class="form-control" id="address">
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Phone</label>
+                <input type="text" class="form-control" id="phone">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Zip</label>
+                <input type="text" class="form-control" id="zip">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">VAT No</label>
+                <input type="number" class="form-control" id="vat_no">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">City</label>
+                <input type="text" class="form-control" id="city">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">State</label>
+                <input type="text" class="form-control" id="state">
+              </div>
+            </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" id="submitCreateShop" class="btn btn-primary">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Shop Modal -->
+  <div class="modal fade" id="updateShopModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Update Shop</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="updateShopForm">
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Shop Name (blName)</label>
+                <input type="text" class="form-control" id="update_blName" readonly>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">blId</label>
+                <input type="number" class="form-control" id="update_blId">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Shop Type</label>
+                <select class="form-select" id="update_shop_type">
+                  <option value="Shop">Shop</option>
+                  <option value="Warehouse">Warehouse</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Country</label>
+                <input type="text" class="form-control" id="update_country">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Timezone</label>
+                <input type="text" class="form-control" id="update_timezone">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Store</label>
+                <input type="text" class="form-control" id="update_store">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Customer</label>
+                <input type="text" class="form-control" id="update_customer">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">MT Shop Name</label>
+                <input type="text" class="form-control" id="update_mt_shop_name">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Active Indicator</label>
+                <select class="form-select" id="update_actv_ind">
+                  <option value="1">Active</option>
+                  <option value="0">Inactive</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Tier</label>
+                <input type="text" class="form-control" id="update_tier">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Longitude</label>
+                <input type="text" class="form-control" id="update_longitude">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Latitude</label>
+                <input type="text" class="form-control" id="update_latitude">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Address</label>
+              <input type="text" class="form-control" id="update_address">
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Phone</label>
+                <input type="text" class="form-control" id="update_phone">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Zip</label>
+                <input type="text" class="form-control" id="update_zip">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label">VAT No</label>
+                <input type="number" class="form-control" id="update_vat_no">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">City</label>
+                <input type="text" class="form-control" id="update_city">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">State</label>
+                <input type="text" class="form-control" id="update_state">
+              </div>
+            </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" id="submitUpdateShop" class="btn btn-primary">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    let shopDataList = [];
+    let currentShopName = null;
+
+    $(document).ready(function () {
+      var roles = {{ roles | tojson }};
+      var user_role = "{{ user.role }}";
+      disableControlsPerRole(roles, user_role);
+
+      $("#getShops").on("click", function (event) {
+        event.preventDefault();
+        loadShops();
+      });
+
+      $("#createShop").on("click", function () {
+        $("#createShopModal").modal("show");
+      });
+
+      $("#submitCreateShop").on("click", function () {
+        const payload = {
+          blName: $("#blName").val().trim(),
+          blId: $("#blId").val() || null,
+          shop_type: $("#shop_type").val(),
+          country: $("#country").val().trim(),
+          timezone: $("#timezone").val().trim(),
+          store: $("#store").val().trim(),
+          customer: $("#customer").val().trim(),
+          mt_shop_name: $("#mt_shop_name").val().trim(),
+          actv_ind: $("#actv_ind").val(),
+          tier: $("#tier").val().trim(),
+          longitude: $("#longitude").val().trim(),
+          latitude: $("#latitude").val().trim(),
+          address: $("#address").val().trim(),
+          phone: $("#phone").val().trim(),
+          zip: $("#zip").val().trim(),
+          city: $("#city").val().trim(),
+          state: $("#state").val().trim(),
+          vat_no: $("#vat_no").val() || null
+        };
+
+        $.ajax({
+          url: "/api/shops",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify(payload),
+          success: function (response) {
+            alert(response.message);
+            $("#createShopModal").modal("hide");
+            $("#createShopForm")[0].reset();
+            loadShops();
+          },
+          error: function (xhr) {
+            alert(xhr.responseJSON?.message || "Failed to create shop");
+          }
+        });
+      });
+
+      $("#submitUpdateShop").on("click", function () {
+        const payload = {
+          blId: $("#update_blId").val() || null,
+          shop_type: $("#update_shop_type").val(),
+          country: $("#update_country").val().trim(),
+          timezone: $("#update_timezone").val().trim(),
+          store: $("#update_store").val().trim(),
+          customer: $("#update_customer").val().trim(),
+          mt_shop_name: $("#update_mt_shop_name").val().trim(),
+          actv_ind: $("#update_actv_ind").val(),
+          tier: $("#update_tier").val().trim(),
+          longitude: $("#update_longitude").val().trim(),
+          latitude: $("#update_latitude").val().trim(),
+          address: $("#update_address").val().trim(),
+          phone: $("#update_phone").val().trim(),
+          zip: $("#update_zip").val().trim(),
+          city: $("#update_city").val().trim(),
+          state: $("#update_state").val().trim(),
+          vat_no: $("#update_vat_no").val() || null
+        };
+
+        $.ajax({
+          url: `/api/shops/${encodeURIComponent(currentShopName)}`,
+          method: "PUT",
+          contentType: "application/json",
+          data: JSON.stringify(payload),
+          success: function (response) {
+            alert(response.message);
+            $("#updateShopModal").modal("hide");
+            loadShops();
+          },
+          error: function (xhr) {
+            alert(xhr.responseJSON?.message || "Failed to update shop");
+          }
+        });
+      });
+
+      $(document).on("click", ".btn-update-shop", function () {
+        const shopName = $(this).data("id");
+        const shop = shopDataList.find(x => x.blName === shopName);
+        if (!shop) return;
+
+        currentShopName = shop.blName;
+
+        $("#update_blName").val(shop.blName || "");
+        $("#update_blId").val(shop.blId || "");
+        $("#update_shop_type").val(shop.shop_type || "Shop");
+        $("#update_country").val(shop.country || "");
+        $("#update_timezone").val(shop.timezone || "");
+        $("#update_store").val(shop.store || "");
+        $("#update_customer").val(shop.customer || "");
+        $("#update_mt_shop_name").val(shop.mt_shop_name || "");
+        $("#update_actv_ind").val(String(shop.actv_ind ?? 1));
+        $("#update_tier").val(shop.tier || "");
+        $("#update_longitude").val(shop.longitude || "");
+        $("#update_latitude").val(shop.latitude || "");
+        $("#update_address").val(shop.address || "");
+        $("#update_phone").val(shop.phone || "");
+        $("#update_zip").val(shop.zip || "");
+        $("#update_city").val(shop.city || "");
+        $("#update_state").val(shop.state || "");
+        $("#update_vat_no").val(shop.vat_no || "");
+
+        $("#updateShopModal").modal("show");
+      });
+
+      function loadShops() {
+        $.ajax({
+          url: "/api/shops",
+          method: "GET",
+          success: function (response) {
+            shopDataList = response;
+
+            if ($.fn.DataTable.isDataTable("#ShopsTable")) {
+              $("#ShopsTable").DataTable().destroy();
+            }
+
+            $("#ShopsTable thead").empty();
+            $("#ShopsTable tbody").empty();
+
+            const columnOrder = [
+              "blName", "blId", "shop_type", "country", "timezone",
+              "store", "customer", "mt_shop_name", "actv_ind",
+              "tier", "city", "state", "phone"
+            ];
+
+            let headerHtml = "<tr>";
+            columnOrder.forEach(function (header) {
+              headerHtml += `<th>${header}</th>`;
+            });
+            headerHtml += "<th>Actions</th></tr>";
+            $("#ShopsTable thead").append(headerHtml);
+
+            const tableData = response.map(shop => {
+              let row = [];
+              columnOrder.forEach(function (header) {
+                row.push(shop[header] ?? "");
+              });
+
+              row.push(`
+                <button class="btn btn-primary btn-sm btn-update-shop" data-id="${shop.blName}">
+                  Update
+                </button>
+              `);
+
+              return row;
+            });
+
+            $("#ShopsTable").DataTable({
+              data: tableData,
+              searching: true,
+              ordering: true,
+              paging: true,
+              pageLength: 25
+            });
+          },
+          error: function () {
+            alert("Failed to load shops");
+          }
+        });
+      }
+    });
+  </script>
+
+</body>
+</html>

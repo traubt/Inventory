@@ -43,6 +43,7 @@ class TOC_SHOPS(db.Model):
 
     blName = db.Column(db.String(255), primary_key=True)
     blId = db.Column(db.BigInteger)
+    shop_type = db.Column(db.String(20), nullable=False, default='Shop')
     country = db.Column(db.String(2))
     timezone = db.Column(db.String(50))
     store = db.Column(db.String(10))
