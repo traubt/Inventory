@@ -7715,63 +7715,6 @@ def admin_shops():
     )
 
 
-@main.route('/api/shops', methods=['POST'])
-def create_shop():
-    data = request.get_json()
-
-    if not data or not data.get('blName'):
-        return jsonify({"message": "Missing required field: blName"}), 400
-
-    existing_shop = TOC_SHOPS.query.filter_by(blName=data.get('blName')).first()
-    if existing_shop:
-        return jsonify({"message": "Shop already exists"}), 400
-
-    try:
-        new_shop = TOC_SHOPS(
-            blName=data.get('blName'),
-            blId=data.get('blId'),
-            shop_type=data.get('shop_type', 'Shop'),
-            country=data.get('country'),
-            timezone=data.get('timezone'),
-            store=data.get('store'),
-            customer=data.get('customer'),
-            mt_shop_name=data.get('mt_shop_name'),
-            actv_ind=data.get('actv_ind', 1),
-            tier=data.get('tier'),
-            longitude=data.get('longitude'),
-            latitude=data.get('latitude'),
-            address=data.get('address'),
-            phone=data.get('phone'),
-            zip=data.get('zip'),
-            city=data.get('city'),
-            state=data.get('state'),
-            vat_no=data.get('vat_no')
-        )
-
-        db.session.add(new_shop)
-        db.session.flush()   # keep shop pending but available in this transaction
-
-        # Populate toc_stock for the new shop
-        shop_id = (new_shop.customer or "").strip()
-        if not shop_id:
-            raise ValueError("Customer / shop_id is required to populate toc_stock")
-
-        distribute_all_items_to_shop(
-            shop_id=shop_id,
-            shop_type=new_shop.shop_type
-        )
-
-        db.session.commit()
-
-        return jsonify({
-            "message": f"Shop created successfully and stock rows initialized for {new_shop.shop_type}",
-            "shop": new_shop.blName
-        }), 201
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"message": f"Failed to create shop: {str(e)}"}), 500
-
 
 @main.route('/api/shops', methods=['POST'])
 def create_shop():
