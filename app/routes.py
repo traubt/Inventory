@@ -7714,7 +7714,35 @@ def admin_shops():
         shops=shops
     )
 
+@main.route('/api/shops', methods=['GET'])
+def get_shops():
+    shops = TOC_SHOPS.query.order_by(TOC_SHOPS.blName.asc()).all()
 
+    shops_data = [
+        {
+            "blName": s.blName,
+            "blId": s.blId,
+            "shop_type": s.shop_type,
+            "country": s.country,
+            "timezone": s.timezone,
+            "store": s.store,
+            "customer": s.customer,
+            "mt_shop_name": s.mt_shop_name,
+            "actv_ind": s.actv_ind,
+            "tier": s.tier,
+            "longitude": s.longitude,
+            "latitude": s.latitude,
+            "address": s.address,
+            "phone": s.phone,
+            "zip": s.zip,
+            "city": s.city,
+            "state": s.state,
+            "vat_no": s.vat_no
+        }
+        for s in shops
+    ]
+
+    return jsonify(shops_data)
 
 @main.route('/api/shops', methods=['POST'])
 def create_shop():
