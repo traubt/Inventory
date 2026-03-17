@@ -7692,7 +7692,6 @@ def _mark_transfer_received(order_id: str):
     t.status = "Received"
     t.received_at = datetime.now(timezone.utc)
 
-
 ############################# Admin shops #########################
 
 @main.route('/admin_shops')

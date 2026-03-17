@@ -916,6 +916,3 @@ class TocStockTransferItem(db.Model):
     def qty_in_transit(self):
         return (self.qty_sent or 0) - (self.qty_received or 0)
 
-
-
-
