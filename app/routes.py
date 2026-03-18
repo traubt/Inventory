@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app, send_file
-import pymysql
-import json
+
 import os
 from sqlalchemy.exc import SQLAlchemyError
 from .models import *
@@ -22,11 +21,13 @@ import requests
 from sqlalchemy.exc import IntegrityError
 import unicodedata
 
-
 from shipday import Shipday
 from shipday.order import Address, Customer, Pickup, OrderItem, Order
 from flask import g
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
+from pathlib import Path
+import json
 
 shipday_api = Blueprint('shipday_api', __name__)
 
@@ -77,6 +78,61 @@ DB_CONFIG = {
     'database': 'tasteofc_wp268',
     'cursorclass': pymysql.cursors.DictCursor  # Return rows as dictionaries
 }
+
+BUSINESS_LOCATION_FILE = Path("/home/TOC/business_location.py")
+
+
+def append_business_location_entry(*, blName, blId, country, timezone_name, store, customer):
+    """
+    Appends a new shop mapping object into /home/TOC/business_location.py
+
+    Expected file format:
+        BUSLOC = [
+            {...},
+            {...},
+        ]
+    """
+    if not blName:
+        raise ValueError("blName is required for business_location.py")
+    if blId in (None, "", 0):
+        raise ValueError("blId is required for business_location.py")
+    if not store:
+        raise ValueError("store is required for business_location.py")
+    if not customer:
+        raise ValueError("customer is required for business_location.py")
+
+    if not BUSINESS_LOCATION_FILE.exists():
+        raise FileNotFoundError(f"business_location.py not found: {BUSINESS_LOCATION_FILE}")
+
+    content = BUSINESS_LOCATION_FILE.read_text(encoding="utf-8")
+
+    # Prevent duplicate by blName or customer or blId
+    duplicate_checks = [
+        f'"blName": "{blName}"',
+        f'"customer": "{customer}"',
+        f'"blId": {blId}',
+    ]
+    if any(token in content for token in duplicate_checks):
+        return  # already exists, do not append again
+
+    new_entry = (
+        "    {\n"
+        f'        "blName": {json.dumps(blName)},\n'
+        f'        "blId": {int(blId)},\n'
+        f'        "country": {json.dumps(country or "ZA")},\n'
+        f'        "timezone": {json.dumps(timezone_name or "Africa/Johannesburg")},\n'
+        f'        "store": {json.dumps(str(store))},\n'
+        f'        "customer": {json.dumps(customer)}\n'
+        "    },\n"
+    )
+
+    # Append right before the final closing bracket of BUSLOC = [ ... ]
+    last_bracket = content.rfind("]")
+    if last_bracket == -1:
+        raise ValueError("Invalid business_location.py format: closing ] not found")
+
+    updated_content = content[:last_bracket] + new_entry + content[last_bracket:]
+    BUSINESS_LOCATION_FILE.write_text(updated_content, encoding="utf-8")
 
 def secure_filename(filename: str) -> str:
     r"""Pass it a filename and it will return a secure version of it.  This
@@ -7748,16 +7804,20 @@ def get_shops():
 def create_shop():
     data = request.get_json()
 
-    if not data or not data.get('blName'):
+    blName = (data.get('blName') or '').strip() if data else ''
+
+    if not data or not blName:
         return jsonify({"message": "Missing required field: blName"}), 400
 
-    existing_shop = TOC_SHOPS.query.filter_by(blName=data.get('blName')).first()
+    existing_shop = TOC_SHOPS.query.filter_by(blName=blName).first()
     if existing_shop:
-        return jsonify({"message": "Shop already exists"}), 400
+        return jsonify({
+            "message": f"Shop '{blName}' already exists. Please check the name and try again."
+        }), 400
 
     try:
         new_shop = TOC_SHOPS(
-            blName=data.get('blName'),
+            blName=blName,
             blId=data.get('blId'),
             shop_type=data.get('shop_type', 'Shop'),
             country=data.get('country'),
@@ -7780,6 +7840,8 @@ def create_shop():
         db.session.add(new_shop)
         db.session.flush()
 
+        normalized_type = (new_shop.shop_type or "Shop").strip().lower()
+
         # 1. Populate toc_stock
         shop_id = (new_shop.customer or "").strip()
         if not shop_id:
@@ -7790,20 +7852,53 @@ def create_shop():
             shop_type=new_shop.shop_type
         )
 
-        # 2. Populate toc_shops_hours
-        if (new_shop.shop_type or "Shop").strip().lower() == "shop":
+        # 2. Populate toc_shops_hours only for Shop
+        if normalized_type == "shop":
             create_default_shop_hours(new_shop.blName)
+
+        # 3. Append to Lightspeed business_location.py only for Shop
+        if normalized_type == "shop":
+            append_business_location_entry(
+                blName=new_shop.blName,
+                blId=new_shop.blId,
+                country=new_shop.country or "ZA",
+                timezone_name=new_shop.timezone or "Africa/Johannesburg",
+                store=(new_shop.store or "").strip(),
+                customer=(new_shop.customer or "").strip()
+            )
 
         db.session.commit()
 
         return jsonify({
-            "message": f"Shop created successfully, stock rows initialized, and default shop hours created",
+            "message": f"Shop '{new_shop.blName}' created successfully",
             "shop": new_shop.blName
         }), 201
 
+    except IntegrityError as e:
+        db.session.rollback()
+        error_text = str(e.orig) if getattr(e, "orig", None) else str(e)
+
+        if "Duplicate entry" in error_text and "toc_shops.PRIMARY" in error_text:
+            return jsonify({
+                "message": f"Shop '{blName}' already exists. Please check the name and try again."
+            }), 400
+
+        return jsonify({
+            "message": "Database error occurred while creating the shop."
+        }), 500
+
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({
+            "message": str(e)
+        }), 400
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({"message": f"Failed to create shop: {str(e)}"}), 500
+        return jsonify({
+            "message": f"Failed to create shop: {str(e)}"
+        }), 500
+
 
 
 @main.route('/api/shops/<string:blName>', methods=['PUT'])

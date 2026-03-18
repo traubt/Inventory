@@ -85,12 +85,14 @@
 
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label class="form-label">Shop Name (blName) *</label>
+                <label class="form-label">Shop Name (blName)</label>
                 <input type="text" class="form-control" id="blName" required>
+                <div class="invalid-feedback">Shop name is required</div>
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label">blId</label>
-                <input type="number" class="form-control" id="blId">
+                <input type="number" class="form-control" id="blId" required>
+                <div class="invalid-feedback">Lightspeed POS ID is required</div>
               </div>
             </div>
 
@@ -115,14 +117,16 @@
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label">Store</label>
-                <input type="text" class="form-control" id="store">
+                <input type="text" class="form-control" id="store" required>
+                <div class="invalid-feedback">Store is required</div>
               </div>
             </div>
 
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label">Customer</label>
-                <input type="text" class="form-control" id="customer">
+                <input type="text" class="form-control" id="customer" required>
+                <div class="invalid-feedback">customer is required</div>
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label">MT Shop Name</label>
