@@ -7791,7 +7791,8 @@ def create_shop():
         )
 
         # 2. Populate toc_shops_hours
-        create_default_shop_hours(new_shop.blName)
+        if (new_shop.shop_type or "Shop").strip().lower() == "shop":
+            create_default_shop_hours(new_shop.blName)
 
         db.session.commit()
 
