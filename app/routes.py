@@ -396,7 +396,6 @@ def distribute_stock_row_to_all_shops(sku: str, product_name: str = None):
     """
     shops = (
         TOC_SHOPS.query
-        .filter(TOC_SHOPS.store != '001')
         .filter(TOC_SHOPS.actv_ind == 1)
         .filter(TOC_SHOPS.customer.isnot(None))
         .filter(TOC_SHOPS.customer != '')
