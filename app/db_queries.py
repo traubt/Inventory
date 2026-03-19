@@ -124,27 +124,39 @@ def get_recent_sales(shop_name, from_date, to_date):
 
     elif shop_name == "Online":
         query = '''
-            SELECT                 
-                wo.customer_name,
-                wo.customer_email,
-                ROUND(SUM(wi.total_amount) / 1.15, 2) AS total_spent_excl_vat, 
-                COUNT(DISTINCT wo.order_id) AS total_orders,
-                MAX(wo.order_date) AS last_order_date
-            FROM 
-                toc_wc_sales_order wo
-            JOIN 
-                toc_wc_sales_items wi 
-            ON 
-                wo.order_id = wi.order_id
-            WHERE
-                    wo.order_date >= %s
-                    and wo.order_date < %s
-                    and wo.status not in ('wc-cancelled','wc-pending')
-            GROUP BY 
-                wo.customer_name, wo.customer_email
-            ORDER BY 
-                total_spent_excl_vat DESC
-            LIMIT 30;
+SELECT                 
+    wo.customer_name,
+    wo.customer_email,
+    ROUND(SUM(wi.total_amount) / 1.15, 2) AS total_spent_excl_vat, 
+    COUNT(DISTINCT wo.order_id) AS total_orders,
+    MAX(wo.order_date) AS last_order_date
+FROM 
+    toc_wc_sales_order wo
+
+JOIN 
+    toc_wc_sales_items wi 
+    ON wo.order_id = wi.order_id
+
+-- ✅ Join to identify B2B
+LEFT JOIN 
+    toc_wholeseller w 
+    ON wo.customer_id = w.customer_id
+
+WHERE
+    wo.order_date >= %s
+    AND wo.order_date < %s
+    AND wo.status NOT IN ('wc-cancelled','wc-pending')
+
+    -- ✅ Exclude B2B customers
+    AND w.customer_id IS NULL
+
+GROUP BY 
+    wo.customer_name, wo.customer_email
+
+ORDER BY 
+    total_spent_excl_vat DESC
+
+LIMIT 30;
         '''
         cursor.execute(query, (from_date,to_date))  # No placeholders, so no additional parameters
 
@@ -1236,18 +1248,25 @@ def get_sales_by_shop_last_three_months(user_shop):
                 GROUP BY 
                     ts.store_name, sale_month
                 UNION ALL
-                SELECT 
-                    'Online' AS store_name,
-                    DATE_FORMAT(order_date, '%Y-%m') AS sale_month, -- Grouping by creation_date
-                    ROUND(SUM(total_amount / 1.15)) AS total_sales -- Removing 15% VAT
-                FROM 
-                    toc_wc_sales_order
-                WHERE 
-                    order_date >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
-                    AND status NOT IN ('wc-cancelled','wc-pending')
-                     and order_id not in (select wc_orderid from toc_shipday)
-                GROUP BY 
-                    store_name, sale_month;
+SELECT 
+    'Online' AS store_name,
+    DATE_FORMAT(o.order_date, '%Y-%m') AS sale_month,
+    ROUND(SUM(o.total_amount / 1.15)) AS total_sales
+FROM 
+    toc_wc_sales_order o
+LEFT JOIN 
+    toc_wholeseller w 
+    ON o.customer_id = w.customer_id
+WHERE 
+    o.order_date >= DATE_FORMAT(CURDATE() - INTERVAL 3 MONTH, '%Y-%m-01')
+    AND o.status NOT IN ('wc-cancelled','wc-pending')
+    AND o.order_id NOT IN (SELECT wc_orderid FROM toc_shipday)
+
+    -- ✅ EXCLUDE B2B (only keep NON-wholesale customers)
+    AND w.customer_id IS NULL
+
+GROUP BY 
+    store_name, sale_month;
                 '''
         # Execute the query
         cursor.execute(query)
