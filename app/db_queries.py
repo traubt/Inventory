@@ -967,14 +967,28 @@ def get_stock_count_per_shop(shop):
 
     if shop == HEAD_OFFICE_NAME:
         query = """
-            WITH sales_data AS (
+            WITH wc_completed AS (
+              SELECT
+                  c.comment_post_ID AS order_id,
+                  MAX(c.comment_date) AS completed_comment_date
+              FROM tasteofc_wp268.wpf7_comments c
+              WHERE c.comment_type = 'order_note'
+                AND (
+                      c.comment_content LIKE 'Order status changed from % to Completed.%'
+                   OR c.comment_content LIKE 'Order status changed from % to completed.%'
+                   OR c.comment_content LIKE 'Status changed from % to Completed.%'
+                   OR c.comment_content LIKE 'Status changed from % to completed.%'
+                )
+              GROUP BY c.comment_post_ID
+            ),
+            sales_data AS (
               SELECT
                   p.item_sku,
                   st.stock_qty_date,
                   SUM(
                     CASE
-                      WHEN wo.creation_date > st.stock_qty_date
-                           AND wos.status = 'wc-completed'
+                      WHEN wc.completed_comment_date IS NOT NULL
+                           AND DATE_ADD(wc.completed_comment_date, INTERVAL 2 HOUR) > st.stock_qty_date
                            AND sd.wc_orderid IS NULL
                       THEN COALESCE(wi.quantity, 0)
                       ELSE 0
@@ -985,8 +999,8 @@ def get_stock_count_per_shop(shop):
                      ON p.item_sku = wi.sku
               LEFT JOIN toc_wc_sales_order wo
                      ON wi.order_id = wo.order_id
-              LEFT JOIN tasteofc_wp268.wpf7_wc_order_stats wos
-                     ON wo.order_id = wos.order_id
+              LEFT JOIN wc_completed wc
+                     ON wo.order_id = wc.order_id
               LEFT JOIN toc_shipday sd
                      ON wo.order_id = sd.wc_orderid
               LEFT JOIN toc_stock st
