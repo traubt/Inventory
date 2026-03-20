@@ -974,10 +974,10 @@ def get_stock_count_per_shop(shop):
               FROM tasteofc_wp268.wpf7_comments c
               WHERE c.comment_type = 'order_note'
                 AND (
-                      c.comment_content LIKE 'Order status changed from % to Completed.%'
-                   OR c.comment_content LIKE 'Order status changed from % to completed.%'
-                   OR c.comment_content LIKE 'Status changed from % to Completed.%'
-                   OR c.comment_content LIKE 'Status changed from % to completed.%'
+                      c.comment_content LIKE 'Order status changed from %% to Completed.%%'
+                   OR c.comment_content LIKE 'Order status changed from %% to completed.%%'
+                   OR c.comment_content LIKE 'Status changed from %% to Completed.%%'
+                   OR c.comment_content LIKE 'Status changed from %% to completed.%%'
                 )
               GROUP BY c.comment_post_ID
             ),
