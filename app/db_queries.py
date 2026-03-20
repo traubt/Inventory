@@ -983,7 +983,7 @@ def get_stock_count_per_shop(shop):
             ),
             sales_data AS (
               SELECT
-                  st.sku AS item_sku,
+                  p.item_sku,
                   st.stock_qty_date,
                   SUM(
                     CASE
@@ -994,79 +994,32 @@ def get_stock_count_per_shop(shop):
                       ELSE 0
                     END
                   ) AS sales_since_stock_read
-              FROM toc_stock st
+              FROM toc_product p
               LEFT JOIN toc_wc_sales_items wi
-                     ON st.sku = wi.sku
+                     ON p.item_sku = wi.sku
               LEFT JOIN toc_wc_sales_order wo
                      ON wi.order_id = wo.order_id
               LEFT JOIN wc_completed wc
                      ON wo.order_id = wc.order_id
               LEFT JOIN toc_shipday sd
                      ON wo.order_id = sd.wc_orderid
-              WHERE st.shop_id = %s
-              GROUP BY st.sku, st.stock_qty_date
+              LEFT JOIN toc_stock st
+                     ON p.item_sku = st.sku
+                    AND st.shop_id = %s
+              GROUP BY p.item_sku, st.stock_qty_date
             ),
-            transfer_data AS (
+            damaged_data AS (
               SELECT
-                  st.sku AS item_sku,
-                  st.stock_qty_date,
-                  SUM(
-                    CASE
-                      WHEN a.comments LIKE 'Transfer IN:%%' THEN
-                        COALESCE(
-                          CAST(
-                            SUBSTRING_INDEX(
-                              SUBSTRING_INDEX(a.comments, 'received ', -1),
-                              ',',
-                              1
-                            ) AS DECIMAL(18,3)
-                          ),
-                          0
-                        )
-                        -
-                        COALESCE(
-                          CAST(
-                            SUBSTRING_INDEX(
-                              SUBSTRING_INDEX(a.comments, 'damaged ', -1),
-                              ')',
-                              1
-                            ) AS DECIMAL(18,3)
-                          ),
-                          0
-                        )
-
-                      WHEN a.comments LIKE 'Transfer OUT:%%' THEN
-                        -ABS(
-                          COALESCE(
-                            CAST(
-                              REPLACE(
-                                SUBSTRING_INDEX(
-                                  SUBSTRING_INDEX(a.comments, 'Transfer OUT: ', -1),
-                                  ' ',
-                                  1
-                                ),
-                                '+',
-                                ''
-                              ) AS DECIMAL(18,3)
-                            ),
-                            0
-                          )
-                        )
-
-                      ELSE 0
-                    END
-                  ) AS net_transfer_movement
-              FROM toc_stock st
-              LEFT JOIN toc_stock_audit a
-                     ON a.shop_id = st.shop_id
-                    AND a.sku = st.sku
-                    AND a.creation_date > st.stock_qty_date
-                    AND (
-                         a.comments LIKE 'Transfer IN:%%'
-                      OR a.comments LIKE 'Transfer OUT:%%'
-                    )
-              WHERE st.shop_id = %s
-              GROUP BY st.sku, st.stock_qty_date
+                  d.sku,
+                  d.shop_id,
+                  SUM(d.rcv_damaged) AS total_damaged
+              FROM toc_damaged d
+              INNER JOIN toc_stock st
+                      ON d.sku = st.sku
+                     AND d.shop_id = st.shop_id
+              WHERE d.order_open_date > st.stock_qty_date
+                AND d.shop_id = %s
+              GROUP BY d.sku, d.shop_id
             )
             SELECT DISTINCT
                 st.sku AS item_sku,
@@ -1077,28 +1030,17 @@ def get_stock_count_per_shop(shop):
                 st.stock_count AS last_stock_count,
                 st.stock_qty_date AS last_stock_count_date,
                 COALESCE(s.sales_since_stock_read, 0) AS sold_quantity,
-
-                (
-                  COALESCE(st.stock_count, 0)
-                  + COALESCE(t.net_transfer_movement, 0)
-                  - COALESCE(s.sales_since_stock_read, 0)
-                ) AS current_quantity,
-
-                COALESCE(t.net_transfer_movement, 0) AS received_stock
-
+                COALESCE(st.final_stock_qty, 0) - COALESCE(s.sales_since_stock_read, 0) AS current_quantity,
+                COALESCE(st.stock_transfer, 0) AS received_stock
             FROM toc_stock st
             JOIN toc_product p
               ON p.item_sku = st.sku
              AND p.acct_group NOT IN ('Specials', 'Non stock Item')
-
             LEFT JOIN sales_data s
               ON st.sku = s.item_sku
              AND st.stock_qty_date = s.stock_qty_date
-
-            LEFT JOIN transfer_data t
-              ON st.sku = t.item_sku
-             AND st.stock_qty_date = t.stock_qty_date
-
+            LEFT JOIN damaged_data dd
+              ON st.sku = dd.sku AND st.shop_id = dd.shop_id
             WHERE st.shop_id = %s
             ORDER BY COALESCE(s.sales_since_stock_read, 0) DESC;
         """
