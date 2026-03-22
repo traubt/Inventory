@@ -6744,7 +6744,7 @@ def bom_list():
 def bom_create():
 
     # ---------------------------------------------------
-    # Restore application context (REQUIRED for UI header)
+    # Restore application context
     # ---------------------------------------------------
     user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
@@ -6759,12 +6759,26 @@ def bom_create():
     list_of_shops = [s.blName for s in shops]
 
     # ---------------------------------------------------
+    # Load active warehouse shops
+    # ---------------------------------------------------
+    warehouse_shops = (
+        TOC_SHOPS.query
+        .filter(TOC_SHOPS.shop_type == 'Warehouse')
+        .filter(TOC_SHOPS.actv_ind == 1)
+        .order_by(TOC_SHOPS.blName)
+        .all()
+    )
+
+    # ---------------------------------------------------
     # Load products
     # ---------------------------------------------------
     all_products = TocProduct.query.filter_by(is_active=True).all()
 
     # All BOM parent IDs already in use
-    existing_bom_ids = {row[0] for row in db.session.query(TocBOMComponent.bom_id).distinct()}
+    existing_bom_ids = {
+        row[0]
+        for row in db.session.query(TocBOMComponent.bom_id).distinct()
+    }
 
     # PR products without BOM
     products_pr = [
@@ -6791,30 +6805,81 @@ def bom_create():
     } for p in components]
 
     # ---------------------------------------------------
-    # POST — Save new BOM
+    # POST: create BOM
     # ---------------------------------------------------
     if request.method == 'POST':
         bom_id = request.form.get('product_sku')
 
-        # --------------------------------------------
-        # 🔒 SAFETY CHECK: Does this BOM already exist?
-        # --------------------------------------------
+        # Safety
+        if not bom_id:
+            flash("Finished product is required.", "danger")
+            return render_template(
+                "bom_create.html",
+                edit_mode=False,
+                products=products_json,
+                components=components_json,
+                warehouse_shops=[
+                    {"customer": w.customer, "blName": w.blName}
+                    for w in warehouse_shops
+                ],
+                user=user,
+                shops=list_of_shops,
+                roles=roles_list
+            )
+
         if TocBOMComponent.query.filter_by(bom_id=bom_id).first():
             flash("This product already has a BOM defined.", "warning")
             return redirect(url_for('main.bom_list'))
 
-
         product = TocProduct.query.get(bom_id)
         bom_name = product.item_name if product else None
 
-        comp_skus = request.form.getlist('component_sku[]')
-        comp_qtys = request.form.getlist('quantity[]')
+        component_skus = request.form.getlist('component_sku[]')
+        quantities = request.form.getlist('quantity[]')
+        warehouse_shop_ids = request.form.getlist('warehouse_shop_id[]')
 
-        for sku, qty in zip(comp_skus, comp_qtys):
+        valid_warehouse_ids = {w.customer for w in warehouse_shops if w.customer}
+        row_errors = []
+
+        for idx, (sku, qty, warehouse_shop_id) in enumerate(
+            zip(component_skus, quantities, warehouse_shop_ids), start=1
+        ):
             if not sku:
                 continue
-            qty = float(qty or 0)
-            if qty <= 0:
+
+            qty_val = float(qty or 0)
+            if qty_val <= 0:
+                row_errors.append(f"Row {idx}: Quantity must be greater than zero.")
+
+            if not warehouse_shop_id:
+                row_errors.append(f"Row {idx}: Warehouse is required.")
+            elif warehouse_shop_id not in valid_warehouse_ids:
+                row_errors.append(f"Row {idx}: Invalid warehouse selected.")
+
+        if row_errors:
+            for err in row_errors:
+                flash(err, "danger")
+
+            return render_template(
+                "bom_create.html",
+                edit_mode=False,
+                products=products_json,
+                components=components_json,
+                warehouse_shops=[
+                    {"customer": w.customer, "blName": w.blName}
+                    for w in warehouse_shops
+                ],
+                user=user,
+                shops=list_of_shops,
+                roles=roles_list
+            )
+
+        for sku, qty, warehouse_shop_id in zip(component_skus, quantities, warehouse_shop_ids):
+            if not sku:
+                continue
+
+            qty_val = float(qty or 0)
+            if qty_val <= 0:
                 continue
 
             comp = TocProduct.query.get(sku)
@@ -6824,8 +6889,9 @@ def bom_create():
                 bom_name=bom_name,
                 component_sku=sku,
                 component_name=comp.item_name if comp else None,
-                quantity=qty,
-                cost=qty * float(comp.cost_price or 0)
+                quantity=qty_val,
+                cost=qty_val * float(comp.cost_price or 0),
+                warehouse_shop_id=warehouse_shop_id
             ))
 
         db.session.commit()
@@ -6840,6 +6906,10 @@ def bom_create():
         edit_mode=False,
         products=products_json,
         components=components_json,
+        warehouse_shops=[
+            {"customer": w.customer, "blName": w.blName}
+            for w in warehouse_shops
+        ],
         user=user,
         shops=list_of_shops,
         roles=roles_list
@@ -6860,6 +6930,15 @@ def bom_edit(bom_id):
     roles = TocRole.query.all()
     roles_list = [{'role': r.role, 'exclusions': r.exclusions} for r in roles]
 
+    # Only warehouse-type shops for BOM component source selection
+    warehouse_shops = (
+        TOC_SHOPS.query
+        .filter(TOC_SHOPS.shop_type == 'Warehouse')
+        .filter(TOC_SHOPS.actv_ind == 1)
+        .order_by(TOC_SHOPS.blName)
+        .all()
+    )
+
     # Ensure the BOM exists
     components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
     if not components:
@@ -6875,7 +6954,8 @@ def bom_edit(bom_id):
         {
             "component_sku": c.component_sku,
             "component_name": c.component_name,
-            "quantity": float(c.quantity)
+            "quantity": float(c.quantity or 0),
+            "warehouse_shop_id": c.warehouse_shop_id or ""
         }
         for c in components
     ]
@@ -6891,25 +6971,74 @@ def bom_edit(bom_id):
 
     # POST: save updates
     if request.method == "POST":
-
-        TocBOMComponent.query.filter_by(bom_id=bom_id).delete()
-
         component_skus = request.form.getlist("component_sku[]")
         quantities = request.form.getlist("quantity[]")
+        warehouse_shop_ids = request.form.getlist("warehouse_shop_id[]")
 
-        for sku, qty in zip(component_skus, quantities):
+        # Basic validation
+        valid_warehouse_ids = {w.customer for w in warehouse_shops if w.customer}
+        row_errors = []
+
+        for idx, (sku, qty, warehouse_shop_id) in enumerate(
+            zip(component_skus, quantities, warehouse_shop_ids), start=1
+        ):
+            if not sku:
+                continue
+
+            qty_val = float(qty or 0)
+            if qty_val <= 0:
+                row_errors.append(f"Row {idx}: Quantity must be greater than zero.")
+
+            if not warehouse_shop_id:
+                row_errors.append(f"Row {idx}: Warehouse is required.")
+
+            elif warehouse_shop_id not in valid_warehouse_ids:
+                row_errors.append(f"Row {idx}: Invalid warehouse selected.")
+
+        if row_errors:
+            for err in row_errors:
+                flash(err, "danger")
+
+            return render_template(
+                "bom_create.html",
+                edit_mode=True,
+                bom_id=bom_id,
+                bom_name=bom_name,
+                product_cost=product_cost,
+                existing_components=existing_components,
+                products=[{"item_sku": p.item_sku, "item_name": p.item_name} for p in manufacturable_products],
+                components=[{"item_sku": p.item_sku, "item_name": p.item_name, "cost_price": p.cost_price}
+                            for p in component_products],
+                warehouse_shops=[
+                    {"customer": w.customer, "blName": w.blName}
+                    for w in warehouse_shops
+                ],
+                user=user,
+                shops=list_of_shops,
+                roles=roles_list
+            )
+
+        # Delete old rows and recreate
+        TocBOMComponent.query.filter_by(bom_id=bom_id).delete()
+
+        for sku, qty, warehouse_shop_id in zip(component_skus, quantities, warehouse_shop_ids):
             if sku and qty:
+                qty_val = float(qty or 0)
+                if qty_val <= 0:
+                    continue
+
                 p = TocProduct.query.filter_by(item_sku=sku).first()
                 component_name = p.item_name if p else ""
-                cost = (p.cost_price or 0) * float(qty)
+                cost = (p.cost_price or 0) * qty_val
 
                 db.session.add(TocBOMComponent(
                     bom_id=bom_id,
                     bom_name=bom_name,
                     component_sku=sku,
                     component_name=component_name,
-                    quantity=qty,
-                    cost=cost
+                    quantity=qty_val,
+                    cost=cost,
+                    warehouse_shop_id=warehouse_shop_id
                 ))
 
         db.session.commit()
@@ -6926,6 +7055,10 @@ def bom_edit(bom_id):
         products=[{"item_sku": p.item_sku, "item_name": p.item_name} for p in manufacturable_products],
         components=[{"item_sku": p.item_sku, "item_name": p.item_name, "cost_price": p.cost_price}
                     for p in component_products],
+        warehouse_shops=[
+            {"customer": w.customer, "blName": w.blName}
+            for w in warehouse_shops
+        ],
         user=user,
         shops=list_of_shops,
         roles=roles_list
@@ -7015,9 +7148,6 @@ def bom_manufacture():
 @main.route('/bom/manufacture/components/<bom_id>')
 def bom_manufacture_components(bom_id):
 
-    # ---------------------------------------------------
-    # Restore application context (required for header)
-    # ---------------------------------------------------
     user_data = session.get('user')
     user = json.loads(user_data) if user_data else {}
 
@@ -7030,32 +7160,37 @@ def bom_manufacture_components(bom_id):
     shops = TOC_SHOPS.query.filter(TOC_SHOPS.store != '001').all()
     list_of_shops = [s.blName for s in shops]
 
-    # Manufacturing shop (store='888' in toc_shops, but shop_id='TOC888' in toc_stock)
-    canna_store = "888"
-    canna_shop_id = "TOC888"
-    canna_shop = TOC_SHOPS.query.filter_by(store=canna_store).first()
-    if not canna_shop:
-        canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    # Finished product manufacture location stays TOC888
+    manufacture_shop = TOC_SHOPS.query.filter_by(store='888').first()
+    if not manufacture_shop:
+        manufacture_shop = TOC_SHOPS.query.filter_by(blName="Canndo Holdings").first()
 
-    # ---------------------------------------------------
-    # Get components for this BOM
-    # ---------------------------------------------------
     components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
 
     results = []
     for c in components:
-        stock_row = (
-            TocStock.query
-                .filter_by(sku=c.component_sku, shop_id=canna_shop_id)
-                .first()
-        )
+        warehouse_shop_id = (c.warehouse_shop_id or '').strip()
+
+        stock_row = None
+        if warehouse_shop_id:
+            stock_row = TocStock.query.filter_by(
+                sku=c.component_sku,
+                shop_id=warehouse_shop_id
+            ).first()
+
         available_qty = float(stock_row.final_stock_qty or 0) if stock_row else 0
+
+        warehouse_shop = None
+        if warehouse_shop_id:
+            warehouse_shop = TOC_SHOPS.query.filter_by(customer=warehouse_shop_id).first()
 
         results.append({
             "component_sku": c.component_sku,
             "component_name": c.component_name,
             "qty_per_unit": float(c.quantity or 0),
-            "available_qty": available_qty
+            "available_qty": available_qty,
+            "warehouse_shop_id": warehouse_shop_id,
+            "warehouse_name": warehouse_shop.blName if warehouse_shop else warehouse_shop_id
         })
 
     return jsonify({
@@ -7064,7 +7199,7 @@ def bom_manufacture_components(bom_id):
         "user": user,
         "shops": list_of_shops,
         "roles": roles_list,
-        "active_shop": canna_shop.blName if canna_shop else None
+        "active_shop": manufacture_shop.blName if manufacture_shop else None
     })
 
 
@@ -7072,11 +7207,9 @@ def bom_manufacture_components(bom_id):
 def bom_manufacture_submit():
     """
     Manufacture finished goods from a BOM:
-    - Deduct component stock (toc_stock.final_stock_qty) for the manufacturing shop (TOC888)
-    - Increase finished product stock for the same shop
-    - Update stock_transfer:
-        * +finished qty
-        * -component qty
+    - Deduct each component from its own BOM warehouse
+    - Increase finished product stock in manufacture shop (TOC888)
+    - Update stock_transfer accordingly
     - Write header + lines to toc_bom_manufacture / toc_bom_manufacture_items
     """
     from datetime import datetime
@@ -7096,57 +7229,94 @@ def bom_manufacture_submit():
     user_id = user.get("id") or 0
 
     # ---------------------------------------------------
-    # HARD-CODE manufacturing shop to TOC888
+    # Finished goods always go into Canndo Holdings / TOC888
     # ---------------------------------------------------
-    canna_store = "888"
-    canna_shop = TOC_SHOPS.query.filter_by(store=canna_store).first()
-    if not canna_shop:
-        canna_shop = TOC_SHOPS.query.filter_by(blName="Canna Holdings").first()
+    manufacture_shop = TOC_SHOPS.query.filter_by(store='888').first()
+    if not manufacture_shop:
+        manufacture_shop = TOC_SHOPS.query.filter_by(blName="Canndo Holdings").first()
 
-    if not canna_shop:
-        return jsonify({"status": "error", "message": "Manufacturing shop not found (store=888 / Canna Holdings)"}), 400
+    if not manufacture_shop:
+        return jsonify({"status": "error", "message": "Manufacturing shop not found (store=888 / Canndo Holdings)"}), 400
 
-    canna_shop_id = f"TOC{canna_shop.store}"  # => TOC888
+    manufacture_shop_id = manufacture_shop.customer or "TOC888"
 
     # ---------------------------------------------------
-    # Load components for this BOM (bom_id is finished SKU)
+    # Load BOM components
     # ---------------------------------------------------
     components = TocBOMComponent.query.filter_by(bom_id=bom_id).all()
     if not components:
         return jsonify({"status": "error", "message": f"No BOM components found for finished SKU {bom_id}"}), 400
 
+    # ---------------------------------------------------
+    # Validate all components before doing anything
+    # ---------------------------------------------------
+    validation_errors = []
+
+    for comp in components:
+        required_qty = float(comp.quantity or 0) * qty_to_build
+        warehouse_shop_id = (comp.warehouse_shop_id or '').strip()
+
+        if required_qty <= 0:
+            continue
+
+        if not warehouse_shop_id:
+            validation_errors.append(f"Component {comp.component_sku} has no warehouse assigned.")
+            continue
+
+        stock_row = TocStock.query.filter_by(
+            sku=comp.component_sku,
+            shop_id=warehouse_shop_id
+        ).first()
+
+        available_qty = float(stock_row.final_stock_qty or 0) if stock_row else 0
+
+        if available_qty < required_qty:
+            validation_errors.append(
+                f"Insufficient stock for component {comp.component_sku} in warehouse {warehouse_shop_id}. "
+                f"Required {required_qty:.2f}, available {available_qty:.2f}."
+            )
+
+    if validation_errors:
+        return jsonify({
+            "status": "error",
+            "message": "Manufacture validation failed.",
+            "errors": validation_errors
+        }), 400
+
     try:
         # ---------------------------------------------------
-        # Create manufacturing header row
+        # Create manufacture header
         # ---------------------------------------------------
         man = TocBOMManufacture(
             item_sku=bom_id,
             qty=qty_to_build,
-            shop_id=canna_shop_id,
+            shop_id=manufacture_shop_id,
             created_by=user_id,
             creation_date=datetime.utcnow()
         )
         db.session.add(man)
-        db.session.flush()  # get manufacture_id
+        db.session.flush()
 
         # ---------------------------------------------------
-        # Process each component: deduct stock + transfer + log line
+        # Deduct component stock from each component warehouse
         # ---------------------------------------------------
         for comp in components:
             required_qty = float(comp.quantity or 0) * qty_to_build
             if required_qty <= 0:
                 continue
 
+            warehouse_shop_id = (comp.warehouse_shop_id or '').strip()
+
             stock_row = TocStock.query.filter_by(
                 sku=comp.component_sku,
-                shop_id=canna_shop_id
+                shop_id=warehouse_shop_id
             ).first()
 
-            # If missing, create row with zeros
             if not stock_row:
                 stock_row = TocStock(
                     sku=comp.component_sku,
-                    shop_id=canna_shop_id,
+                    shop_id=warehouse_shop_id,
+                    product_name=comp.component_name,
                     final_stock_qty=0,
                     stock_transfer=0,
                     stock_qty_date=datetime.utcnow()
@@ -7154,54 +7324,47 @@ def bom_manufacture_submit():
                 db.session.add(stock_row)
                 db.session.flush()
 
-            # Deduct component final stock
             stock_row.final_stock_qty = float(stock_row.final_stock_qty or 0) - required_qty
-
-            # ✅ Deduct component transfer (your requirement)
             stock_row.stock_transfer = float(stock_row.stock_transfer or 0) - required_qty
-
             stock_row.stock_qty_date = datetime.utcnow()
 
             db.session.add(TocBOMManufactureItem(
                 manufacture_id=man.manufacture_id,
-                component_sku=comp.component_sku,
-                required_qty=required_qty,
-                deducted_qty=required_qty
+                item_sku=comp.component_sku,
+                qty=required_qty
             ))
 
         # ---------------------------------------------------
-        # Add finished product stock + transfer
+        # Add finished stock into manufacture shop
         # ---------------------------------------------------
-        fp_row = TocStock.query.filter_by(
+        finished_product = TocProduct.query.filter_by(item_sku=bom_id).first()
+
+        finished_stock = TocStock.query.filter_by(
             sku=bom_id,
-            shop_id=canna_shop_id
+            shop_id=manufacture_shop_id
         ).first()
 
-        if not fp_row:
-            fp_row = TocStock(
+        if not finished_stock:
+            finished_stock = TocStock(
                 sku=bom_id,
-                shop_id=canna_shop_id,
+                shop_id=manufacture_shop_id,
+                product_name=finished_product.item_name if finished_product else bom_id,
                 final_stock_qty=0,
                 stock_transfer=0,
                 stock_qty_date=datetime.utcnow()
             )
-            db.session.add(fp_row)
+            db.session.add(finished_stock)
             db.session.flush()
 
-        fp_row.final_stock_qty = float(fp_row.final_stock_qty or 0) + qty_to_build
-
-        # ✅ Add finished product transfer (your requirement)
-        fp_row.stock_transfer = float(fp_row.stock_transfer or 0) + qty_to_build
-
-        fp_row.stock_qty_date = datetime.utcnow()
+        finished_stock.final_stock_qty = float(finished_stock.final_stock_qty or 0) + qty_to_build
+        finished_stock.stock_transfer = float(finished_stock.stock_transfer or 0) + qty_to_build
+        finished_stock.stock_qty_date = datetime.utcnow()
 
         db.session.commit()
 
         return jsonify({
             "status": "success",
-            "message": f"Manufactured {qty_to_build} units of {bom_id} in {canna_shop_id}.",
-            "manufacture_id": man.manufacture_id,
-            "shop_id": canna_shop_id
+            "message": f"Manufactured {qty_to_build:.2f} units of {bom_id} successfully."
         })
 
     except Exception as e:

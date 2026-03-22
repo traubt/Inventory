@@ -654,6 +654,7 @@ class TocBOMComponent(db.Model):
 
     quantity = db.Column(db.Float, nullable=False, default=1)
     cost = db.Column(db.Float, nullable=True)
+    warehouse_shop_id = db.Column(db.String(45), nullable=True)
 
     creation_date = db.Column(db.DateTime, default=datetime.utcnow)
     update_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -95,11 +95,12 @@
           <table class="table table-bordered" id="componentsTable">
             <thead>
               <tr>
-                <th style="width: 35%">Component SKU</th>
-                <th>Description</th>
-                <th style="width: 12%">Qty</th>
-                <th style="width: 12%">Cost</th>
-                <th style="width: 5%">Action</th>
+                <th style="width: 26%">Component SKU</th>
+                <th style="width: 24%">Description</th>
+                <th style="width: 22%">Warehouse</th>
+                <th style="width: 10%">Qty</th>
+                <th style="width: 10%">Cost</th>
+                <th style="width: 8%">Action</th>
               </tr>
             </thead>
             <tbody id="componentRows">
@@ -131,13 +132,11 @@
 <script>
   const products = {{ products | tojson }};
   const components = {{ components | tojson }};
+  const warehouseShops = {{ warehouse_shops | tojson }};
 
   // If editing, preload old components
   const existing = {% if edit_mode %} {{ existing_components | tojson }} {% else %} [] {% endif %};
 
-  // ===========================
-  // EVENT: SET PRODUCT DETAILS
-  // ===========================
   $("#product_sku").on("change", function () {
     let sku = $(this).val();
     let p = products.find(x => x.item_sku === sku);
@@ -148,14 +147,17 @@
     updateCostTotals();
   });
 
-  // ===========================
-  // COMPONENT ROW ADD
-  // ===========================
   $("#addRowBtn").click(function () {
     addComponentRow();
   });
 
   function addComponentRow(data = null) {
+    let warehouseOptions = '<option value="">-- Select Warehouse --</option>';
+
+    warehouseShops.forEach(function (w) {
+      warehouseOptions += `<option value="${w.customer}">${w.customer} - ${w.blName}</option>`;
+    });
+
     let row = `
       <tr>
         <td>
@@ -169,6 +171,12 @@
 
         <td>
           <input type="text" class="form-control component-desc" disabled>
+        </td>
+
+        <td>
+          <select class="form-select component-warehouse" name="warehouse_shop_id[]" required>
+            ${warehouseOptions}
+          </select>
         </td>
 
         <td>
@@ -190,18 +198,15 @@
 
     let added = $("#componentRows tr").last();
 
-    // Pre-fill if editing
     if (data) {
-      added.find(".component-sku").val(data.component_sku).change();
+      added.find(".component-sku").val(data.component_sku).trigger("change");
       added.find(".qty").val(data.quantity);
+      added.find(".component-warehouse").val(data.warehouse_shop_id || "");
     }
 
     updateCostTotals();
   }
 
-  // ===============================
-  // COMPONENT SELECTION CHANGE
-  // ===============================
   $(document).on("change", ".component-sku", function () {
     let sku = $(this).val();
     let comp = components.find(x => x.item_sku === sku);
@@ -213,24 +218,15 @@
     updateCostTotals();
   });
 
-  // ===============================
-  // QUANTITY CHANGE
-  // ===============================
   $(document).on("input", ".qty", function () {
     updateCostTotals();
   });
 
-  // ===============================
-  // REMOVE COMPONENT ROW
-  // ===============================
   $(document).on("click", ".remove-row", function () {
     $(this).closest("tr").remove();
     updateCostTotals();
   });
 
-  // ===============================
-  // COST CALCULATION
-  // ===============================
   function updateCostTotals() {
     let total = 0;
 
@@ -250,24 +246,41 @@
     $("#cost_difference").val((productCost - total).toFixed(2));
   }
 
-  // ===============================
-  // EDIT MODE INITIALIZATION
-  // ===============================
   {% if edit_mode %}
-      $("#product_sku").val("{{ bom_id }}").change();
-      $("#product_name_display").val("{{ bom_name }}");
-      $("#product_cost").val("{{ product_cost }}");
-
+    $("#product_sku").val("{{ bom_id }}").change();
+    $("#description").val("{{ bom_name }}");
+    $("#product_cost").val("{{ product_cost }}");
 
     existing.forEach(function (c) {
       addComponentRow({
         component_sku: c.component_sku,
-        quantity: c.quantity
+        quantity: c.quantity,
+        warehouse_shop_id: c.warehouse_shop_id
       });
     });
 
     updateCostTotals();
   {% endif %}
+
+  $("#bomForm").on("submit", function (e) {
+    let valid = true;
+
+    $("#componentRows tr").each(function () {
+      let sku = $(this).find(".component-sku").val();
+      let warehouse = $(this).find(".component-warehouse").val();
+      let qty = $(this).find(".qty").val();
+
+      if (!sku || !warehouse || !qty) {
+        valid = false;
+        return false;
+      }
+    });
+
+    if (!valid) {
+      e.preventDefault();
+      alert("Please complete Component, Warehouse and Quantity for all rows.");
+    }
+  });
 </script>
 
 </body>

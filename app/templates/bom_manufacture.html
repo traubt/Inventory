@@ -88,20 +88,21 @@
 
         <!-- Warning for insufficient stock -->
         <div id="warningBox" class="alert alert-warning d-none">
-          Some components have <b>insufficient stock</b>.
-          Manufacturing is allowed, but please double-check.
+          Some components have <b>insufficient stock</b> in their assigned warehouse.
+          Manufacturing will be blocked until stock is sufficient.
         </div>
 
         <div class="table-responsive">
           <table class="table table-bordered" id="componentTable">
             <thead>
               <tr>
-                <th>Component SKU</th>
-                <th>Description</th>
-                <th>Qty / Unit</th>
-                <th>Required Qty</th>
-                <th>Available Stock</th>
-                <th>Status</th>
+                <th style="width: 16%">Component SKU</th>
+                <th style="width: 26%">Description</th>
+                <th style="width: 24%">Warehouse</th>
+                <th style="width: 10%">Qty / Unit</th>
+                <th style="width: 10%">Required Qty</th>
+                <th style="width: 10%">Available Stock</th>
+                <th style="width: 8%">Status</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -132,35 +133,42 @@ let hasLowStock = false;
 // =========================================================
 $("#loadComponents").on("click", function () {
     const bom_id = $("#finishedSku").val();
-    const qty = parseFloat($("#manuQty").val());
+    const qty = parseFloat($("#manuQty").val()) || 0;
 
     if (!bom_id) {
         alert("Please select a finished product.");
         return;
     }
 
+    if (qty <= 0) {
+        alert("Please enter a valid quantity to manufacture.");
+        return;
+    }
+
     $("#componentTable tbody").empty();
     $("#componentsCard").addClass("d-none");
+    $("#btnManufacture").prop("disabled", false);
 
     fetch(`/bom/manufacture/components/${bom_id}`)
         .then(resp => resp.json())
         .then(data => {
 
-            const components = data.components;
+            const components = data.components || [];
             hasLowStock = false;
 
             components.forEach(c => {
-                const required = c.qty_per_unit * qty;
-                const available = c.available_qty;
-                const low = (available < required);
+                const required = (parseFloat(c.qty_per_unit) || 0) * qty;
+                const available = parseFloat(c.available_qty) || 0;
+                const low = available < required;
 
                 if (low) hasLowStock = true;
 
                 const row = `
                     <tr class="${low ? 'table-danger' : ''}">
-                        <td>${c.component_sku}</td>
-                        <td>${c.component_name}</td>
-                        <td>${c.qty_per_unit}</td>
+                        <td>${c.component_sku || ''}</td>
+                        <td>${c.component_name || ''}</td>
+                        <td>${c.warehouse_name || c.warehouse_shop_id || ''}</td>
+                        <td>${(parseFloat(c.qty_per_unit) || 0).toFixed(2)}</td>
                         <td>${required.toFixed(2)}</td>
                         <td>${available.toFixed(2)}</td>
                         <td>
@@ -176,11 +184,17 @@ $("#loadComponents").on("click", function () {
 
             if (hasLowStock) {
                 $("#warningBox").removeClass("d-none");
+                $("#btnManufacture").prop("disabled", true);
             } else {
                 $("#warningBox").addClass("d-none");
+                $("#btnManufacture").prop("disabled", false);
             }
 
             $("#componentsCard").removeClass("d-none");
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Failed to load BOM components.");
         });
 });
 
@@ -192,7 +206,7 @@ function sortFinishedProducts() {
   if (!sel) return;
 
   const options = Array.from(sel.options);
-  const placeholder = options.shift(); // first option: "-- Select Product --"
+  const placeholder = options.shift();
 
   options.sort((a, b) => (a.text || "").localeCompare(b.text || "", undefined, { sensitivity: "base" }));
 
@@ -210,20 +224,16 @@ function attachFinishedProductSearch() {
     const q = (this.value || "").trim().toLowerCase();
     if (!q) return;
 
-    // Find first option that contains the text (name or sku)
     const match = Array.from(sel.options).find(opt =>
       opt.value && (opt.text || "").toLowerCase().includes(q)
     );
 
     if (match) {
       sel.value = match.value;
-
-      // Try to scroll the selected option into view (helps on long lists)
       try { sel.options[sel.selectedIndex].scrollIntoView({ block: "nearest" }); } catch (e) {}
     }
   });
 
-  // Quality-of-life: press Enter to move focus to qty
   input.addEventListener("keydown", function(e){
     if (e.key === "Enter") {
       e.preventDefault();
@@ -242,22 +252,53 @@ document.addEventListener("DOMContentLoaded", function () {
 // =========================================================
 $("#btnManufacture").on("click", function () {
     const bom_id = $("#finishedSku").val();
-    const qty = parseFloat($("#manuQty").val());
+    const qty = parseFloat($("#manuQty").val()) || 0;
+
+    if (!bom_id) {
+        alert("Please select a finished product.");
+        return;
+    }
+
+    if (qty <= 0) {
+        alert("Please enter a valid quantity to manufacture.");
+        return;
+    }
+
+    if (hasLowStock) {
+        alert("Manufacture is blocked because one or more components have insufficient stock in their assigned warehouse.");
+        return;
+    }
 
     fetch("/bom/manufacture/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bom_id, qty })
     })
-    .then(resp => resp.json())
-    .then(result => {
-        if (result.status === "success") {
+    .then(async resp => {
+        const result = await resp.json();
+
+        if (resp.ok && result.status === "success") {
             alert(result.message);
             window.location.reload();
-        } else {
-            alert("Error: " + result.message);
+            return;
         }
+
+        if (result.errors && Array.isArray(result.errors) && result.errors.length) {
+            alert(result.errors.join("\n"));
+        } else {
+            alert("Error: " + (result.message || "Manufacture failed."));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Unexpected error during manufacture.");
     });
+});
+
+$("#manuQty").on("input", function () {
+    if (!$("#componentsCard").hasClass("d-none") && $("#finishedSku").val()) {
+        $("#loadComponents").trigger("click");
+    }
 });
 
 </script>
